@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -62,6 +63,7 @@ import io.github.stephenjoy98.heatmap.data.Stats
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.map.HeatRamps
 import io.github.stephenjoy98.heatmap.map.HeatTiles
+import io.github.stephenjoy98.heatmap.map.heatTilePx
 import io.github.stephenjoy98.heatmap.map.OwnTracks
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
@@ -75,6 +77,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val store = remember { PointStore.get(context) }
     val scope = rememberCoroutineScope()
     val dark = isDarkTheme()
+    val tilePx = remember { heatTilePx(context.resources.displayMetrics.density) }
 
     val tracking by Prefs.tracking.collectAsStateWithLifecycle()
     val intervalSec by Prefs.intervalSec.collectAsStateWithLifecycle()
@@ -90,7 +93,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     var centered by rememberSaveable { mutableStateOf(false) }
     val camera = rememberMapCamera()
     val layers = remember(filter, mode, dark) {
-        listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode)))
+        listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
     }
     LaunchedEffect(stats) {
         val latest = stats?.latest
@@ -127,7 +130,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 .padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            StatsBar(stats)
+            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                StatsBar(stats, Modifier.align(Alignment.Center))
+                FilledTonalIconButton(
+                    onClick = { showSettings = true },
+                    modifier = Modifier.align(Alignment.CenterEnd).size(48.dp),
+                ) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
+            }
             Spacer(Modifier.size(8.dp))
             ModeFilterRow(filter)
         }
@@ -145,7 +154,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                         camera.animateTo(latest.lat, latest.lon, 16f)
                     }
                 },
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) { Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position") }
             Spacer(Modifier.size(8.dp))
             ControlPanel(
@@ -159,7 +168,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                         if (missing.isEmpty()) LocationTickerService.start(context) else permissionLauncher.launch(missing)
                     }
                 },
-                onSettings = { showSettings = true },
             )
         }
     }
@@ -180,7 +188,7 @@ private fun ModeFilterRow(filter: Set<TravelMode>) {
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         val chipColors = FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         )
         FilterChip(
             selected = all,
@@ -210,10 +218,11 @@ private fun ModeFilterRow(filter: Set<TravelMode>) {
 }
 
 @Composable
-private fun StatsBar(stats: Stats?) {
+private fun StatsBar(stats: Stats?, modifier: Modifier = Modifier) {
     Surface(
+        modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         tonalElevation = 2.dp,
     ) {
         Row(
@@ -240,12 +249,11 @@ private fun ControlPanel(
     tracking: Boolean,
     intervalSec: Int,
     onToggle: () -> Unit,
-    onSettings: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
     ) {
@@ -281,9 +289,6 @@ private fun ControlPanel(
                     )
                 }
                 Text("Every ${formatInterval(intervalSec)}", style = MaterialTheme.typography.titleLarge)
-            }
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings")
             }
         }
     }

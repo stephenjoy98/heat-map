@@ -9,20 +9,14 @@ import io.github.stephenjoy98.heatmap.cloud.SyncWorker
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
-import org.osmdroid.config.Configuration
-import java.io.File
+import org.maplibre.android.MapLibre
 
 class TickerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
 
-        Configuration.getInstance().apply {
-            load(this@TickerApp, getSharedPreferences("osmdroid", MODE_PRIVATE))
-            userAgentValue = packageName
-            osmdroidBasePath = File(filesDir, "osmdroid")
-            osmdroidTileCache = File(cacheDir, "osmdroid/tiles")
-        }
+        MapLibre.getInstance(this)
 
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(

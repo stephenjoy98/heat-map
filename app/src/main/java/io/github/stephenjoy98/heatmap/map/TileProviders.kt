@@ -12,6 +12,9 @@ import kotlin.math.max
 
 const val TILE_PX = 512
 
+/** Tile size that matches the screen's pixel density (tiles cover ~256 dp), for sharp heat lines. */
+fun heatTilePx(density: Float): Int = (256 * density).toInt().coerceIn(256, 1024)
+
 /** Renders one Web Mercator tile (x, y at zoom), or null if it's empty. Called on background threads. */
 fun interface TileBitmapSource {
     fun render(x: Int, y: Int, zoom: Int): Bitmap?
@@ -22,9 +25,10 @@ class HeatTiles(
     private val source: TrackSource,
     private val ramp: IntArray,
     private val mode: DisplayMode,
+    private val sizePx: Int = TILE_PX,
 ) : TileBitmapSource {
     override fun render(x: Int, y: Int, zoom: Int): Bitmap? = runCatching {
-        HeatRenderer.renderTile(source, TileMath.box(x, y, zoom), TILE_PX, zoom.toDouble(), ramp, mode)
+        HeatRenderer.renderTile(source, TileMath.box(x, y, zoom), sizePx, zoom.toDouble(), ramp, mode)
     }.getOrNull()
 }
 
@@ -72,7 +76,9 @@ class GoogleTileAdapter(private val source: TileBitmapSource) : TileProvider {
         val bitmap = source.render(x, y, zoom) ?: return TileProvider.NO_TILE
         val out = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        val w = bitmap.width
+        val h = bitmap.height
         bitmap.recycle()
-        return Tile(TILE_PX, TILE_PX, out.toByteArray())
+        return Tile(w, h, out.toByteArray())
     }
 }

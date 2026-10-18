@@ -18,9 +18,6 @@ val localProps = Properties().apply {
 }
 val mapsApiKey: String = System.getenv("MAPS_API_KEY")?.takeIf { it.isNotBlank() }
     ?: localProps.getProperty("MAPS_API_KEY", "")
-// Optional: CARTO's free basemaps key, for CARTO's styles instead of tinted OpenStreetMap tiles.
-val cartoApiKey: String = System.getenv("CARTO_API_KEY")?.takeIf { it.isNotBlank() }
-    ?: localProps.getProperty("CARTO_API_KEY", "")
 
 android {
     namespace = "io.github.stephenjoy98.heatmap"
@@ -35,7 +32,6 @@ android {
 
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("boolean", "HAS_MAPS_KEY", (mapsApiKey.isNotEmpty()).toString())
-        buildConfigField("String", "CARTO_API_KEY", "\"$cartoApiKey\"")
     }
 
     signingConfigs {
@@ -97,8 +93,8 @@ dependencies {
     // Location, activity recognition, maps
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.maps.android:maps-compose:6.12.0")
-    // OpenStreetMap, used when the build has no Google Maps key (no setup needed)
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    // Vector OpenStreetMap maps (OpenFreeMap tiles), used when the build has no Google Maps key
+    implementation("org.maplibre.gl:android-sdk:11.13.5")
 
     // Steps
     implementation("androidx.health.connect:connect-client:1.1.0")

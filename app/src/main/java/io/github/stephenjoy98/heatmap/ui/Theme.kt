@@ -19,17 +19,19 @@ val HeatOrange = Color(0xFFFF7A1A)
 val RecordRed = Color(0xFFE53935)
 val FriendBlue = Color(0xFF3D9BFF)
 
-// Strava-like: near-black surfaces with an orange accent.
+// Google-style dark: near-black background, slightly lifted surfaces, orange accent.
 private val darkColors = darkColorScheme(
     primary = HeatOrange,
     onPrimary = Color(0xFF1A0E00),
     secondary = Color(0xFFFFC266),
-    background = Color(0xFF141414),
-    surface = Color(0xFF1E1E1E),
+    background = Color(0xFF121212),
+    surface = Color(0xFF121212),
     surfaceVariant = Color(0xFF2A2A2A),
-    surfaceContainer = Color(0xFF1E1E1E),
-    surfaceContainerLow = Color(0xFF1E1E1E),
-    surfaceContainerHigh = Color(0xFF262626),
+    surfaceContainerLowest = Color(0xFF0E0E0E),
+    surfaceContainerLow = Color(0xFF1A1A1A),
+    surfaceContainer = Color(0xFF1E1F20),
+    surfaceContainerHigh = Color(0xFF282A2C),
+    surfaceContainerHighest = Color(0xFF333537),
 )
 
 // Clean white surfaces with soft greys, in the style of an in-car navigation screen.

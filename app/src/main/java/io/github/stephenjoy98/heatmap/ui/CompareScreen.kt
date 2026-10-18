@@ -56,6 +56,7 @@ import io.github.stephenjoy98.heatmap.map.CellTiles
 import io.github.stephenjoy98.heatmap.map.FriendTracks
 import io.github.stephenjoy98.heatmap.map.HeatRamps
 import io.github.stephenjoy98.heatmap.map.HeatTiles
+import io.github.stephenjoy98.heatmap.map.heatTilePx
 import io.github.stephenjoy98.heatmap.map.OwnTracks
 import io.github.stephenjoy98.heatmap.review.Insights
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +87,7 @@ fun CompareScreen(friend: Friend, onBack: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     val dark = isDarkTheme()
+    val tilePx = remember { heatTilePx(context.resources.displayMetrics.density) }
     var reload by remember { mutableIntStateOf(0) }
     var highlight by remember { mutableStateOf(Highlight.BOTH) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -127,10 +129,10 @@ fun CompareScreen(friend: Friend, onBack: () -> Unit) {
     val all = TravelMode.entries.toSet()
     val sharedColor = if (dark) Color(0xCCFFF3B0) else Color(0xCC7B2CBF)
     val mineHeat = remember(dark) {
-        HeatTiles(OwnTracks(store, all), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, DisplayMode.ROUTES)
+        HeatTiles(OwnTracks(store, all), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, DisplayMode.ROUTES, tilePx)
     }
     val theirHeat = remember(dark, friend.uid, comparison) {
-        HeatTiles(FriendTracks(store, friend.uid, all), if (dark) HeatRamps.darkFriend else HeatRamps.lightFriend, DisplayMode.ROUTES)
+        HeatTiles(FriendTracks(store, friend.uid, all), if (dark) HeatRamps.darkFriend else HeatRamps.lightFriend, DisplayMode.ROUTES, tilePx)
     }
     val layers = remember(highlight, comparison, mineHeat, theirHeat) {
         val faded = if (highlight == Highlight.BOTH) 1f else 0.4f

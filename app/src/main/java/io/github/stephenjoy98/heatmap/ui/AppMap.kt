@@ -1,11 +1,12 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import android.annotation.SuppressLint
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import android.content.Context
+import android.view.Gravity
+import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.widget.FrameLayout
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -13,13 +14,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -42,18 +39,23 @@ import io.github.stephenjoy98.heatmap.BuildConfig
 import io.github.stephenjoy98.heatmap.data.MapProvider
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.map.GoogleTileAdapter
-import io.github.stephenjoy98.heatmap.map.LatestPointOverlay
 import io.github.stephenjoy98.heatmap.map.MapStyles
-import io.github.stephenjoy98.heatmap.map.OsmTileLayer
-import io.github.stephenjoy98.heatmap.map.OsmTiles
 import io.github.stephenjoy98.heatmap.map.TileBitmapSource
 import kotlinx.coroutines.delay
+import io.github.stephenjoy98.heatmap.map.TileOverlayView
+import io.github.stephenjoy98.heatmap.map.VectorMaps
 import kotlinx.coroutines.flow.MutableSharedFlow
-import org.osmdroid.util.BoundingBox
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.CustomZoomButtonsController
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Polyline as OsmPolyline
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
+import org.maplibre.android.geometry.LatLng as MLatLng
 
 /** A tile layer drawn over the base map, independent of which map engine is used. */
 class MapLayer(val id: String, val source: TileBitmapSource, val alpha: Float = 1f, val zIndex: Float = 0f)
@@ -101,7 +103,7 @@ fun AppMap(
     if (useGoogleMaps()) {
         GoogleAppMap(camera, layers, dark, refreshKey, showMyLocation, modifier)
     } else {
-        OsmAppMap(camera, layers, dark, refreshKey, latest, modifier)
+        VectorAppMap(camera, layers, dark, refreshKey, latest, modifier)
     }
 }
 
@@ -162,8 +164,77 @@ private fun GoogleAppMap(
     }
 }
 
+/** Owns a MapLibre MapView, follows the Compose lifecycle, and hands out the map once it's ready. */
+private class VectorMapHolder(context: Context) {
+    val mapView = MapView(context).apply { onCreate(null) }
+    var map: MapLibreMap? = null
+    var styleDark: Boolean? = null
+    private val readyCallbacks = mutableListOf<(MapLibreMap) -> Unit>()
+
+    init {
+        mapView.getMapAsync { m ->
+            map = m
+            m.uiSettings.isRotateGesturesEnabled = false
+            m.uiSettings.isTiltGesturesEnabled = false
+            m.uiSettings.isCompassEnabled = false
+            m.uiSettings.isLogoEnabled = false
+            m.uiSettings.attributionGravity = Gravity.BOTTOM or Gravity.START
+            // Keep the OpenStreetMap credit visible above the recording panel.
+            val dp = context.resources.displayMetrics.density
+            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (112 * dp).toInt())
+            readyCallbacks.forEach { it(m) }
+            readyCallbacks.clear()
+        }
+    }
+
+    fun withMap(block: (MapLibreMap) -> Unit) {
+        map?.let(block) ?: readyCallbacks.add(block)
+    }
+
+    /** Loads the vector style for the theme (recoloured for dark), then calls [onLoaded]. */
+    fun setTheme(dark: Boolean, onLoaded: (Style) -> Unit = {}) = withMap { m ->
+        if (styleDark == dark) return@withMap
+        styleDark = dark
+        m.setStyle(Style.Builder().fromUri(VectorMaps.STYLE_URL)) { style ->
+            if (dark) VectorMaps.applyDark(style)
+            onLoaded(style)
+        }
+    }
+}
+
 @Composable
-private fun OsmAppMap(
+private fun rememberVectorMap(): VectorMapHolder {
+    val context = LocalContext.current
+    val holder = remember { VectorMapHolder(context) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val mapView = holder.mapView
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> mapView.onStart()
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                else -> Unit
+            }
+        }
+        // Adding the observer replays ON_START/ON_RESUME if the screen is already showing.
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.onPause()
+            mapView.onStop()
+            mapView.onDestroy()
+        }
+    }
+    return holder
+}
+
+// Google Maps zoom levels count 256 px tiles; MapLibre counts 512 px tiles, so it's one level lower.
+private fun Float.toVectorZoom(): Double = (this - 1f).toDouble().coerceAtLeast(0.0)
+
+@Composable
+private fun VectorAppMap(
     camera: MapCamera,
     layers: List<MapLayer>,
     dark: Boolean,
@@ -172,101 +243,56 @@ private fun OsmAppMap(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    val density = context.resources.displayMetrics.density
-    val mapView = remember {
-        MapView(context).apply {
-            setMultiTouchControls(true)
-            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            setTilesScaledToDpi(true)
-            setHorizontalMapRepetitionEnabled(false)
-            setVerticalMapRepetitionEnabled(false)
-            val maxLat = MapView.getTileSystem().maxLatitude
-            setScrollableAreaLimitLatitude(maxLat, -maxLat, 0)
-            setMinZoomLevel(2.0)
-            setMaxZoomLevel(20.0)
-            controller.setZoom(camera.initialZoom.toDouble())
-            controller.setCenter(GeoPoint(camera.initialLat, camera.initialLon))
-        }
-    }
-    val tileLayers = remember { LinkedHashMap<String, OsmTileLayer>() }
-    val dot = remember { LatestPointOverlay(density) }
+    val holder = rememberVectorMap()
+    val overlay = remember { TileOverlayView(context) }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                else -> Unit
-            }
+    DisposableEffect(Unit) {
+        holder.withMap { m ->
+            m.moveCamera(
+                org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
+                    MLatLng(camera.initialLat, camera.initialLon), camera.initialZoom.toVectorZoom(),
+                )
+            )
+            overlay.attach(m)
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onDetach()
-        }
+        onDispose { overlay.release() }
     }
 
-    LaunchedEffect(dark) {
-        mapView.setTileSource(OsmTiles.source(dark))
-        mapView.overlayManager.tilesOverlay.setColorFilter(OsmTiles.filter(dark))
-        val background = if (dark) Color(0xFF1B1B1B) else Color(0xFFF5F5F5)
-        mapView.overlayManager.tilesOverlay.setLoadingBackgroundColor(background.toArgb())
-        mapView.overlayManager.tilesOverlay.setLoadingLineColor(background.toArgb())
-    }
+    LaunchedEffect(dark) { holder.setTheme(dark) }
 
-    // Keep osmdroid's overlays in step with [layers], ordered by z-index, with the location dot on top.
     SideEffect {
-        val wanted = layers.associateBy { it.id }
-        tileLayers.keys.filter { it !in wanted }.forEach { id ->
-            tileLayers.remove(id)?.let { mapView.overlays.remove(it); it.onDetach(mapView) }
-        }
-        for (layer in layers) {
-            val existing = tileLayers[layer.id]
-            if (existing == null) {
-                tileLayers[layer.id] = OsmTileLayer(layer.source, layer.alpha)
-            } else {
-                if (existing.source !== layer.source) existing.source = layer.source
-                existing.setAlpha(layer.alpha)
-            }
-        }
-        mapView.overlays.removeAll { it is OsmTileLayer || it is LatestPointOverlay }
-        layers.sortedBy { it.zIndex }.forEach { mapView.overlays.add(tileLayers.getValue(it.id)) }
-        dot.point = latest?.let { GeoPoint(it.latitude, it.longitude) }
-        mapView.overlays.add(dot)
-        mapView.invalidate()
+        overlay.setLayers(layers.map { TileOverlayView.LayerSpec(it.id, it.source, it.alpha, it.zIndex) })
+        overlay.latest = latest?.let { MLatLng(it.latitude, it.longitude) }
     }
 
     LaunchedEffect(refreshKey) {
         delay(1500)
-        tileLayers.values.forEach { it.refresh() }
-        mapView.invalidate()
+        overlay.refresh()
     }
 
     LaunchedEffect(camera) {
         camera.commands.collect { c ->
-            if (c.animate) {
-                mapView.controller.animateTo(GeoPoint(c.lat, c.lon), c.zoom.toDouble(), 600L)
-            } else {
-                mapView.controller.setZoom(c.zoom.toDouble())
-                mapView.controller.setCenter(GeoPoint(c.lat, c.lon))
+            holder.withMap { m ->
+                val update = org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(MLatLng(c.lat, c.lon), c.zoom.toVectorZoom())
+                if (c.animate) m.animateCamera(update, 600) else m.moveCamera(update)
             }
         }
     }
 
-    Box(modifier) {
-        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-        Text(
-            OsmTiles.attribution,
-            fontSize = 9.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-            modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
-        )
-    }
+    AndroidView(
+        modifier = modifier,
+        factory = {
+            FrameLayout(it).apply {
+                (holder.mapView.parent as? ViewGroup)?.removeView(holder.mapView)
+                (overlay.parent as? ViewGroup)?.removeView(overlay)
+                addView(holder.mapView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+                addView(overlay, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+            }
+        },
+    )
 }
 
 /** A small, non-interactive map showing one trip. */
-@SuppressLint("ClickableViewAccessibility")
 @Composable
 fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
     val dark = isDarkTheme()
@@ -285,28 +311,40 @@ fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
             Polyline(points = path, color = lineColor, width = 10f)
         }
     } else {
-        val context = LocalContext.current
-        val points = remember(path) { path.map { GeoPoint(it.latitude, it.longitude) } }
+        val holder = rememberVectorMap()
+        LaunchedEffect(path, dark) {
+            holder.styleDark = null // Reload so the trip line is added to the fresh style.
+            holder.setTheme(dark) { style ->
+                val line = LineString.fromLngLats(path.map { Point.fromLngLat(it.longitude, it.latitude) })
+                style.addSource(GeoJsonSource("trip", Feature.fromGeometry(line)))
+                style.addLayer(
+                    LineLayer("trip-line", "trip").withProperties(
+                        PropertyFactory.lineColor(lineColor.toArgb()),
+                        PropertyFactory.lineWidth(4f),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                    )
+                )
+                holder.withMap { m ->
+                    m.uiSettings.setAllGesturesEnabled(false)
+                    m.uiSettings.isAttributionEnabled = false
+                    if (path.size >= 2) {
+                        val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
+                            .includes(path.map { MLatLng(it.latitude, it.longitude) })
+                            .build()
+                        holder.mapView.post {
+                            runCatching { m.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds, 48)) }
+                        }
+                    }
+                }
+            }
+        }
         AndroidView(
             modifier = modifier,
             factory = {
-                MapView(context).apply {
-                    setTileSource(OsmTiles.source(dark))
-                    overlayManager.tilesOverlay.setColorFilter(OsmTiles.filter(dark))
-                    zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-                    setTilesScaledToDpi(true)
-                    setOnTouchListener { _, _ -> true } // A preview; the trip is explored on the main map.
-                    overlays.add(OsmPolyline(this).apply {
-                        setPoints(points)
-                        outlinePaint.color = lineColor.toArgb()
-                        outlinePaint.strokeWidth = 4 * context.resources.displayMetrics.density
-                    })
-                    addOnFirstLayoutListener { _, _, _, _, _ ->
-                        if (points.size >= 2) zoomToBoundingBox(BoundingBox.fromGeoPoints(points), false, 48)
-                    }
-                }
+                (holder.mapView.parent as? ViewGroup)?.removeView(holder.mapView)
+                holder.mapView
             },
-            onRelease = { it.onDetach() },
         )
     }
 }

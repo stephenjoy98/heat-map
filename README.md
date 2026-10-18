@@ -15,16 +15,12 @@ up to your Google account, and lets you compare explored areas with friends.
   in Settings; otherwise the orange heat palette). The heat colours themselves never change.
 
 ### Map
-- **Works with no setup**: when the build has no Google Maps API key it uses **OpenStreetMap**'s
-  standard tiles, which need no key, so there's nothing for users to configure. With a key, Google
-  Maps is used, and Settings lets you switch between the two.
-- Two looks either way: a **dark** near-black canvas like Strava's heatmap and a clean **light**
-  white map in the spirit of Tesla's in-car map. On OpenStreetMap these are made by recolouring the
-  standard tiles on the phone; on Google Maps they're custom map styles. Choose Dark, Light or System;
-  the whole app follows.
-- Optional: a free [CARTO basemaps key](https://carto.com/basemaps/apikey/) in the `CARTO_API_KEY`
-  secret switches OpenStreetMap to CARTO's Dark Matter and Positron styles. (CARTO started requiring
-  a key in 2026; without one its tiles show an "API key required" watermark.)
+- **Works with no setup**: without a Google Maps API key the app uses sharp **vector maps** from
+  [OpenFreeMap](https://openfreemap.org/) (OpenStreetMap data, no key, no limits), drawn by MapLibre
+  at your screen's full resolution. With a key, Google Maps is used, and Settings lets you switch.
+- Two looks either way: a **dark** map in the near-black greys of Google's dark theme, so routes glow
+  like Strava's heatmap, and a clean **light** white map in the spirit of Tesla's in-car map. Choose
+  Dark, Light or System; the whole app follows.
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
   up. On the dark map roads used once are dark red and your most travelled ones burn orange, yellow and
   white. The light map uses light orange through deep crimson.
@@ -81,7 +77,7 @@ steps, on-device AI and statistics. Sign-in, backup, friends and cloud AI need F
 ## Setup
 
 ### 1. Google Maps API key (optional)
-OpenStreetMap is used without one. To use Google Maps instead:
+Vector OpenStreetMap maps are used without one. To use Google Maps instead:
 1. In [Google Cloud console](https://console.cloud.google.com/), create a project (or reuse your
    Firebase one), enable **Maps SDK for Android**, and create an API key.
 2. Restrict it to Android apps with package `io.github.stephenjoy98.heatmap` and the SHA-1 below.
@@ -131,8 +127,8 @@ Requires JDK 17 and the Android SDK (API 36).
 | Trip splitting and travel-mode decisions | `tracking/TripDetector.kt` |
 | Storage (SQLite: points, trips, places cache, friends' routes) | `data/PointStore.kt` |
 | Heatmap rendering and map tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |
-| Map engines (Google Maps or OpenStreetMap) behind one composable | `ui/AppMap.kt`, `map/OsmSupport.kt` |
-| Map styles (dark / light) | `map/MapStyles.kt`, `map/OsmSupport.kt` |
+| Map engines (Google Maps or MapLibre vector maps) behind one composable | `ui/AppMap.kt`, `map/VectorMapSupport.kt` |
+| Map styles (dark / light) | `map/MapStyles.kt`, `map/VectorMapSupport.kt` |
 | Review stats, steps, insights (Nano / cloud / statistics) | `review/` |
 | Sign-in, backup, friends, daily sync | `cloud/` |
 | UI (Jetpack Compose) | `ui/` |
