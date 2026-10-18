@@ -245,7 +245,7 @@ class TileOverlayView(context: Context) : View(context) {
             out.set(tl.x, tl.y, br.x, br.y)
         }
         for ((_, renderer) in renderers.values.sortedBy { it.first }) {
-            renderer.draw(canvas, zoom, bounds.latNorth, bounds.latSouth, bounds.lonEast, bounds.lonWest, place)
+            renderer.draw(canvas, zoom, bounds.latitudeNorth, bounds.latitudeSouth, bounds.longitudeEast, bounds.longitudeWest, place)
         }
         latest?.let {
             val p = projection.toScreenLocation(it)
