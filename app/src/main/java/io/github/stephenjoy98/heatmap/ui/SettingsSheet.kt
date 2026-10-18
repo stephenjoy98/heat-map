@@ -51,6 +51,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.stephenjoy98.heatmap.data.DisplayMode
+import io.github.stephenjoy98.heatmap.data.MapTheme
+import io.github.stephenjoy98.heatmap.review.HealthSteps
+import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
+import androidx.health.connect.client.PermissionController
+import androidx.compose.runtime.produceState
 import io.github.stephenjoy98.heatmap.data.GpxExporter
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
@@ -80,7 +85,11 @@ fun SettingsSheet(
     val intervalSec by Prefs.intervalSec.collectAsStateWithLifecycle()
     val highAccuracy by Prefs.highAccuracy.collectAsStateWithLifecycle()
     val mode by Prefs.displayMode.collectAsStateWithLifecycle()
+    val mapTheme by Prefs.mapTheme.collectAsStateWithLifecycle()
+    val aiEngine by Prefs.aiEngine.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
+    var showAiChoice by remember { mutableStateOf(false) }
+    var healthTick by remember { mutableIntStateOf(0) }
 
     // A running recorder picks up new settings when it is (re)started.
     fun applyToService() {
@@ -110,6 +119,19 @@ fun SettingsSheet(
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* State is re-read below on the next recomposition. */ }
+
+    val activityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted && tracking) LocationTickerService.start(context) }
+
+    val healthLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { healthTick++ }
+    val healthAvailability = remember { HealthSteps.availability(context) }
+    val healthGranted by produceState(false, resumeTick, healthTick) {
+        value = runCatching { HealthSteps.hasPermission(context) }.getOrDefault(false)
+    }
+    val hasActivity = remember(resumeTick) { ActivityTracker.hasPermission(context) }
 
     // Re-checked whenever the app resumes, e.g. after returning from system settings.
     val hasBackground = remember(resumeTick) { LocationTickerService.hasBackgroundPermission(context) }
@@ -150,6 +172,14 @@ fun SettingsSheet(
 
             Divider()
             SectionTitle("Map")
+            Text("Theme", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(MapTheme.DARK to "Dark", MapTheme.LIGHT to "Light", MapTheme.SYSTEM to "Match system").forEach { (t, label) ->
+                    FilterChip(selected = mapTheme == t, onClick = { Prefs.setMapTheme(t) }, label = { Text(label) })
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Show", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = mode == DisplayMode.ROUTES,
@@ -161,6 +191,46 @@ fun SettingsSheet(
                     onClick = { Prefs.setDisplayMode(DisplayMode.POINTS) },
                     label = { Text("Points") },
                 )
+            }
+
+            Divider()
+            SectionTitle("Insights and activity")
+            SettingRow(title = "Review insights", subtitle = engineLabel(aiEngine)) {
+                OutlinedButton(onClick = { showAiChoice = true }) { Text("Change") }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                SettingRow(
+                    title = "Detect how you travel",
+                    subtitle = if (hasActivity) "Using motion sensors to tell walking, cycling and vehicles apart"
+                    else "Allow physical activity access for better walking, cycling and vehicle detection",
+                ) {
+                    if (!hasActivity) {
+                        OutlinedButton(onClick = { activityLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) }) { Text("Allow") }
+                    }
+                }
+            }
+            SettingRow(
+                title = "Steps from Health Connect",
+                subtitle = when {
+                    healthAvailability == HealthSteps.Availability.UNSUPPORTED -> "Health Connect isn't available on this phone"
+                    healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> "Install or update Health Connect to show steps"
+                    healthGranted -> "Connected"
+                    else -> "Show your daily steps on the Review tab"
+                },
+            ) {
+                when {
+                    healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> OutlinedButton(onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    }) { Text("Get") }
+                    healthAvailability == HealthSteps.Availability.AVAILABLE && !healthGranted ->
+                        OutlinedButton(onClick = { healthLauncher.launch(HealthSteps.permissions) }) { Text("Connect") }
+                    else -> Unit
+                }
             }
 
             if (!hasBackground || !ignoresBattery) {
@@ -208,6 +278,10 @@ fun SettingsSheet(
                 }
             }
         }
+    }
+
+    if (showAiChoice) {
+        AiChoiceDialog(onDismiss = { showAiChoice = false })
     }
 
     if (confirmClear) {

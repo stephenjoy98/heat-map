@@ -7,102 +7,95 @@ import android.graphics.Paint
 import android.graphics.Path
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.GeoBox
-import io.github.stephenjoy98.heatmap.data.PointStore
-import io.github.stephenjoy98.heatmap.data.TrackRules
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
+import io.github.stephenjoy98.heatmap.data.GridData
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
+import kotlin.math.sinh
 import kotlin.math.tan
 
+/** Anything the heatmap can draw: continuous routes, optionally summarised as a density grid. */
+interface TrackSource {
+    /** Number of points in [box]; above [HeatRenderer.ROUTE_POINT_LIMIT] the grid is used instead. */
+    fun count(box: GeoBox): Int
+
+    /** Calls [block] once per continuous route overlapping [box], with points [from, to) of the arrays. */
+    fun forEachTrack(box: GeoBox, block: (lat: DoubleArray, lon: DoubleArray, from: Int, to: Int) -> Unit)
+
+    /** Points per cell, or null if this source can't aggregate. */
+    fun grid(box: GeoBox, cellLat: Double, cellLon: Double): GridData?
+}
+
 /**
- * Renders recorded points as a Strava-style heatmap.
+ * Renders routes as a Strava-style heatmap tile.
  *
  * Every route is stroked onto an offscreen buffer with a low, fixed alpha. Overlapping routes stack up
  * (1 - (1 - a)^n), so the buffer's alpha channel ends up as a "how often have I been here" density.
- * That density is then mapped through a colour ramp: dark red for roads used once, through orange
- * and yellow, to white for the routes travelled the most.
+ * That density is then mapped through a colour ramp, from the colour of a road used once to the colour
+ * of the routes travelled the most.
  */
 object HeatRenderer {
-    /** Above this many points in view, draw a density grid instead of individual routes. */
-    private const val ROUTE_POINT_LIMIT = 400_000
+    /** Above this many points in a tile, draw a density grid instead of individual routes. */
+    const val ROUTE_POINT_LIMIT = 300_000
 
-    /** Cap on rendered pixels; the bitmap is scaled up to the screen, which also softens the glow. */
-    private const val PIXEL_BUDGET = 1_600_000
+    /** Alpha a single pass adds; about 20 overlapping visits saturate the ramp. */
+    const val PASS_ALPHA = 0.12f
 
-    /** Alpha a single pass adds; about 20 overlapping visits saturate to white. */
-    private const val PASS_ALPHA = 0.12f
+    /**
+     * Renders the [box] area into a [size]×[size] bitmap, or returns null if nothing is there.
+     * [isCancelled] is polled so abandoned tiles stop early.
+     */
+    fun renderTile(
+        source: TrackSource,
+        box: GeoBox,
+        size: Int,
+        zoom: Double,
+        ramp: IntArray,
+        mode: DisplayMode,
+        isCancelled: () -> Boolean = { false },
+    ): Bitmap? {
+        val px = Projector(box, size, size)
+        // Tiles are 256 "dp" wide in map units.
+        val pxPerDp = size / 256f
+        val strokeDp = (0.8 + (zoom - 12) * 0.5).coerceIn(1.0, 4.0)
+        val stroke = (strokeDp * pxPerDp).toFloat()
 
-    class Request(
-        val view: GeoBox,
-        val widthPx: Int,
-        val heightPx: Int,
-        val zoom: Double,
-        val density: Float,
-        val mode: DisplayMode,
-    )
-
-    /** A rendered bitmap covering [box]. */
-    class Result(val bitmap: Bitmap, val box: GeoBox)
-
-    private val ramp: IntArray = buildRamp()
-
-    suspend fun render(store: PointStore, req: Request): Result? {
-        if (req.widthPx <= 0 || req.heightPx <= 0) return null
-
-        // Render a margin around the view so short pans don't reveal empty edges before the next render.
-        val viewTop = mercY(req.view.north)
-        val viewBottom = mercY(req.view.south)
-        val viewSpanY = viewTop - viewBottom
-        val viewSpanX = req.view.east - req.view.west
-        if (viewSpanY <= 0 || viewSpanX <= 0) return null
-
-        val top = min(viewTop + viewSpanY * MARGIN, MAX_MERC_Y)
-        val bottom = max(viewBottom - viewSpanY * MARGIN, -MAX_MERC_Y)
-        val west = max(req.view.west - viewSpanX * MARGIN, -180.0)
-        val east = min(req.view.east + viewSpanX * MARGIN, 180.0)
-        val box = GeoBox(north = latFromMercY(top), south = latFromMercY(bottom), east = east, west = west)
-
-        val fullW = req.widthPx * (east - west) / viewSpanX
-        val fullH = req.heightPx * (top - bottom) / viewSpanY
-        val scale = min(1.0, sqrt(PIXEL_BUDGET / (fullW * fullH)))
-        val w = (fullW * scale).roundToInt().coerceAtLeast(1)
-        val h = (fullH * scale).roundToInt().coerceAtLeast(1)
-
-        val px = Projector(box, top, bottom, w, h)
-        val strokeDp = (0.8 + (req.zoom - 12) * 0.5).coerceIn(1.0, 4.0)
-        val stroke = (strokeDp * req.density * scale).toFloat().coerceAtLeast(1f)
-
-        val buffer = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(buffer)
-
-        // Query a little beyond the bitmap so routes leaving its edge are still drawn up to the edge.
+        // Include routes that pass through the tile even when their fixes are outside it.
+        val latPad = max((box.north - box.south) * 0.5, 0.02)
+        val lonPad = max((box.east - box.west) * 0.5, 0.02)
         val query = GeoBox(
-            north = min(box.north + (box.north - box.south) * 0.1, 90.0),
-            south = max(box.south - (box.north - box.south) * 0.1, -90.0),
-            east = box.east + (box.east - box.west) * 0.1,
-            west = box.west - (box.east - box.west) * 0.1,
+            north = min(box.north + latPad, 90.0),
+            south = max(box.south - latPad, -90.0),
+            east = box.east + lonPad,
+            west = box.west - lonPad,
         )
-        val count = store.countIn(query)
-        if (req.mode == DisplayMode.ROUTES && count <= ROUTE_POINT_LIMIT) {
-            drawRoutes(store, query, px, canvas, stroke)
-        } else {
-            drawGrid(store, query, px, canvas, stroke, w, h)
-        }
-        currentCoroutineContext().ensureActive()
 
-        colorize(buffer)
-        return Result(buffer, box)
+        val buffer = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(buffer)
+        val count = source.count(query)
+        val useGrid = mode == DisplayMode.POINTS || count > ROUTE_POINT_LIMIT
+        val drew = if (useGrid) {
+            val grid = source.grid(query, (box.north - box.south) / size * 1.5, (box.east - box.west) / size * 1.5)
+            if (grid != null) drawGrid(grid, query, (box.north - box.south) / size * 1.5, (box.east - box.west) / size * 1.5, px, canvas, stroke)
+            else drawRoutes(source, query, px, canvas, stroke, isCancelled)
+        } else {
+            drawRoutes(source, query, px, canvas, stroke, isCancelled)
+        }
+        if (!drew || isCancelled()) {
+            buffer.recycle()
+            return null
+        }
+        colorize(buffer, ramp)
+        return buffer
     }
 
-    private suspend fun drawRoutes(store: PointStore, query: GeoBox, px: Projector, canvas: Canvas, stroke: Float) {
-        val tracks = store.tracksIn(query)
-        currentCoroutineContext().ensureActive()
-
+    private fun drawRoutes(
+        source: TrackSource, query: GeoBox, px: Projector, canvas: Canvas, stroke: Float, isCancelled: () -> Boolean,
+    ): Boolean {
         val alpha = (PASS_ALPHA * 255).roundToInt()
         val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -120,28 +113,22 @@ object HeatRenderer {
         // Each continuous route is one Path, so a route only counts once where it overlaps itself;
         // only separate trips add up.
         val path = Path()
-        var start = 0
-        for (i in 1..tracks.size) {
-            val endsHere = i == tracks.size || TrackRules.isBreak(
-                tracks.time[i - 1], tracks.lat[i - 1], tracks.lon[i - 1],
-                tracks.time[i], tracks.lat[i], tracks.lon[i],
-                tracks.intervalMs[i],
-            )
-            if (!endsHere) continue
-
-            if (i - start == 1) {
+        var drew = false
+        var tracks = 0
+        source.forEachTrack(query) { lat, lon, from, to ->
+            if (to - from == 1) {
                 // A lone fix (e.g. hourly sampling): show it as a dot.
-                canvas.drawCircle(px.x(tracks.lon[start]), px.y(tracks.lat[start]), stroke * 1.2f, dot)
+                canvas.drawCircle(px.x(lon[from]), px.y(lat[from]), stroke * 1.2f, dot)
             } else {
                 path.rewind()
-                var lastX = px.x(tracks.lon[start])
-                var lastY = px.y(tracks.lat[start])
+                var lastX = px.x(lon[from])
+                var lastY = px.y(lat[from])
                 path.moveTo(lastX, lastY)
-                for (j in start + 1 until i) {
-                    val x = px.x(tracks.lon[j])
-                    val y = px.y(tracks.lat[j])
+                for (j in from + 1 until to) {
+                    val x = px.x(lon[j])
+                    val y = px.y(lat[j])
                     // Skip sub-pixel steps; standing still for an hour shouldn't cost thousands of segments.
-                    if (kotlin.math.abs(x - lastX) + kotlin.math.abs(y - lastY) < 0.75f) continue
+                    if (abs(x - lastX) + abs(y - lastY) < 0.75f) continue
                     path.lineTo(x, y)
                     lastX = x
                     lastY = y
@@ -149,20 +136,15 @@ object HeatRenderer {
                 canvas.drawPath(path, glow)
                 canvas.drawPath(path, core)
             }
-            start = i
-            if (i % 2048 == 0) currentCoroutineContext().ensureActive()
+            drew = true
+            if (++tracks % 256 == 0 && isCancelled()) return@forEachTrack
         }
+        return drew
     }
 
-    private suspend fun drawGrid(
-        store: PointStore, query: GeoBox, px: Projector, canvas: Canvas, stroke: Float, w: Int, h: Int,
-    ) {
-        // Roughly one cell per 1.5 output pixels.
-        val cellLon = (px.box.east - px.box.west) / w * 1.5
-        val cellLat = (px.box.north - px.box.south) / h * 1.5
-        val grid = store.gridIn(query, cellLat, cellLon)
-        currentCoroutineContext().ensureActive()
-
+    private fun drawGrid(
+        grid: GridData, query: GeoBox, cellLat: Double, cellLon: Double, px: Projector, canvas: Canvas, stroke: Float,
+    ): Boolean {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val radius = max(stroke * 1.2f, 1f)
         for (i in 0 until grid.size) {
@@ -173,10 +155,11 @@ object HeatRenderer {
             paint.color = Color.argb((weight * 255).roundToInt(), 255, 255, 255)
             canvas.drawCircle(px.x(lon), px.y(lat), radius, paint)
         }
+        return grid.size > 0
     }
 
     /** Replaces the white density buffer with ramp colours, in place. */
-    private fun colorize(bitmap: Bitmap) {
+    private fun colorize(bitmap: Bitmap, ramp: IntArray) {
         val w = bitmap.width
         val h = bitmap.height
         val row = IntArray(w)
@@ -187,27 +170,70 @@ object HeatRenderer {
         }
     }
 
-    private fun buildRamp(): IntArray {
-        // (density, r, g, b)
-        val stops = arrayOf(
-            floatArrayOf(0.00f, 90f, 10f, 40f),
-            floatArrayOf(PASS_ALPHA, 150f, 22f, 48f),
-            floatArrayOf(0.35f, 225f, 62f, 22f),
-            floatArrayOf(0.60f, 255f, 140f, 0f),
-            floatArrayOf(0.82f, 255f, 212f, 90f),
-            floatArrayOf(1.00f, 255f, 255f, 238f),
-        )
-        return IntArray(256) { a -> if (a == 0) Color.TRANSPARENT else rampColor(a / 255f, stops) }
+    /** Maps lat/lon to bitmap pixels; linear in Web Mercator, matching the map tiles. */
+    private class Projector(box: GeoBox, w: Int, h: Int) {
+        private val west = box.west
+        private val top = TileMath.mercY(box.north)
+        private val sx = w / (box.east - box.west)
+        private val sy = h / (top - TileMath.mercY(box.south))
+        fun x(lon: Double) = ((lon - west) * sx).toFloat()
+        fun y(lat: Double) = ((top - TileMath.mercY(lat)) * sy).toFloat()
     }
+}
 
-    private fun rampColor(t: Float, stops: Array<FloatArray>): Int {
+/** Colour ramps from "travelled once" to "travelled the most". */
+object HeatRamps {
+    /** Strava-like: dark red, orange, yellow, white. For the dark map. */
+    val darkHeat = build(
+        floatArrayOf(0.00f, 90f, 10f, 40f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 150f, 22f, 48f),
+        floatArrayOf(0.35f, 225f, 62f, 22f),
+        floatArrayOf(0.60f, 255f, 140f, 0f),
+        floatArrayOf(0.82f, 255f, 212f, 90f),
+        floatArrayOf(1.00f, 255f, 255f, 238f),
+    )
+
+    /** Light orange to deep crimson, which reads well on the white map. */
+    val lightHeat = build(
+        floatArrayOf(0.00f, 255f, 180f, 120f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 255f, 140f, 60f),
+        floatArrayOf(0.35f, 245f, 90f, 20f),
+        floatArrayOf(0.60f, 215f, 40f, 30f),
+        floatArrayOf(0.82f, 160f, 0f, 50f),
+        floatArrayOf(1.00f, 90f, 0f, 70f),
+    )
+
+    /** Friends are drawn in blues so they stand apart from your own heat. */
+    val darkFriend = build(
+        floatArrayOf(0.00f, 20f, 40f, 110f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 30f, 80f, 200f),
+        floatArrayOf(0.35f, 40f, 150f, 255f),
+        floatArrayOf(0.60f, 90f, 210f, 255f),
+        floatArrayOf(0.82f, 170f, 240f, 255f),
+        floatArrayOf(1.00f, 240f, 255f, 255f),
+    )
+
+    val lightFriend = build(
+        floatArrayOf(0.00f, 150f, 190f, 255f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 100f, 150f, 255f),
+        floatArrayOf(0.35f, 40f, 100f, 240f),
+        floatArrayOf(0.60f, 20f, 60f, 200f),
+        floatArrayOf(0.82f, 10f, 30f, 150f),
+        floatArrayOf(1.00f, 20f, 10f, 90f),
+    )
+
+    /** Each stop is (density, r, g, b). */
+    private fun build(vararg stops: FloatArray): IntArray =
+        IntArray(256) { a -> if (a == 0) Color.TRANSPARENT else color(a / 255f, stops) }
+
+    private fun color(t: Float, stops: Array<out FloatArray>): Int {
         var k = 1
         while (k < stops.size - 1 && t > stops[k][0]) k++
         val lo = stops[k - 1]
         val hi = stops[k]
         val f = ((t - lo[0]) / (hi[0] - lo[0])).coerceIn(0f, 1f)
         // Fade in up to one full pass so antialiased edges stay smooth.
-        val opacity = min(1f, t / PASS_ALPHA)
+        val opacity = min(1f, t / HeatRenderer.PASS_ALPHA)
         return Color.argb(
             (opacity * 255).roundToInt(),
             (lo[1] + (hi[1] - lo[1]) * f).roundToInt(),
@@ -215,23 +241,24 @@ object HeatRenderer {
             (lo[3] + (hi[3] - lo[3]) * f).roundToInt(),
         )
     }
+}
 
-    /** Maps lat/lon to bitmap pixels; linear in Web Mercator, matching the map tiles. */
-    private class Projector(val box: GeoBox, val top: Double, bottom: Double, w: Int, h: Int) {
-        private val sx = w / (box.east - box.west)
-        private val sy = h / (top - bottom)
-        fun x(lon: Double) = ((lon - box.west) * sx).toFloat()
-        fun y(lat: Double) = ((top - mercY(lat)) * sy).toFloat()
+/** Web Mercator helpers for map tiles. */
+object TileMath {
+    fun box(x: Int, y: Int, zoom: Int): GeoBox {
+        val n = (1 shl zoom).toDouble()
+        return GeoBox(
+            north = lat(y / n),
+            south = lat((y + 1) / n),
+            west = x / n * 360.0 - 180.0,
+            east = (x + 1) / n * 360.0 - 180.0,
+        )
     }
 
-    private const val MARGIN = 0.25
-    private val MAX_MERC_Y = mercY(85.05)
+    private fun lat(fraction: Double): Double = atan(sinh(PI * (1 - 2 * fraction))) * 180 / PI
 
-    private fun mercY(lat: Double): Double {
+    fun mercY(lat: Double): Double {
         val clamped = lat.coerceIn(-85.05, 85.05)
         return ln(tan(PI / 4 + clamped * PI / 360)) * 180 / PI
     }
-
-    private fun latFromMercY(y: Double): Double =
-        (2 * kotlin.math.atan(kotlin.math.exp(y * PI / 180)) - PI / 2) * 180 / PI
 }

@@ -48,6 +48,7 @@ class LocationTickerService : Service() {
     private var intervalMs = 60_000L
     private var maxAccuracyM = 100f
     private var lastSavedAt = 0L
+    private var lastDetectedAt = 0L
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -88,12 +89,16 @@ class LocationTickerService : Service() {
         }
 
         Prefs.setTracking(true)
+        ActivityTracker.start(this)
         requestUpdates()
         return START_STICKY
     }
 
     override fun onDestroy() {
         fused.removeLocationUpdates(callback)
+        ActivityTracker.stop(this)
+        val app = applicationContext
+        handler.post { TripDetector.process(app) }
         worker.quitSafely()
         super.onDestroy()
     }
@@ -129,9 +134,16 @@ class LocationTickerService : Service() {
                 lon = location.longitude,
                 accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
                 intervalMs = intervalMs.toInt(),
+                activity = ActivityTracker.current,
             )
         )
         lastSavedAt = location.time
+
+        // Look for finished trips every couple of minutes rather than on every fix.
+        if (location.time - lastDetectedAt > 2 * 60_000L) {
+            lastDetectedAt = location.time
+            TripDetector.process(this)
+        }
 
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, buildNotification(location))

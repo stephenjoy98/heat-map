@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Security rules for Location Ticker. Paste into Firebase console > Firestore > Rules,
+// or deploy with: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isFriendOf(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid));
+    }
+
+    // Friend code -> uid. Anyone signed in may look up a code they were given; only the owner claims it.
+    match /friendCodes/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      // Profile and stats: you, and people on your friends list.
+      allow read: if signedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      allow write: if signedIn() && request.auth.uid == uid;
+
+      match /friends/{friendUid} {
+        allow read, update: if signedIn() && request.auth.uid == uid;
+        // You can add anyone to your own list; someone can add themselves to yours only with your code.
+        allow create: if signedIn() && (
+          request.auth.uid == uid ||
+          (request.auth.uid == friendUid &&
+           request.resource.data.code == get(/databases/$(database)/documents/users/$(uid)).data.friendCode));
+        allow delete: if signedIn() && (request.auth.uid == uid || request.auth.uid == friendUid);
+      }
+
+      // Shared routes (no timestamps): you and your friends.
+      match /routes/{routeId} {
+        allow read: if signedIn() && (request.auth.uid == uid || isFriendOf(uid));
+        allow write: if signedIn() && request.auth.uid == uid;
+      }
+
+      // Full backup with timestamps: only you.
+      match /backup/{doc} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+  }
+}

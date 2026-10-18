@@ -21,10 +21,12 @@ object TrackRules {
         intervalMs: Int,
     ): Boolean {
         val gap = time - prevTime
-        val maxGap = (intervalMs * 3L).coerceAtLeast(MIN_GAP_MS).coerceAtMost(MAX_GAP_MS)
-        if (gap <= 0 || gap > maxGap) return true
+        if (gap <= 0 || gap > maxGapMs(intervalMs)) return true
         return distanceMeters(prevLat, prevLon, lat, lon) / (gap / 1000.0) > MAX_SPEED_MPS
     }
+
+    /** The longest gap between two fixes that still counts as one continuous route. */
+    fun maxGapMs(intervalMs: Int): Long = (intervalMs * 3L).coerceAtLeast(MIN_GAP_MS).coerceAtMost(MAX_GAP_MS)
 
     /** Equirectangular approximation; plenty accurate over the short hops between fixes. */
     fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

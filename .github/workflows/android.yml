@@ -2,7 +2,6 @@ name: Android build
 
 on:
   push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -18,7 +17,21 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Optional: without these secrets the app still builds, minus the map tiles and Firebase features.
+      - name: Add Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+            echo "Firebase config added"
+          else
+            echo "No GOOGLE_SERVICES_JSON secret; building without Firebase"
+          fi
+
       - name: Build APKs
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew --no-daemon assembleDebug assembleRelease
 
       - uses: actions/upload-artifact@v4
