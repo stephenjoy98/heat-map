@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -31,8 +33,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -44,24 +46,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.TileOverlay
-import com.google.maps.android.compose.rememberCameraPositionState
 import io.github.stephenjoy98.heatmap.cloud.Friend
 import io.github.stephenjoy98.heatmap.cloud.Friends
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
-import io.github.stephenjoy98.heatmap.map.CellTileProvider
+import io.github.stephenjoy98.heatmap.map.CellTiles
 import io.github.stephenjoy98.heatmap.map.FriendTracks
 import io.github.stephenjoy98.heatmap.map.HeatRamps
-import io.github.stephenjoy98.heatmap.map.HeatTileProvider
-import io.github.stephenjoy98.heatmap.map.MapStyles
+import io.github.stephenjoy98.heatmap.map.HeatTiles
 import io.github.stephenjoy98.heatmap.map.OwnTracks
 import io.github.stephenjoy98.heatmap.review.Insights
 import kotlinx.coroutines.Dispatchers
@@ -85,6 +79,7 @@ private class Comparison(
     val center: LatLng?,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompareScreen(friend: Friend, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
@@ -119,51 +114,55 @@ fun CompareScreen(friend: Friend, onBack: () -> Unit) {
         }
     }
 
-    val camera = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(LatLng(20.0, 0.0), 2f) }
+    val camera = rememberMapCamera()
     var centered by remember { mutableStateOf(false) }
-    comparison?.center?.let {
-        if (!centered) {
-            camera.position = CameraPosition.fromLatLngZoom(it, 12f)
+    LaunchedEffect(comparison) {
+        val center = comparison?.center
+        if (!centered && center != null) {
+            camera.moveTo(center.latitude, center.longitude, 12f)
             centered = true
         }
     }
 
     val all = TravelMode.entries.toSet()
-    val mineHeat = remember(dark) { HeatTileProvider(OwnTracks(store, all), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, DisplayMode.ROUTES) }
-    val theirHeat = remember(dark, friend.uid, comparison) {
-        HeatTileProvider(FriendTracks(store, friend.uid, all), if (dark) HeatRamps.darkFriend else HeatRamps.lightFriend, DisplayMode.ROUTES)
-    }
     val sharedColor = if (dark) Color(0xCCFFF3B0) else Color(0xCC7B2CBF)
-    val cellLayer = remember(highlight, comparison, dark) {
-        val c = comparison ?: return@remember null
-        when (highlight) {
-            Highlight.BOTH -> null
-            Highlight.SHARED -> CellTileProvider(c.shared, sharedColor.toArgb())
-            Highlight.NEW_TO_ME -> CellTileProvider(c.onlyTheirs, FriendBlue.copy(alpha = 0.75f).toArgb())
-            Highlight.NEW_TO_THEM -> CellTileProvider(c.onlyMine, HeatOrange.copy(alpha = 0.75f).toArgb())
+    val mineHeat = remember(dark) {
+        HeatTiles(OwnTracks(store, all), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, DisplayMode.ROUTES)
+    }
+    val theirHeat = remember(dark, friend.uid, comparison) {
+        HeatTiles(FriendTracks(store, friend.uid, all), if (dark) HeatRamps.darkFriend else HeatRamps.lightFriend, DisplayMode.ROUTES)
+    }
+    val layers = remember(highlight, comparison, mineHeat, theirHeat) {
+        val faded = if (highlight == Highlight.BOTH) 1f else 0.4f
+        val c = comparison
+        val cells = when {
+            c == null -> null
+            highlight == Highlight.SHARED -> CellTiles(c.shared, sharedColor.toArgb())
+            highlight == Highlight.NEW_TO_ME -> CellTiles(c.onlyTheirs, FriendBlue.copy(alpha = 0.75f).toArgb())
+            highlight == Highlight.NEW_TO_THEM -> CellTiles(c.onlyMine, HeatOrange.copy(alpha = 0.75f).toArgb())
+            else -> null
         }
+        listOfNotNull(
+            MapLayer("mine", mineHeat, alpha = faded, zIndex = 0f),
+            MapLayer("theirs", theirHeat, alpha = faded, zIndex = 1f),
+            cells?.let { MapLayer("cells-${highlight.name}", it, zIndex = 2f) },
+        )
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.statusBarsPadding().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                Text("You and ${friend.name}", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                IconButton(onClick = { reload++ }) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
-            }
+            TopAppBar(
+                title = { Text("You and ${friend.name}") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
+                actions = {
+                    IconButton(onClick = { reload++ }) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
+                },
+            )
 
             Box(Modifier.fillMaxWidth().weight(1f)) {
-                GoogleMap(
-                    modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = camera,
-                    properties = MapProperties(mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light)),
-                    uiSettings = MapUiSettings(zoomControlsEnabled = false, mapToolbarEnabled = false),
-                ) {
-                    val faded = highlight != Highlight.BOTH
-                    key(mineHeat) { TileOverlay(tileProvider = mineHeat, fadeIn = false, transparency = if (faded) 0.6f else 0f) }
-                    key(theirHeat) { TileOverlay(tileProvider = theirHeat, fadeIn = false, transparency = if (faded) 0.6f else 0f, zIndex = 1f) }
-                    cellLayer?.let { layer -> key(layer) { TileOverlay(tileProvider = layer, fadeIn = false, zIndex = 2f) } }
-                }
+                AppMap(camera = camera, layers = layers, modifier = Modifier.fillMaxSize(), refreshKey = comparison)
                 if (comparison == null) {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
                 }

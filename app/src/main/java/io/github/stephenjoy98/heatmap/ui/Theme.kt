@@ -1,6 +1,10 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -54,7 +58,19 @@ fun isDarkTheme(): Boolean {
     }
 }
 
+/**
+ * Material 3 theme. On Android 12+ it uses Material You dynamic colour from the wallpaper (unless turned
+ * off in Settings); otherwise the heatmap's orange palette. The heat ramps themselves never change.
+ */
 @Composable
 fun TickerTheme(dark: Boolean = isDarkTheme(), content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (dark) darkColors else lightColors, content = content)
+    val dynamic by Prefs.dynamicColor.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scheme = when {
+        dynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dark -> darkColors
+        else -> lightColors
+    }
+    MaterialTheme(colorScheme = scheme, content = content)
 }

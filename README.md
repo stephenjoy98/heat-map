@@ -3,16 +3,24 @@
 Your most travelled routes on a map.
 
 **Location Ticker** is an Android app that records your position on a fixed tick, anywhere from every
-15 seconds to once a day, and draws everything as a Strava-style heatmap on Google Maps. It works out
+15 seconds to once a day, and draws everything as a Strava-style heatmap on OpenStreetMap or Google Maps. It works out
 how you travelled, gives you a Review tab with AI insights, reads your steps from Health Connect, backs
 up to your Google account, and lets you compare explored areas with friends.
 
 ## Features
 
+### Design
+- **Material Design 3** throughout: large collapsing top app bars, segmented buttons, M3 navigation bar,
+  cards and sheets, and **Material You** dynamic colour from your wallpaper on Android 12+ (switchable
+  in Settings; otherwise the orange heat palette). The heat colours themselves never change.
+
 ### Map
-- **Google Maps** with two custom styles: a **dark** near-black canvas like Strava's heatmap, and a
-  clean **light** white style in the spirit of in-car navigation maps. Choose Dark, Light or Match
-  system in Settings; the whole app follows the map theme.
+- **Works with no setup**: when the build has no Google Maps API key it uses **OpenStreetMap** with
+  CARTO's free basemaps, so there's nothing for users to configure. With a key, Google Maps is used,
+  and Settings lets you switch between the two.
+- Two looks either way: a **dark** near-black canvas like Strava's heatmap (CARTO Dark Matter or a
+  custom Google style) and a clean **light** white map in the spirit of Tesla's in-car map (CARTO
+  Positron or a custom Google style). Choose Dark, Light or System; the whole app follows.
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
   up. On the dark map roads used once are dark red and your most travelled ones burn orange, yellow and
   white. The light map uses light orange through deep crimson.
@@ -63,13 +71,13 @@ Every push builds the APKs in GitHub Actions (**Actions → Android build → ar
 `location-ticker-apk`**). Install `app-release.apk` on Android 8.0+. You'll need to allow installing
 from unknown sources.
 
-Without the setup below the app still works: recording, heatmap (on a blank map), travel modes,
-Review, steps, on-device AI and statistics. Map tiles need the Maps key; sign-in, backup, friends and
-cloud AI need Firebase.
+Without any setup the app works fully on OpenStreetMap: recording, heatmap, travel modes, Review,
+steps, on-device AI and statistics. Sign-in, backup, friends and cloud AI need Firebase (below).
 
 ## Setup
 
-### 1. Google Maps API key
+### 1. Google Maps API key (optional)
+OpenStreetMap is used without one. To use Google Maps instead:
 1. In [Google Cloud console](https://console.cloud.google.com/), create a project (or reuse your
    Firebase one), enable **Maps SDK for Android**, and create an API key.
 2. Restrict it to Android apps with package `io.github.stephenjoy98.heatmap` and the SHA-1 below.
@@ -118,8 +126,9 @@ Requires JDK 17 and the Android SDK (API 36).
 | Recording service, activity tagging | `tracking/LocationTickerService.kt`, `tracking/ActivityTracker.kt` |
 | Trip splitting and travel-mode decisions | `tracking/TripDetector.kt` |
 | Storage (SQLite: points, trips, places cache, friends' routes) | `data/PointStore.kt` |
-| Heatmap rendering and Google Maps tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |
-| Map styles (dark / light) | `map/MapStyles.kt` |
+| Heatmap rendering and map tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |
+| Map engines (Google Maps or OpenStreetMap) behind one composable | `ui/AppMap.kt`, `map/OsmSupport.kt` |
+| Map styles (dark / light) | `map/MapStyles.kt`, `map/OsmSupport.kt` |
 | Review stats, steps, insights (Nano / cloud / statistics) | `review/` |
 | Sign-in, backup, friends, daily sync | `cloud/` |
 | UI (Jetpack Compose) | `ui/` |

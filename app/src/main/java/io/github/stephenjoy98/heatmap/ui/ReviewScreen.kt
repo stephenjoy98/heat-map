@@ -24,7 +24,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,21 +61,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMapOptions
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Trip
-import io.github.stephenjoy98.heatmap.map.MapStyles
 import io.github.stephenjoy98.heatmap.review.HealthSteps
 import io.github.stephenjoy98.heatmap.review.InsightResult
 import io.github.stephenjoy98.heatmap.review.Insights
@@ -79,6 +78,7 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int) {
     val context = LocalContext.current
@@ -90,49 +90,63 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int) {
         value = withContext(Dispatchers.IO) { ReviewRepository.load(context, period) }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Text("Review", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReviewPeriod.entries.forEach { p ->
-                    FilterChip(selected = p == period, onClick = { period = p }, label = { Text(p.label) })
-                }
-            }
-        }
-
-        val d = data
-        if (d == null) {
-            item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-            return@LazyColumn
-        }
-
-        if (d.questions.isNotEmpty()) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0),
+        topBar = { LargeTopAppBar(title = { Text("Review") }, scrollBehavior = scrollBehavior) },
+    ) { inner ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = inner.calculateTopPadding() + 4.dp,
+                bottom = contentPadding.calculateBottomPadding() + 16.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             item {
-                Text("How did you travel?", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "The app couldn't tell these trips apart. Your answer also teaches it your regular routes.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            items(d.questions.take(10), key = { it.id }) { trip ->
-                QuestionCard(trip) { mode ->
-                    store.setTripMode(trip.id, mode)
-                    refresh++
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    ReviewPeriod.entries.forEachIndexed { i, p ->
+                        SegmentedButton(
+                            selected = p == period,
+                            onClick = { period = p },
+                            shape = SegmentedButtonDefaults.itemShape(index = i, count = ReviewPeriod.entries.size),
+                        ) { Text(p.label, maxLines = 1) }
+                    }
                 }
             }
-        }
 
-        item { StatGrid(d) }
-        item { ModeBreakdown(d) }
-        item { StepsCard(d, resumeTick) { refresh++ } }
-        if (d.cities.isNotEmpty()) item { CitiesCard(d) }
-        item { InsightsCard(d) }
+            val d = data
+            if (d == null) {
+                item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                return@LazyColumn
+            }
+
+            if (d.questions.isNotEmpty()) {
+                item {
+                    Text("How did you travel?", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "The app couldn't tell these trips apart. Your answer also teaches it your regular routes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                items(d.questions.take(10), key = { it.id }) { trip ->
+                    QuestionCard(trip) { mode ->
+                        store.setTripMode(trip.id, mode)
+                        refresh++
+                    }
+                }
+            }
+
+            item { StatGrid(d) }
+            item { ModeBreakdown(d) }
+            item { StepsCard(d, resumeTick) { refresh++ } }
+            if (d.cities.isNotEmpty()) item { CitiesCard(d) }
+            item { InsightsCard(d) }
+        }
     }
 }
 
@@ -322,7 +336,6 @@ private fun InsightsCard(d: ReviewData) {
 private fun QuestionCard(trip: Trip, onAnswer: suspend (TravelMode) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val dark = isDarkTheme()
     val path by produceState<List<LatLng>>(emptyList(), trip.id) {
         value = withContext(Dispatchers.IO) {
             val p = PointStore.get(context).tripPath(trip.id)
@@ -343,7 +356,7 @@ private fun QuestionCard(trip: Trip, onAnswer: suspend (TravelMode) -> Unit) {
             )
             if (path.size >= 2) {
                 Spacer(Modifier.height(8.dp))
-                TripPreview(path, dark)
+                TripPreview(path)
             }
             Spacer(Modifier.height(8.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -365,20 +378,6 @@ private fun QuestionCard(trip: Trip, onAnswer: suspend (TravelMode) -> Unit) {
 }
 
 @Composable
-private fun TripPreview(path: List<LatLng>, dark: Boolean) {
-    val camera = rememberCameraPositionState()
-    val bounds = remember(path) { LatLngBounds.builder().apply { path.forEach { include(it) } }.build() }
-    val lineColor = MaterialTheme.colorScheme.primary
-    Box(Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(12.dp))) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = camera,
-            googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
-            properties = MapProperties(mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light)),
-            uiSettings = MapUiSettings(mapToolbarEnabled = false, zoomControlsEnabled = false),
-            onMapLoaded = { runCatching { camera.move(CameraUpdateFactory.newLatLngBounds(bounds, 48)) } },
-        ) {
-            Polyline(points = path, color = lineColor, width = 10f)
-        }
-    }
+private fun TripPreview(path: List<LatLng>) {
+    TripPreviewMap(path, Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(12.dp)))
 }

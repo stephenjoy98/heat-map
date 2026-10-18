@@ -43,7 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -56,29 +55,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.TileOverlay
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberTileOverlayState
-import io.github.stephenjoy98.heatmap.BuildConfig
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Stats
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.map.HeatRamps
-import io.github.stephenjoy98.heatmap.map.HeatTileProvider
-import io.github.stephenjoy98.heatmap.map.MapStyles
+import io.github.stephenjoy98.heatmap.map.HeatTiles
 import io.github.stephenjoy98.heatmap.map.OwnTracks
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -101,23 +88,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
 
     var showSettings by remember { mutableStateOf(false) }
     var centered by rememberSaveable { mutableStateOf(false) }
-    val camera = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(20.0, 0.0), 2f)
-    }
-
-    val tileState = rememberTileOverlayState()
-    val provider = remember(filter, mode, dark) {
-        HeatTileProvider(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode)
-    }
-    // New points arrive every tick; refresh tiles at most every couple of seconds.
-    LaunchedEffect(changes) {
-        delay(2000)
-        tileState.clearTileCache()
+    val camera = rememberMapCamera()
+    val layers = remember(filter, mode, dark) {
+        listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode)))
     }
     LaunchedEffect(stats) {
         val latest = stats?.latest
         if (!centered && latest != null) {
-            camera.position = CameraPosition.fromLatLngZoom(LatLng(latest.lat, latest.lon), 15f)
+            camera.moveTo(latest.lat, latest.lon, 15f)
             centered = true
         }
     }
@@ -133,25 +111,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     }
 
     Box(Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding())) {
-        GoogleMap(
+        AppMap(
+            camera = camera,
+            layers = layers,
             modifier = Modifier.fillMaxSize(),
-            cameraPositionState = camera,
-            properties = MapProperties(
-                mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light),
-                isMyLocationEnabled = hasLocation,
-            ),
-            uiSettings = MapUiSettings(
-                zoomControlsEnabled = false,
-                myLocationButtonEnabled = false,
-                mapToolbarEnabled = false,
-                compassEnabled = false,
-            ),
-        ) {
-            // Recreate the overlay when its provider changes (filter, display mode, theme).
-            key(provider) {
-                TileOverlay(tileProvider = provider, state = tileState, fadeIn = false)
-            }
-        }
+            refreshKey = changes,
+            latest = stats?.latest?.let { LatLng(it.lat, it.lon) },
+            showMyLocation = hasLocation,
+        )
 
         Column(
             Modifier
@@ -163,17 +130,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             StatsBar(stats)
             Spacer(Modifier.size(8.dp))
             ModeFilterRow(filter)
-            if (!BuildConfig.HAS_MAPS_KEY) {
-                Spacer(Modifier.size(8.dp))
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        "This build has no Google Maps API key, so map tiles won't load. Your routes still draw. See the README.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(10.dp),
-                    )
-                }
-            }
         }
 
         Column(
@@ -186,9 +142,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     if (latest == null) {
                         scope.launch { snackbar.showSnackbar("No points recorded yet") }
                     } else {
-                        scope.launch {
-                            camera.animate(CameraUpdateFactory.newLatLngZoom(LatLng(latest.lat, latest.lon), 16f), 600)
-                        }
+                        camera.animateTo(latest.lat, latest.lon, 16f)
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.surface,

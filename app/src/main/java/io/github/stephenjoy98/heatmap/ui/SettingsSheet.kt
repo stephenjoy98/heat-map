@@ -52,6 +52,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.MapTheme
+import io.github.stephenjoy98.heatmap.data.MapProvider
+import io.github.stephenjoy98.heatmap.BuildConfig
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import io.github.stephenjoy98.heatmap.review.HealthSteps
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
 import androidx.health.connect.client.PermissionController
@@ -86,6 +91,8 @@ fun SettingsSheet(
     val highAccuracy by Prefs.highAccuracy.collectAsStateWithLifecycle()
     val mode by Prefs.displayMode.collectAsStateWithLifecycle()
     val mapTheme by Prefs.mapTheme.collectAsStateWithLifecycle()
+    val mapProvider by Prefs.mapProvider.collectAsStateWithLifecycle()
+    val dynamicColor by Prefs.dynamicColor.collectAsStateWithLifecycle()
     val aiEngine by Prefs.aiEngine.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     var showAiChoice by remember { mutableStateOf(false) }
@@ -173,24 +180,38 @@ fun SettingsSheet(
             Divider()
             SectionTitle("Map")
             Text("Theme", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(MapTheme.DARK to "Dark", MapTheme.LIGHT to "Light", MapTheme.SYSTEM to "Match system").forEach { (t, label) ->
-                    FilterChip(selected = mapTheme == t, onClick = { Prefs.setMapTheme(t) }, label = { Text(label) })
-                }
-            }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
+            SegmentedChoice(
+                options = listOf(MapTheme.DARK to "Dark", MapTheme.LIGHT to "Light", MapTheme.SYSTEM to "System"),
+                selected = mapTheme,
+                onSelect = Prefs::setMapTheme,
+            )
+            Spacer(Modifier.height(12.dp))
             Text("Show", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = mode == DisplayMode.ROUTES,
-                    onClick = { Prefs.setDisplayMode(DisplayMode.ROUTES) },
-                    label = { Text("Routes") },
+            Spacer(Modifier.height(6.dp))
+            SegmentedChoice(
+                options = listOf(DisplayMode.ROUTES to "Routes", DisplayMode.POINTS to "Points"),
+                selected = mode,
+                onSelect = Prefs::setDisplayMode,
+            )
+            if (BuildConfig.HAS_MAPS_KEY) {
+                Spacer(Modifier.height(12.dp))
+                Text("Map", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                SegmentedChoice(
+                    options = listOf(MapProvider.AUTO to "Google Maps", MapProvider.OSM to "OpenStreetMap"),
+                    selected = if (mapProvider == MapProvider.OSM) MapProvider.OSM else MapProvider.AUTO,
+                    onSelect = Prefs::setMapProvider,
                 )
-                FilterChip(
-                    selected = mode == DisplayMode.POINTS,
-                    onClick = { Prefs.setDisplayMode(DisplayMode.POINTS) },
-                    label = { Text("Points") },
-                )
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Spacer(Modifier.height(8.dp))
+                SettingRow(
+                    title = "Wallpaper colours",
+                    subtitle = "Material You: match the app's colours to your wallpaper",
+                ) {
+                    Switch(checked = dynamicColor, onCheckedChange = Prefs::setDynamicColor)
+                }
             }
 
             Divider()
@@ -368,6 +389,20 @@ private fun CustomInterval(intervalSec: Int, onChange: (Int) -> Unit) {
             onChange(seconds!!.toInt())
             text = ""
         }) { Text("Set") }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        options.forEachIndexed { i, (value, label) ->
+            SegmentedButton(
+                selected = value == selected,
+                onClick = { onSelect(value) },
+                shape = SegmentedButtonDefaults.itemShape(index = i, count = options.size),
+            ) { Text(label, maxLines = 1) }
+        }
     }
 }
 

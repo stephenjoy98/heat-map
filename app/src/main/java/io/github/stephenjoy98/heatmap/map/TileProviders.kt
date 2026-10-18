@@ -10,35 +10,30 @@ import io.github.stephenjoy98.heatmap.data.DisplayMode
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
 
-private const val TILE_PX = 512
+const val TILE_PX = 512
 
-private fun Bitmap.toTile(): Tile {
-    val out = ByteArrayOutputStream()
-    compress(Bitmap.CompressFormat.PNG, 100, out)
-    recycle()
-    return Tile(TILE_PX, TILE_PX, out.toByteArray())
+/** Renders one Web Mercator tile (x, y at zoom), or null if it's empty. Called on background threads. */
+fun interface TileBitmapSource {
+    fun render(x: Int, y: Int, zoom: Int): Bitmap?
 }
 
-/** Serves heatmap tiles to Google Maps; called on the map's background threads. */
-class HeatTileProvider(
+/** Heatmap tiles for a set of routes. */
+class HeatTiles(
     private val source: TrackSource,
     private val ramp: IntArray,
     private val mode: DisplayMode,
-) : TileProvider {
-    override fun getTile(x: Int, y: Int, zoom: Int): Tile {
-        val bitmap = runCatching {
-            HeatRenderer.renderTile(source, TileMath.box(x, y, zoom), TILE_PX, zoom.toDouble(), ramp, mode)
-        }.getOrNull() ?: return TileProvider.NO_TILE
-        return bitmap.toTile()
-    }
+) : TileBitmapSource {
+    override fun render(x: Int, y: Int, zoom: Int): Bitmap? = runCatching {
+        HeatRenderer.renderTile(source, TileMath.box(x, y, zoom), TILE_PX, zoom.toDouble(), ramp, mode)
+    }.getOrNull()
 }
 
 /** Fills ~220 m [Cells] with a colour; used to show shared and unexplored areas when comparing with a friend. */
-class CellTileProvider(
+class CellTiles(
     private val cells: Collection<Long>,
     private val color: Int,
-) : TileProvider {
-    override fun getTile(x: Int, y: Int, zoom: Int): Tile {
+) : TileBitmapSource {
+    override fun render(x: Int, y: Int, zoom: Int): Bitmap? {
         val box = TileMath.box(x, y, zoom)
         val minRow = Cells.row(box.south)
         val maxRow = Cells.row(box.north)
@@ -49,11 +44,11 @@ class CellTileProvider(
             val c = Cells.colOf(it)
             r in minRow..maxRow && c in minCol..maxCol
         }
-        if (inside.isEmpty()) return TileProvider.NO_TILE
+        if (inside.isEmpty()) return null
 
         val bitmap = Bitmap.createBitmap(TILE_PX, TILE_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val paint = Paint().apply { this.color = this@CellTileProvider.color }
+        val paint = Paint().apply { this.color = this@CellTiles.color }
         val sx = TILE_PX / (box.east - box.west)
         val top = TileMath.mercY(box.north)
         val sy = TILE_PX / (top - TileMath.mercY(box.south))
@@ -67,6 +62,17 @@ class CellTileProvider(
             // Keep cells visible when zoomed far out.
             canvas.drawRect(l, t, max(r, l + 2f), max(b, t + 2f), paint)
         }
-        return bitmap.toTile()
+        return bitmap
+    }
+}
+
+/** Serves a [TileBitmapSource] to Google Maps as PNG tiles. */
+class GoogleTileAdapter(private val source: TileBitmapSource) : TileProvider {
+    override fun getTile(x: Int, y: Int, zoom: Int): Tile {
+        val bitmap = source.render(x, y, zoom) ?: return TileProvider.NO_TILE
+        val out = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        bitmap.recycle()
+        return Tile(TILE_PX, TILE_PX, out.toByteArray())
     }
 }

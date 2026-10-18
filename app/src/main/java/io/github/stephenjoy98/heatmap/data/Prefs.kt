@@ -9,6 +9,9 @@ enum class DisplayMode { ROUTES, POINTS }
 
 enum class MapTheme { SYSTEM, DARK, LIGHT }
 
+/** AUTO uses Google Maps when the build has an API key and OpenStreetMap otherwise. */
+enum class MapProvider { AUTO, GOOGLE, OSM }
+
 /** Where Review insights are written. */
 enum class AiEngine { ON_DEVICE, CLOUD, STATS }
 
@@ -56,6 +59,13 @@ object Prefs {
     private val _autoBackup = MutableStateFlow(true)
     val autoBackup: StateFlow<Boolean> = _autoBackup
 
+    private val _mapProvider = MutableStateFlow(MapProvider.AUTO)
+    val mapProvider: StateFlow<MapProvider> = _mapProvider
+
+    /** Material You: take the app's colours from the wallpaper (Android 12+). */
+    private val _dynamicColor = MutableStateFlow(true)
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor
+
     private val _lastBackup = MutableStateFlow(0L)
     val lastBackup: StateFlow<Long> = _lastBackup
 
@@ -75,6 +85,8 @@ object Prefs {
         _shareRoutes.value = sp.getBoolean("share_routes", true)
         _autoBackup.value = sp.getBoolean("auto_backup", true)
         _lastBackup.value = sp.getLong("last_backup", 0L)
+        _mapProvider.value = MapProvider.entries.byName(sp.getString("map_provider", null)) ?: MapProvider.AUTO
+        _dynamicColor.value = sp.getBoolean("dynamic_color", true)
     }
 
     fun setIntervalSec(seconds: Int) {
@@ -132,6 +144,16 @@ object Prefs {
     fun setAutoBackup(on: Boolean) {
         _autoBackup.value = on
         sp.edit().putBoolean("auto_backup", on).apply()
+    }
+
+    fun setMapProvider(provider: MapProvider) {
+        _mapProvider.value = provider
+        sp.edit().putString("map_provider", provider.name).apply()
+    }
+
+    fun setDynamicColor(on: Boolean) {
+        _dynamicColor.value = on
+        sp.edit().putBoolean("dynamic_color", on).apply()
     }
 
     fun setLastBackup(time: Long) {
