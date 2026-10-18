@@ -3,12 +3,18 @@ package io.github.stephenjoy98.heatmap.map
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Point
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
+import io.github.stephenjoy98.heatmap.BuildConfig
+import org.osmdroid.tileprovider.tilesource.ITileSource
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -22,20 +28,49 @@ import kotlin.math.ln
 import kotlin.math.tan
 
 /**
- * CARTO's basemaps on OpenStreetMap data: free and keyless. Positron is a clean, white,
- * low-contrast map (close to an in-car navigation look); Dark Matter is near-black like Strava's heatmap.
+ * Keyless base maps from OpenStreetMap's standard tiles, tinted in the app: a muted near-black for the
+ * dark theme (like Strava's heatmap) and a soft, low-contrast white for the light theme (like an in-car
+ * navigation map). If the build has a CARTO basemaps key, CARTO's own Dark Matter and Positron styles
+ * are used instead.
  */
 object OsmTiles {
+    private val cartoKey = BuildConfig.CARTO_API_KEY
+
     private fun carto(name: String, path: String) = XYTileSource(
-        name, 0, 20, 256, ".png",
+        name, 0, 20, 256, ".png?key=$cartoKey",
         arrayOf("a", "b", "c", "d").map { "https://$it.basemaps.cartocdn.com/$path/" }.toTypedArray(),
         "© OpenStreetMap contributors © CARTO",
     )
 
-    val light = carto("CartoPositron", "light_all")
-    val dark = carto("CartoDarkMatter", "dark_all")
+    val usesCarto: Boolean get() = cartoKey.isNotEmpty()
 
-    const val ATTRIBUTION = "© OpenStreetMap contributors © CARTO"
+    fun source(dark: Boolean): ITileSource = when {
+        !usesCarto -> TileSourceFactory.MAPNIK
+        dark -> carto("CartoDarkMatterKeyed", "dark_all")
+        else -> carto("CartoPositronKeyed", "light_all")
+    }
+
+    /** Recolours the standard OSM tiles; none needed for CARTO's styles. */
+    fun filter(dark: Boolean): ColorFilter? {
+        if (usesCarto) return null
+        // Greyscale luminance, then: dark = 157.5 - 0.5·L (land ≈ 38, labels light), light = 102 + 0.6·L (land ≈ 245).
+        val (scale, offset) = if (dark) -0.5f to 157.5f else 0.6f to 102f
+        val r = 0.299f * scale
+        val g = 0.587f * scale
+        val b = 0.114f * scale
+        return ColorMatrixColorFilter(
+            ColorMatrix(
+                floatArrayOf(
+                    r, g, b, 0f, offset,
+                    r, g, b, 0f, offset,
+                    r, g, b, 0f, offset,
+                    0f, 0f, 0f, 1f, 0f,
+                )
+            )
+        )
+    }
+
+    val attribution: String get() = if (usesCarto) "© OpenStreetMap contributors © CARTO" else "© OpenStreetMap contributors"
 }
 
 /**

@@ -18,6 +18,9 @@ val localProps = Properties().apply {
 }
 val mapsApiKey: String = System.getenv("MAPS_API_KEY")?.takeIf { it.isNotBlank() }
     ?: localProps.getProperty("MAPS_API_KEY", "")
+// Optional: CARTO's free basemaps key, for CARTO's styles instead of tinted OpenStreetMap tiles.
+val cartoApiKey: String = System.getenv("CARTO_API_KEY")?.takeIf { it.isNotBlank() }
+    ?: localProps.getProperty("CARTO_API_KEY", "")
 
 android {
     namespace = "io.github.stephenjoy98.heatmap"
@@ -32,6 +35,7 @@ android {
 
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("boolean", "HAS_MAPS_KEY", (mapsApiKey.isNotEmpty()).toString())
+        buildConfigField("String", "CARTO_API_KEY", "\"$cartoApiKey\"")
     }
 
     signingConfigs {

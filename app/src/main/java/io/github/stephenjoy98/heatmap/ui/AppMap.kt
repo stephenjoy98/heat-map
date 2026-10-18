@@ -208,7 +208,8 @@ private fun OsmAppMap(
     }
 
     LaunchedEffect(dark) {
-        mapView.setTileSource(if (dark) OsmTiles.dark else OsmTiles.light)
+        mapView.setTileSource(OsmTiles.source(dark))
+        mapView.overlayManager.tilesOverlay.setColorFilter(OsmTiles.filter(dark))
         val background = if (dark) Color(0xFF1B1B1B) else Color(0xFFF5F5F5)
         mapView.overlayManager.tilesOverlay.setLoadingBackgroundColor(background.toArgb())
         mapView.overlayManager.tilesOverlay.setLoadingLineColor(background.toArgb())
@@ -256,7 +257,7 @@ private fun OsmAppMap(
     Box(modifier) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         Text(
-            OsmTiles.ATTRIBUTION,
+            OsmTiles.attribution,
             fontSize = 9.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
             modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
@@ -290,7 +291,8 @@ fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
             modifier = modifier,
             factory = {
                 MapView(context).apply {
-                    setTileSource(if (dark) OsmTiles.dark else OsmTiles.light)
+                    setTileSource(OsmTiles.source(dark))
+                    overlayManager.tilesOverlay.setColorFilter(OsmTiles.filter(dark))
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     setTilesScaledToDpi(true)
                     setOnTouchListener { _, _ -> true } // A preview; the trip is explored on the main map.

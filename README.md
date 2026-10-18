@@ -15,12 +15,16 @@ up to your Google account, and lets you compare explored areas with friends.
   in Settings; otherwise the orange heat palette). The heat colours themselves never change.
 
 ### Map
-- **Works with no setup**: when the build has no Google Maps API key it uses **OpenStreetMap** with
-  CARTO's free basemaps, so there's nothing for users to configure. With a key, Google Maps is used,
-  and Settings lets you switch between the two.
-- Two looks either way: a **dark** near-black canvas like Strava's heatmap (CARTO Dark Matter or a
-  custom Google style) and a clean **light** white map in the spirit of Tesla's in-car map (CARTO
-  Positron or a custom Google style). Choose Dark, Light or System; the whole app follows.
+- **Works with no setup**: when the build has no Google Maps API key it uses **OpenStreetMap**'s
+  standard tiles, which need no key, so there's nothing for users to configure. With a key, Google
+  Maps is used, and Settings lets you switch between the two.
+- Two looks either way: a **dark** near-black canvas like Strava's heatmap and a clean **light**
+  white map in the spirit of Tesla's in-car map. On OpenStreetMap these are made by recolouring the
+  standard tiles on the phone; on Google Maps they're custom map styles. Choose Dark, Light or System;
+  the whole app follows.
+- Optional: a free [CARTO basemaps key](https://carto.com/basemaps/apikey/) in the `CARTO_API_KEY`
+  secret switches OpenStreetMap to CARTO's Dark Matter and Positron styles. (CARTO started requiring
+  a key in 2026; without one its tiles show an "API key required" watermark.)
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
   up. On the dark map roads used once are dark red and your most travelled ones burn orange, yellow and
   white. The light map uses light orange through deep crimson.
