@@ -1,0 +1,197 @@
+package io.github.stephenjoy98.heatmap.tracking
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
+import android.location.Location
+import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import io.github.stephenjoy98.heatmap.R
+import io.github.stephenjoy98.heatmap.data.LocationPoint
+import io.github.stephenjoy98.heatmap.data.PointStore
+import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.ui.MainActivity
+import io.github.stephenjoy98.heatmap.ui.formatInterval
+import java.text.DateFormat
+import java.util.Date
+
+/**
+ * Foreground service that asks for a location fix once per configured interval and stores each one.
+ * Every start command (re)applies the current settings, so it is also how interval changes take effect.
+ */
+class LocationTickerService : Service() {
+
+    private lateinit var fused: FusedLocationProviderClient
+    private lateinit var store: PointStore
+    private lateinit var worker: HandlerThread
+    private lateinit var handler: Handler
+
+    // Only touched on the worker thread.
+    private var intervalMs = 60_000L
+    private var maxAccuracyM = 100f
+    private var lastSavedAt = 0L
+
+    private val callback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            result.locations.forEach(::record)
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        fused = LocationServices.getFusedLocationProviderClient(this)
+        store = PointStore.get(this)
+        worker = HandlerThread("location-ticker").apply { start() }
+        handler = Handler(worker.looper)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP || !hasLocationPermission(this)) {
+            Prefs.setTracking(false)
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        try {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                buildNotification(null),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0,
+            )
+        } catch (e: Exception) {
+            // Typically: started from the background without "Allow all the time" location access.
+            Prefs.setTracking(false)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        Prefs.setTracking(true)
+        requestUpdates()
+        return START_STICKY
+    }
+
+    override fun onDestroy() {
+        fused.removeLocationUpdates(callback)
+        worker.quitSafely()
+        super.onDestroy()
+    }
+
+    @SuppressLint("MissingPermission") // Checked in onStartCommand.
+    private fun requestUpdates() {
+        val interval = Prefs.intervalSec.value * 1000L
+        val highAccuracy = Prefs.highAccuracy.value
+        handler.post {
+            intervalMs = interval
+            maxAccuracyM = if (highAccuracy) 100f else 500f
+            if (lastSavedAt == 0L) lastSavedAt = store.latest()?.time ?: 0L
+        }
+
+        val priority = if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        val request = LocationRequest.Builder(priority, interval)
+            .setMinUpdateIntervalMillis(interval)
+            .setWaitForAccurateLocation(false)
+            .build()
+        fused.removeLocationUpdates(callback)
+        fused.requestLocationUpdates(request, callback, worker.looper)
+    }
+
+    private fun record(location: Location) {
+        if (location.hasAccuracy() && location.accuracy > maxAccuracyM) return
+        // The fused provider can deliver early (e.g. when another app asks for location); keep the set pace.
+        if (location.time - lastSavedAt < intervalMs * 9 / 10) return
+
+        store.insert(
+            LocationPoint(
+                time = location.time,
+                lat = location.latitude,
+                lon = location.longitude,
+                accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
+                intervalMs = intervalMs.toInt(),
+            )
+        )
+        lastSavedAt = location.time
+
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, buildNotification(location))
+    }
+
+    private fun buildNotification(last: Location?): Notification {
+        val open = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+        val stop = PendingIntent.getService(
+            this, 1,
+            Intent(this, LocationTickerService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+        val every = "Every ${formatInterval(Prefs.intervalSec.value)}"
+        val text = if (last == null) {
+            "$every · waiting for first fix"
+        } else {
+            val time = DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(last.time))
+            "$every · last fix $time (±${last.accuracy.toInt()} m)"
+        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_ticker)
+            .setContentTitle("Recording location")
+            .setContentText(text)
+            .setContentIntent(open)
+            .addAction(0, "Stop", stop)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .build()
+    }
+
+    companion object {
+        const val CHANNEL_ID = "recording"
+        private const val NOTIFICATION_ID = 1
+        private const val ACTION_STOP = "io.github.stephenjoy98.heatmap.STOP"
+
+        fun hasLocationPermission(context: Context): Boolean =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        fun hasBackgroundPermission(context: Context): Boolean =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        /** Starts recording, or applies changed settings if it is already running. */
+        fun start(context: Context) {
+            Prefs.setTracking(true)
+            ContextCompat.startForegroundService(context, Intent(context, LocationTickerService::class.java))
+        }
+
+        fun stop(context: Context) {
+            Prefs.setTracking(false)
+            context.stopService(Intent(context, LocationTickerService::class.java))
+        }
+    }
+}

@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Faint, warm and hot routes crossing, like the heatmap itself. -->
+    <path
+        android:pathData="M30,76 C40,62 46,58 54,54 C64,49 70,40 78,30"
+        android:strokeColor="#FF8C1A2E"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M28,44 C42,48 50,52 54,54 C60,58 70,66 80,72"
+        android:strokeColor="#FFF07818"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,26 L54,82"
+        android:strokeColor="#FFFFE9A0"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,54m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+</vector>
