@@ -1,7 +1,12 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.location.GnssStatus
 import android.location.Location
+import android.location.LocationManager
+import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -149,6 +154,56 @@ fun rememberFixQuality(fix: Location?): FixQuality {
     return fixQuality(fix, maxOf(now, fix?.time ?: 0L), LocationTickerService.accuracyLimitM(highAccuracy))
 }
 
+/** Satellites the GPS chip can see right now, and how many of them it's using for the fix. */
+class SatelliteInfo(val used: Int, val visible: Int, val byConstellation: List<Pair<String, Int>>)
+
+private fun constellationName(type: Int) = when (type) {
+    GnssStatus.CONSTELLATION_GPS -> "GPS"
+    GnssStatus.CONSTELLATION_GLONASS -> "GLONASS"
+    GnssStatus.CONSTELLATION_GALILEO -> "Galileo"
+    GnssStatus.CONSTELLATION_BEIDOU -> "BeiDou"
+    GnssStatus.CONSTELLATION_QZSS -> "QZSS"
+    GnssStatus.CONSTELLATION_SBAS -> "SBAS"
+    GnssStatus.CONSTELLATION_IRNSS -> "NavIC"
+    else -> "Other"
+}
+
+/**
+ * Live satellite counts while [enabled]. Null when there's no precise-location permission or no update
+ * yet. Updates only arrive while the GPS chip is on, which [rememberLiveFix] takes care of.
+ */
+@SuppressLint("MissingPermission") // Checked below.
+@Composable
+fun rememberSatellites(enabled: Boolean): SatelliteInfo? {
+    val context = LocalContext.current
+    var info by remember { mutableStateOf<SatelliteInfo?>(null) }
+    DisposableEffect(enabled) {
+        val fine = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val manager = context.getSystemService(LocationManager::class.java)
+        if (!enabled || !fine || manager == null) return@DisposableEffect onDispose { }
+        val callback = object : GnssStatus.Callback() {
+            override fun onSatelliteStatusChanged(status: GnssStatus) {
+                var used = 0
+                val counts = LinkedHashMap<String, Int>()
+                for (i in 0 until status.satelliteCount) {
+                    if (status.usedInFix(i)) used++
+                    val name = constellationName(status.getConstellationType(i))
+                    counts[name] = (counts[name] ?: 0) + 1
+                }
+                info = SatelliteInfo(used, status.satelliteCount, counts.entries.sortedByDescending { it.value }.map { it.key to it.value })
+            }
+
+            override fun onStopped() {
+                info = null
+            }
+        }
+        @Suppress("DEPRECATION") // The Executor overload needs API 30; this one works from API 24.
+        manager.registerGnssStatusCallback(callback, Handler(Looper.getMainLooper()))
+        onDispose { manager.unregisterGnssStatusCallback(callback) }
+    }
+    return info
+}
+
 /** Signal-strength bars for the accuracy button: more filled bars, better fix. */
 @Composable
 fun SignalBars(quality: FixQuality, modifier: Modifier = Modifier) {
@@ -182,6 +237,9 @@ private val clockFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 /** Live accuracy readout: metres, a quality badge, heading and speed, and when the fix was taken. */
 @Composable
 fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier) {
+    val satellites = rememberSatellites(enabled = true)
+    val context = LocalContext.current
+    val precise = remember { context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -245,6 +303,24 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier) {
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    SatelliteGlyph(Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        satellites?.let { "${it.used} in use · ${it.visible} in view" }
+                            ?: if (precise) "Searching for satellites…" else "Satellites need precise location",
+                        fontFamily = mono,
+                        fontSize = 13.sp,
+                    )
+                }
+                satellites?.takeIf { it.visible > 0 }?.let { sats ->
+                    Text(
+                        sats.byConstellation.joinToString("  ") { (name, n) -> "$name $n" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = muted,
+                        modifier = Modifier.padding(start = 24.dp),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     ClockGlyph(Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -264,7 +340,8 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier) {
             text = {
                 Text(
                     "Accuracy is the radius around the reported position within which your true location very " +
-                        "probably is, so a smaller number means a more precise dot.\n\n" +
+                        "probably is, so a smaller number means a more precise dot. More satellites in use usually " +
+                        "means better accuracy; buildings, trees and being indoors block them.\n\n" +
                         "Good is within 20 m, fair within 50 m. Location Ticker only records fixes within " +
                         "${limit.roundToInt()} m" +
                         (if (highAccuracy) "" else " (100 m with High accuracy on in Settings)") +
@@ -293,6 +370,20 @@ private fun HeadingArrow(bearing: Float?, modifier: Modifier = Modifier) {
             },
             color,
         )
+    }
+}
+
+/** A small satellite: a body with two solar panels. */
+@Composable
+private fun SatelliteGlyph(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.onSurface
+    Canvas(modifier.rotate(-45f)) {
+        val w = size.width
+        val h = size.height
+        drawRoundRect(color, topLeft = Offset(w * 0.38f, h * 0.3f), size = Size(w * 0.24f, h * 0.4f), cornerRadius = CornerRadius(w * 0.05f))
+        drawRect(color, topLeft = Offset(0f, h * 0.38f), size = Size(w * 0.3f, h * 0.24f))
+        drawRect(color, topLeft = Offset(w * 0.7f, h * 0.38f), size = Size(w * 0.3f, h * 0.24f))
+        drawLine(color, Offset(w * 0.3f, h / 2), Offset(w * 0.7f, h / 2), strokeWidth = w * 0.06f)
     }
 }
 

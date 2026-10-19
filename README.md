@@ -31,7 +31,8 @@ up to your Google account, and lets you compare explored areas with friends.
   OpenStreetMap; Google's terrain map with a key), and **3D buildings** under Map details, which tilts
   the map so buildings stand up.
 - **GPS accuracy** (signal-bars button, like Fog of World): live accuracy in metres with a Good / Fair /
-  Poor / Too weak badge, heading and speed, and the time of the fix. The **?** explains what accuracy
+  Poor / Too weak badge, satellites in use and in view (by constellation: GPS, Galileo, GLONASS,
+  BeiDou…), heading and speed, and the time of the fix. The **?** explains what accuracy
   means; fixes less precise than 100 m (500 m in battery-saver mode) are never recorded.
 - **Edit dots**: tap the pencil to fix mapping errors. Pick a day, narrow it down with a **start–end
   slider** (the dots in range are highlighted and joined in time order), or tap a single dot and step
