@@ -75,9 +75,9 @@ data class Trip(
 data class Stats(val total: Long, val today: Long, val latest: LocationPoint?)
 
 /** A coarse (~5 km) area visited during a period, used to work out cities. */
-class CoarseArea(val key: String, val lat: Double, val lon: Double, val points: Int)
+class CoarseArea(val key: String, val lat: Double, val lon: Double, val points: Int, val days: Int = 0)
 
-class Place(val city: String?, val country: String?)
+class Place(val city: String?, val country: String?, val state: String? = null, val countryCode: String? = null)
 
 class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
@@ -121,7 +121,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 3) {
+    SQLiteOpenHelper(context, "points.db", null, 4) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -215,6 +215,11 @@ class PointStore private constructor(context: Context) :
                 )"""
             )
             db.execSQL("CREATE INDEX road_questions_trip ON road_questions(trip_id)")
+        }
+        if (oldVersion < 4) {
+            // State and country code, for counting states, countries and continents on the profile.
+            db.execSQL("ALTER TABLE places ADD COLUMN state TEXT")
+            db.execSQL("ALTER TABLE places ADD COLUMN country_code TEXT")
         }
     }
 
@@ -611,6 +616,31 @@ class PointStore private constructor(context: Context) :
         writableDatabase.execSQL("UPDATE road_questions SET chosen = $choice WHERE id = $id")
     }
 
+    /** Time coverage in the range: distinct hours, days, months and years with at least one point. */
+    fun coverage(from: Long, to: Long): IntArray =
+        readableDatabase.rawQuery(
+            """SELECT COUNT(DISTINCT strftime('%Y-%m-%d %H', time / 1000, 'unixepoch', 'localtime')),
+                      COUNT(DISTINCT date(time / 1000, 'unixepoch', 'localtime')),
+                      COUNT(DISTINCT strftime('%Y-%m', time / 1000, 'unixepoch', 'localtime')),
+                      COUNT(DISTINCT strftime('%Y', time / 1000, 'unixepoch', 'localtime'))
+               FROM points WHERE time >= $from AND time < $to""",
+            null,
+        ).use { c -> if (c.moveToFirst()) intArrayOf(c.getInt(0), c.getInt(1), c.getInt(2), c.getInt(3)) else IntArray(4) }
+
+    /** Years (local time) that have recorded points, newest first. */
+    fun yearsWithData(): List<Int> =
+        readableDatabase.rawQuery(
+            "SELECT DISTINCT CAST(strftime('%Y', time / 1000, 'unixepoch', 'localtime') AS INTEGER) y FROM points ORDER BY y DESC", null
+        ).use { c -> buildList { while (c.moveToNext()) add(c.getInt(0)) } }
+
+    fun firstPointTime(): Long? =
+        readableDatabase.rawQuery("SELECT MIN(time) FROM points", null).use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+        }
+
+    fun longestTrip(from: Long, to: Long): Trip? =
+        trips("WHERE start_time >= $from AND start_time < $to ORDER BY distance_m DESC LIMIT 1").firstOrNull()
+
     // ---- Timeline ----
 
     fun tripsBetween(from: Long, to: Long): List<Trip> =
@@ -703,19 +733,22 @@ class PointStore private constructor(context: Context) :
     /** ~5 km areas visited in the period with a representative coordinate, busiest first. */
     fun coarseAreas(from: Long, to: Long, limit: Int = 300): List<CoarseArea> =
         readableDatabase.rawQuery(
-            """SELECT CAST((lat + 90) * 20 AS INTEGER) r, CAST((lon + 180) * 20 AS INTEGER) c, AVG(lat), AVG(lon), COUNT(*) n
+            """SELECT CAST((lat + 90) * 20 AS INTEGER) r, CAST((lon + 180) * 20 AS INTEGER) c, AVG(lat), AVG(lon), COUNT(*) n,
+                      COUNT(DISTINCT date(time / 1000, 'unixepoch', 'localtime'))
                FROM points WHERE time >= $from AND time < $to GROUP BY r, c ORDER BY n DESC LIMIT $limit""",
             null,
         ).use { c ->
             buildList {
-                while (c.moveToNext()) add(CoarseArea("${c.getInt(0)}:${c.getInt(1)}", c.getDouble(2), c.getDouble(3), c.getInt(4)))
+                while (c.moveToNext()) {
+                    add(CoarseArea("${c.getInt(0)}:${c.getInt(1)}", c.getDouble(2), c.getDouble(3), c.getInt(4), c.getInt(5)))
+                }
             }
         }
 
     /** Cached reverse-geocoding result; null if never looked up. */
     fun place(cell: String): Place? =
-        readableDatabase.rawQuery("SELECT city, country FROM places WHERE cell = ?", arrayOf(cell)).use { c ->
-            if (c.moveToFirst()) Place(c.getStringOrNull(0), c.getStringOrNull(1)) else null
+        readableDatabase.rawQuery("SELECT city, country, state, country_code FROM places WHERE cell = ?", arrayOf(cell)).use { c ->
+            if (c.moveToFirst()) Place(c.getStringOrNull(0), c.getStringOrNull(1), c.getStringOrNull(2), c.getStringOrNull(3)) else null
         }
 
     fun putPlace(cell: String, place: Place) {
@@ -723,6 +756,8 @@ class PointStore private constructor(context: Context) :
             put("cell", cell)
             put("city", place.city)
             put("country", place.country)
+            put("state", place.state)
+            put("country_code", place.countryCode)
         }, SQLiteDatabase.CONFLICT_REPLACE)
     }
 

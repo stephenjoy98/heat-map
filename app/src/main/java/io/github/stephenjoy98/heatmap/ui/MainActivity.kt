@@ -109,7 +109,7 @@ private fun AppScaffold(
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var friendsOpen by rememberSaveable { mutableStateOf(false) }
     var backupOpen by rememberSaveable { mutableStateOf(false) }
-    var profileOpen by remember { mutableStateOf(false) }
+    var profileOpen by rememberSaveable { mutableStateOf(false) }
     val friendsRequested by openFriends.collectAsStateWithLifecycle()
     var resumeTick by remember { mutableIntStateOf(0) }
     val pendingInvite by invite.collectAsStateWithLifecycle()
@@ -151,14 +151,6 @@ private fun AppScaffold(
     }
 
     val openProfile = { profileOpen = true }
-    if (profileOpen) {
-        ProfileDialog(
-            onDismiss = { profileOpen = false },
-            onFriends = { friendsOpen = true },
-            onBackup = { backupOpen = true },
-            onSettings = { settingsOpen = true },
-        )
-    }
 
     if (settingsOpen) {
         SettingsScreen(store = store, resumeTick = resumeTick, onBack = { settingsOpen = false })
@@ -188,6 +180,21 @@ private fun AppScaffold(
                 onBack = { friendsOpen = false },
             )
         }
+        return
+    }
+
+    if (profileOpen) {
+        ProfileScreen(
+            resumeTick = resumeTick,
+            onBack = { profileOpen = false },
+            onFriends = { friendsOpen = true },
+            onBackup = { backupOpen = true },
+            onSettings = { settingsOpen = true },
+            onExplore = {
+                profileOpen = false
+                tab = MainActivity.TAB_REVIEW
+            },
+        )
         return
     }
 

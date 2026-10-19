@@ -1,14 +1,11 @@
 package io.github.stephenjoy98.heatmap.review
 
 import android.content.Context
-import android.location.Geocoder
-import io.github.stephenjoy98.heatmap.data.Place
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Trip
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.Locale
 
 enum class ReviewPeriod(val label: String) { WEEK("Week"), MONTH("Month"), YEAR("Year"), ALL("All time") }
 
@@ -70,25 +67,12 @@ object ReviewRepository {
 
     /** Cities visited, busiest first, reverse-geocoding ~5 km areas once and caching the answer. */
     private fun cities(context: Context, store: PointStore, from: Long, to: Long): List<CityVisit> {
-        val geocoder = if (Geocoder.isPresent()) Geocoder(context, Locale.getDefault()) else null
-        var lookups = 0
         val byCity = LinkedHashMap<String, CityVisit>()
-        for (area in store.coarseAreas(from, to)) {
-            var place = store.place(area.key)
-            if (place == null && geocoder != null && lookups < MAX_GEOCODES_PER_LOAD) {
-                lookups++
-                place = lookup(geocoder, area.lat, area.lon)?.also { store.putPlace(area.key, it) }
-            }
-            val city = place?.city ?: continue
+        for ((area, place) in Places.resolve(context, store, store.coarseAreas(from, to), MAX_GEOCODES_PER_LOAD)) {
+            val city = place.city ?: continue
             val prev = byCity[city]
             byCity[city] = CityVisit(city, place.country ?: prev?.country, (prev?.points ?: 0) + area.points)
         }
         return byCity.values.sortedByDescending { it.points }
     }
-
-    @Suppress("DEPRECATION") // The callback variant needs API 33; this runs on a background thread anyway.
-    private fun lookup(geocoder: Geocoder, lat: Double, lon: Double): Place? = runCatching {
-        val a = geocoder.getFromLocation(lat, lon, 1)?.firstOrNull() ?: return@runCatching Place(null, null)
-        Place(a.locality ?: a.subAdminArea ?: a.adminArea, a.countryName)
-    }.getOrNull() // Offline or rate limited: leave uncached and try again next time.
 }

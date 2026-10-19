@@ -61,9 +61,13 @@ up to your Google account, and lets you compare explored areas with friends.
   travel mode. Tap a row to drill in.
 
 ### Profile
-- An account button in the top-right corner of every tab (your initial, or a person icon) opens a
-  Google-style card with your name, email and friend ID, plus **Friends**, **Backup**, **Settings**, and
-  sign in or sign out.
+- The account button in the top-right corner of every tab opens a profile page, a "travel passport":
+  your name, joining date and friend ID; your **home base** (the city where you spend the most days);
+  **dots captured** with kilometres, trips and areas; **time captured** (distinct hours, days, months
+  and years with a dot); your most visited city and longest trip; **cities, states, countries and
+  continents** visited; an estimated **carbon footprint** with CO₂ saved by walking and cycling; and
+  **stamps** (achievements) with progress. Filter by all time or by year.
+- Below the stats: **Friends**, **Backup**, **Settings**, and sign in or out.
 
 ### Review tab
 - Week / Month / Year / All time: distance (total and per mode), **new areas explored** (~220 m
