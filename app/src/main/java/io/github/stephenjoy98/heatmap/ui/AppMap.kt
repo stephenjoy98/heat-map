@@ -265,9 +265,9 @@ private class VectorMapHolder(context: Context) {
             m.uiSettings.isCompassEnabled = false
             m.uiSettings.isLogoEnabled = false
             m.uiSettings.attributionGravity = Gravity.BOTTOM or Gravity.START
-            // Keep the OpenStreetMap credit visible above the recording panel.
+            // Keep the OpenStreetMap credit visible above the recording panel and the accuracy button.
             val dp = context.resources.displayMetrics.density
-            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (112 * dp).toInt())
+            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (160 * dp).toInt())
             readyCallbacks.forEach { it(m) }
             readyCallbacks.clear()
         }

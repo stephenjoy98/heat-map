@@ -27,6 +27,8 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ### Changed
 - Edit dots has moved to the Timeline tab.
+- Map buttons rearranged: the compass sits under your profile button; layers, zoom and your position
+  stack in the bottom right corner; GPS accuracy is in the bottom left.
 - Review has moved from the bottom bar to the account menu.
 - Theme options are now Light, Dark and System.
 - Locations explored on your profile matches the other cards and follows your theme.

@@ -44,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -182,47 +181,56 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     ModeFilterRow(filter)
                 }
             }
+            // Compass under the profile button; it moves down with the chips when they're out.
+            Spacer(Modifier.size(12.dp))
+            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                CompassButton(camera, Modifier.align(Alignment.CenterEnd))
+            }
         }
 
-        MapControls(
-            camera = camera,
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
-            onLayers = { layersOpen = true },
-        )
         if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false })
 
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-            horizontalAlignment = Alignment.End,
-        ) {
-            // The card grows out of the accuracy button and shrinks back into it.
-            AnimatedVisibility(
-                visible = accuracyOpen && hasLocation,
-                enter = scaleIn(spatialSpring(), initialScale = 0.3f, transformOrigin = TransformOrigin(0.85f, 1f)) + fadeIn(),
-                exit = scaleOut(targetScale = 0.3f, transformOrigin = TransformOrigin(0.85f, 1f)) + fadeOut(),
-            ) {
-                Column(horizontalAlignment = Alignment.End) {
-                    // The tail lines up with the accuracy button, the second from the right (40 dp buttons, 8 dp gaps).
-                    AccuracyCard(liveFix, tailEndPadding = 59.dp)
-                    Spacer(Modifier.size(4.dp))
-                }
-            }
-            Row {
-                if (hasLocation) {
-                    AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
-                    Spacer(Modifier.width(8.dp))
-                }
-                SmallFloatingActionButton(
-                    onClick = {
-                        val latest = stats?.latest
-                        if (latest == null) {
-                            scope.launch { snackbar.showSnackbar("No points recorded yet") }
-                        } else {
-                            camera.animateTo(latest.lat, latest.lon, 16f)
+        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                // Bottom left: GPS accuracy. Its card grows up out of the button and shrinks back into it.
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                    AnimatedVisibility(
+                        visible = accuracyOpen && hasLocation,
+                        enter = scaleIn(spatialSpring(), initialScale = 0.3f, transformOrigin = TransformOrigin(0.05f, 1f)) + fadeIn(),
+                        exit = scaleOut(targetScale = 0.3f, transformOrigin = TransformOrigin(0.05f, 1f)) + fadeOut(),
+                    ) {
+                        Column {
+                            // The tail points at the middle of the 48 dp accuracy button.
+                            AccuracyCard(liveFix, tailInset = 15.dp)
+                            Spacer(Modifier.size(4.dp))
                         }
-                    },
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) { Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position") }
+                    }
+                    if (hasLocation) AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
+                }
+                Spacer(Modifier.width(12.dp))
+                // Bottom right, from the corner up: map layers, zoom, then your latest position.
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(
+                        onClick = {
+                            val latest = stats?.latest
+                            if (latest == null) {
+                                scope.launch { snackbar.showSnackbar("No points recorded yet") }
+                            } else {
+                                camera.animateTo(latest.lat, latest.lon, 16f)
+                            }
+                        },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                        shadowElevation = 3.dp,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position")
+                        }
+                    }
+                    ZoomButtons(camera)
+                    LayersButton(onClick = { layersOpen = true })
+                }
             }
             Spacer(Modifier.size(8.dp))
             ControlPanel(

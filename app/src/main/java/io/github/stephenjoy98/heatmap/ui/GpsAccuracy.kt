@@ -29,7 +29,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -232,8 +231,14 @@ fun SignalBars(quality: FixQuality, modifier: Modifier = Modifier) {
 /** The map button: signal bars that open the accuracy card. */
 @Composable
 fun AccuracyButton(quality: FixQuality, onClick: () -> Unit) {
-    SmallFloatingActionButton(onClick = onClick, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        SignalBars(quality, Modifier.size(width = 20.dp, height = 16.dp))
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+        shadowElevation = 3.dp,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) { SignalBars(quality, Modifier.size(width = 20.dp, height = 16.dp)) }
     }
 }
 
@@ -241,10 +246,11 @@ private val clockFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 /**
  * Live accuracy readout: metres, a quality badge, coordinates, satellites and when the fix was taken. A
- * speech-bubble tail points down at the button that opened it, [tailEndPadding] from the right edge.
+ * speech-bubble tail points down at the button that opened it, [tailInset] from the left edge (or the right
+ * edge, when [tailAtStart] is false).
  */
 @Composable
-fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailEndPadding: Dp = 12.dp) {
+fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailInset: Dp = 12.dp, tailAtStart: Boolean = true) {
     val satellites = rememberSatellites(enabled = true)
     val context = LocalContext.current
     val precise = remember { context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED }
@@ -263,7 +269,7 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailEndPadding: 
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     val cardColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    Column(modifier, horizontalAlignment = Alignment.End) {
+    Column(modifier, horizontalAlignment = if (tailAtStart) Alignment.Start else Alignment.End) {
         Surface(
             modifier = Modifier.widthIn(max = 360.dp),
             shape = RoundedCornerShape(24.dp),
@@ -341,7 +347,11 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailEndPadding: 
             }
         }
         // Speech-bubble tail pointing at the accuracy button.
-        Canvas(Modifier.padding(end = tailEndPadding).size(width = 18.dp, height = 9.dp)) {
+        Canvas(
+            Modifier
+                .padding(start = if (tailAtStart) tailInset else 0.dp, end = if (tailAtStart) 0.dp else tailInset)
+                .size(width = 18.dp, height = 9.dp),
+        ) {
             drawPath(
                 Path().apply {
                     moveTo(0f, 0f)
