@@ -12,6 +12,18 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.13.1] - 2026-10-19
+
+### Changed
+- The compass only appears while the map is turned away from north.
+- Map type tiles in the layers sheet show real previews of the OpenStreetMap styles around you.
+- Light theme: white cards and buttons on a light grey page, with stronger secondary text, for better
+  contrast.
+
+### Fixed
+- Switching between Map and Timeline no longer flashes or reloads the maps; each tab keeps its map and
+  its place.
+
 ## [2.13.0] - 2026-10-19
 
 ### Added

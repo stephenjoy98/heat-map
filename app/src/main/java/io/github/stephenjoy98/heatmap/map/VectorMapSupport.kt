@@ -99,22 +99,31 @@ object VectorMaps {
      */
     fun addTerrain(style: Style, dark: Boolean) {
         if (style.getSource(TERRAIN_SOURCE) != null) return
-        val tiles = TileSet("2.2.0", "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png").apply {
-            encoding = "terrarium"
-            setMaxZoom(15f)
-        }
-        style.addSource(RasterDemSource(TERRAIN_SOURCE, tiles, 256))
-        val hillshade = HillshadeLayer("terrain-hillshade", TERRAIN_SOURCE).withProperties(
-            PropertyFactory.hillshadeExaggeration(if (dark) 0.45f else 0.6f),
-            PropertyFactory.hillshadeShadowColor(if (dark) "#000000" else "#5F6B5A"),
-            PropertyFactory.hillshadeHighlightColor(if (dark) "#2A2A2A" else "#FFFFFF"),
-            PropertyFactory.hillshadeAccentColor(if (dark) "#0A0A0A" else "#7D8A72"),
-        )
+        style.addSource(terrainSource())
+        val hillshade = hillshadeLayer(dark)
         val below = firstLayerAbove(style) { id, layer ->
             layer is SymbolLayer || listOf("building", "tunnel", "highway", "road", "bridge", "transportation").any { it in id }
         }
         if (below != null) style.addLayerBelow(hillshade, below) else style.addLayer(hillshade)
     }
+
+    /** The elevation source behind terrain shading. A new one is needed for each style. */
+    fun terrainSource(): RasterDemSource {
+        val tiles = TileSet("2.2.0", "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png").apply {
+            encoding = "terrarium"
+            setMaxZoom(15f)
+        }
+        return RasterDemSource(TERRAIN_SOURCE, tiles, 256)
+    }
+
+    /** Hill shading from [terrainSource], softer on the dark map. */
+    fun hillshadeLayer(dark: Boolean): HillshadeLayer =
+        HillshadeLayer("terrain-hillshade", TERRAIN_SOURCE).withProperties(
+            PropertyFactory.hillshadeExaggeration(if (dark) 0.45f else 0.6f),
+            PropertyFactory.hillshadeShadowColor(if (dark) "#000000" else "#5F6B5A"),
+            PropertyFactory.hillshadeHighlightColor(if (dark) "#2A2A2A" else "#FFFFFF"),
+            PropertyFactory.hillshadeAccentColor(if (dark) "#0A0A0A" else "#7D8A72"),
+        )
 
     /** Extrudes OpenMapTiles building footprints by their height, Google Maps-style. Seen when the map is tilted. */
     fun addBuildings(style: Style, dark: Boolean) {

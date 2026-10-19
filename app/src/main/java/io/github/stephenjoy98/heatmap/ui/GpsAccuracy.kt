@@ -268,7 +268,7 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailInset: Dp = 
     val mono = FontFamily.Monospace
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
-    val cardColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
     Column(modifier, horizontalAlignment = if (tailAtStart) Alignment.Start else Alignment.End) {
         Surface(
             modifier = Modifier.widthIn(max = 360.dp),

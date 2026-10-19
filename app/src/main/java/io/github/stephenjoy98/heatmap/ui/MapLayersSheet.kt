@@ -1,6 +1,24 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import androidx.compose.foundation.BorderStroke
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import io.github.stephenjoy98.heatmap.map.VectorMaps
+import java.util.Locale
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.Style
+import org.maplibre.android.snapshotter.MapSnapshot
+import org.maplibre.android.snapshotter.MapSnapshotter
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,10 +75,13 @@ val LayersIcon: ImageVector by lazy {
     }.build()
 }
 
-/** Google Maps-style sheet: pick the map type, and turn map details such as 3D buildings on or off. */
+/**
+ * Google Maps-style sheet: pick the map type, and turn map details such as 3D buildings on or off. The map
+ * types show live previews of the actual OpenStreetMap styles around [center] (your latest position).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapLayersSheet(onDismiss: () -> Unit) {
+fun MapLayersSheet(onDismiss: () -> Unit, center: Pair<Double, Double>? = null) {
     val layer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     ModalBottomSheet(
@@ -74,8 +95,12 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Close") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LayerTile("Default", layer == MapLayerType.DEFAULT, { Prefs.setMapLayer(MapLayerType.DEFAULT) }) { drawDefaultArt(it) }
-                LayerTile("Terrain", layer == MapLayerType.TERRAIN, { Prefs.setMapLayer(MapLayerType.TERRAIN) }) { drawTerrainArt(it) }
+                LayerTile("Default", layer == MapLayerType.DEFAULT, { Prefs.setMapLayer(MapLayerType.DEFAULT) }, preview = {
+                    MapPreview(terrain = false, center = center, fallback = it)
+                }) { drawDefaultArt(it) }
+                LayerTile("Terrain", layer == MapLayerType.TERRAIN, { Prefs.setMapLayer(MapLayerType.TERRAIN) }, preview = {
+                    MapPreview(terrain = true, center = center, fallback = it)
+                }) { drawTerrainArt(it) }
             }
             Spacer(Modifier.height(20.dp))
             Text("Map details", style = MaterialTheme.typography.titleMedium)
@@ -97,7 +122,14 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
 private class ArtColors(val ground: Color, val line: Color, val accent: Color, val selected: Boolean)
 
 @Composable
-private fun LayerTile(label: String, selected: Boolean, onClick: () -> Unit, art: DrawScope.(ArtColors) -> Unit) {
+private fun LayerTile(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    // A picture for the tile; it's handed the drawn icon to show until (or instead of) the picture.
+    preview: (@Composable (fallback: @Composable () -> Unit) -> Unit)? = null,
+    art: DrawScope.(ArtColors) -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
     val colors = ArtColors(
         ground = scheme.surfaceContainerHighest,
@@ -119,7 +151,8 @@ private fun LayerTile(label: String, selected: Boolean, onClick: () -> Unit, art
             border = if (selected) BorderStroke(2.dp, scheme.primary) else BorderStroke(1.dp, scheme.outlineVariant),
             modifier = Modifier.size(64.dp),
         ) {
-            Canvas(Modifier.size(64.dp)) { art(colors) }
+            val drawn: @Composable () -> Unit = { Canvas(Modifier.size(64.dp)) { art(colors) } }
+            if (preview != null) preview(drawn) else drawn()
         }
         Spacer(Modifier.height(6.dp))
         Text(
@@ -187,4 +220,67 @@ private fun DrawScope.drawBuildingsArt(c: ArtColors) {
     }
     box(w * 0.14f, h * 0.45f, w * 0.26f)
     box(w * 0.5f, h * 0.28f, w * 0.24f)
+}
+
+// Snapshots already rendered this run, by style and rounded position.
+private val previewCache = HashMap<String, Bitmap>()
+
+// Turns the light map grey and inverts it, close to the app's dark map, for the dark theme.
+private val darkPreview = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            -0.254f, -0.499f, -0.097f, 0f, 216f,
+            -0.254f, -0.499f, -0.097f, 0f, 216f,
+            -0.254f, -0.499f, -0.097f, 0f, 216f,
+            0f, 0f, 0f, 1f, 0f,
+        )
+    )
+)
+
+/**
+ * A still picture of the real map style around [center], rendered off screen by MapLibre's snapshotter and
+ * cached. Shows [fallback] while it renders, offline, or when there's no position yet.
+ */
+@Composable
+private fun MapPreview(terrain: Boolean, center: Pair<Double, Double>?, fallback: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val dark = isDarkTheme()
+    val key = center?.let { "$terrain:${"%.2f".format(Locale.US, it.first)}:${"%.2f".format(Locale.US, it.second)}" }
+    var bitmap by remember(key) { mutableStateOf(key?.let { previewCache[it] }) }
+    DisposableEffect(key) {
+        if (center == null || key == null || bitmap != null) return@DisposableEffect onDispose { }
+        val style = Style.Builder().fromUri(VectorMaps.STYLE_URL).apply {
+            if (terrain) {
+                withSource(VectorMaps.terrainSource())
+                withLayer(VectorMaps.hillshadeLayer(dark = false))
+            }
+        }
+        val snapshotter = MapSnapshotter(
+            context,
+            MapSnapshotter.Options(64, 64)
+                .withPixelRatio(context.resources.displayMetrics.density)
+                .withStyleBuilder(style)
+                .withCameraPosition(CameraPosition.Builder().target(LatLng(center.first, center.second)).zoom(12.0).build())
+                .withLogo(false),
+        )
+        snapshotter.start(object : MapSnapshotter.SnapshotReadyCallback {
+            override fun onSnapshotReady(snapshot: MapSnapshot) {
+                previewCache[key] = snapshot.bitmap
+                bitmap = snapshot.bitmap
+            }
+        })
+        onDispose { snapshotter.cancel() }
+    }
+    val b = bitmap
+    if (b == null) {
+        fallback()
+    } else {
+        Image(
+            b.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            colorFilter = if (dark) darkPreview else null,
+            modifier = Modifier.size(64.dp),
+        )
+    }
 }

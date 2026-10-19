@@ -20,7 +20,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.AlertDialog
@@ -36,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -116,6 +116,7 @@ private fun AppScaffold(
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableIntStateOf(MainActivity.TAB_MAP) }
     val stack = rememberPageStack()
+    val tabState = rememberSaveableStateHolder()
     var comparing by remember { mutableStateOf<Friend?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
@@ -244,8 +245,11 @@ private fun AppScaffold(
                         }
                     },
                 ) { padding ->
-                    Crossfade(targetState = tab, label = "tab") { t ->
-                        when (t) {
+                    // No crossfade: map views can't fade like the rest of the UI, so the tabs switch instantly.
+                    // Each tab's map stays loaded (see AppMap's cacheKey), so coming back shows it straight away.
+                    // Each tab keeps its place (map position, Timeline day) while you're on the other one.
+                    tabState.SaveableStateProvider(tab) {
+                        when (tab) {
                             MainActivity.TAB_TIMELINE -> TimelineScreen(padding, resumeTick, onProfile = openMenu)
                             else -> MapScreen(padding, snackbar, resumeTick, onOpenProfile = openMenu)
                         }

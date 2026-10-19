@@ -142,6 +142,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             refreshKey = changes,
             latest = stats?.latest?.let { LatLng(it.lat, it.lon) },
             showMyLocation = hasLocation,
+            cacheKey = "map",
         )
 
         Column(
@@ -181,14 +182,21 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     ModeFilterRow(filter)
                 }
             }
-            // Compass under the profile button; it moves down with the chips when they're out.
-            Spacer(Modifier.size(12.dp))
-            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                CompassButton(camera, Modifier.align(Alignment.CenterEnd))
+            // Compass under the profile button, shown only while the map is turned away from north. It moves
+            // down with the chips when they're out.
+            val turned = ((camera.bearing % 360f) + 360f) % 360f
+            AnimatedVisibility(
+                visible = minOf(turned, 360f - turned) > 1f,
+                enter = scaleIn(spatialSpring()) + fadeIn(),
+                exit = scaleOut() + fadeOut(),
+            ) {
+                Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
+                    CompassButton(camera, Modifier.align(Alignment.CenterEnd))
+                }
             }
         }
 
-        if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false })
+        if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false }, center = stats?.latest?.let { it.lat to it.lon })
 
         Column(modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {

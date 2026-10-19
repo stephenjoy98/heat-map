@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import io.github.stephenjoy98.heatmap.data.MapTheme
 import io.github.stephenjoy98.heatmap.data.Prefs
 
@@ -51,12 +53,33 @@ private val lightColors = lightColorScheme(
     background = Color(0xFFF7F7F7),
     surface = Color.White,
     surfaceVariant = Color(0xFFEFEFEF),
-    surfaceContainer = Color.White,
+    surfaceContainer = Color(0xFFF4F4F6),
     surfaceContainerLow = Color.White,
-    surfaceContainerHigh = Color(0xFFF2F2F2),
+    surfaceContainerHigh = Color(0xFFEDEDEF),
     onSurface = Color(0xFF1C1C1E),
     onSurfaceVariant = Color(0xFF6B6B70),
 )
+
+/**
+ * Light themes put cards on a background only a shade or two lighter, which washes out (especially with Monet
+ * colours from a mostly white or grey wallpaper). This gives a light-grey page with crisp white cards, sheets
+ * and buttons, grey tiles inside cards, and slightly stronger secondary text and dividers.
+ */
+private fun ColorScheme.withLightContrast(): ColorScheme {
+    val page = surfaceContainerHigh
+    val card = surfaceContainerLowest
+    return copy(
+        background = page,
+        surface = page,
+        surfaceContainerLowest = card,
+        surfaceContainerLow = card,
+        surfaceContainer = card,
+        surfaceContainerHigh = card,
+        surfaceContainerHighest = surfaceContainer,
+        onSurfaceVariant = lerp(onSurfaceVariant, onSurface, 0.35f),
+        outlineVariant = lerp(outlineVariant, outline, 0.3f),
+    )
+}
 
 /** Whether the map (and so the whole app) is currently dark. */
 @Composable
@@ -119,7 +142,7 @@ fun TickerTheme(dark: Boolean = isDarkTheme(), content: @Composable () -> Unit) 
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> darkColors
         else -> lightColors
-    }
+    }.let { if (dark) it else it.withLightContrast() }
     CompositionLocalProvider(LocalExpressive provides expressive) {
         MaterialTheme(
             colorScheme = scheme,

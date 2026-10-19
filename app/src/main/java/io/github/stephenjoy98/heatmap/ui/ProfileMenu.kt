@@ -188,7 +188,8 @@ fun AccountMenu(
 
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    // An inset panel: darker than the menu in the dark theme, light grey in the light one.
+                    color = MaterialTheme.colorScheme.background,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {

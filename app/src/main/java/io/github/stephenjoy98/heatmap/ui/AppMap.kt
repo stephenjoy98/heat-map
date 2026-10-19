@@ -1,6 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.view.Gravity
 import android.view.ViewGroup
@@ -14,7 +15,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -54,6 +55,7 @@ import kotlinx.coroutines.delay
 import io.github.stephenjoy98.heatmap.map.TileOverlayView
 import io.github.stephenjoy98.heatmap.map.VectorMaps
 import kotlinx.coroutines.flow.MutableSharedFlow
+import java.util.WeakHashMap
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -139,6 +141,7 @@ fun AppMap(
     latest: LatLng? = null,
     showMyLocation: Boolean = false,
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
+    cacheKey: String? = null,
 ) {
     val dark = isDarkTheme()
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
@@ -147,7 +150,7 @@ fun AppMap(
     if (useGoogleMaps()) {
         GoogleAppMap(camera, layers, style, refreshKey, showMyLocation, onMapClick, modifier)
     } else {
-        VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, modifier)
+        VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, modifier)
     }
 }
 
@@ -257,6 +260,18 @@ private class VectorMapHolder(context: Context) {
     var styleLook: Any? = null
     private val readyCallbacks = mutableListOf<(MapLibreMap) -> Unit>()
 
+    // For full maps: the heat overlay, and what the map's listeners report to. Kept here so a cached map
+    // keeps its tiles and doesn't gain a second set of listeners when it's shown again.
+    val overlay by lazy { TileOverlayView(context) }
+    var camera: MapCamera? = null
+    var onClick: ((Double, Double) -> Unit)? = null
+    var setUp = false
+
+    fun destroy() {
+        overlay.release()
+        mapView.onDestroy()
+    }
+
     init {
         mapView.getMapAsync { m ->
             map = m
@@ -293,12 +308,37 @@ private class VectorMapHolder(context: Context) {
     }
 }
 
+/**
+ * MapLibre maps kept alive per activity, one per key (e.g. each tab's map), so switching tabs shows the map
+ * as it was instead of loading it again. They're destroyed with the activity.
+ */
+private object VectorMapCache {
+    private val byActivity = WeakHashMap<Activity, HashMap<String, VectorMapHolder>>()
+
+    fun get(context: Context, key: String): VectorMapHolder {
+        val activity = context.findActivity()
+            ?: return VectorMapHolder(context)
+        val maps = byActivity.getOrPut(activity) {
+            HashMap<String, VectorMapHolder>().also { maps ->
+                (activity as? LifecycleOwner)?.lifecycle?.addObserver(LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_DESTROY) {
+                        maps.values.forEach { it.destroy() }
+                        maps.clear()
+                        byActivity.remove(activity)
+                    }
+                })
+            }
+        }
+        return maps.getOrPut(key) { VectorMapHolder(activity) }
+    }
+}
+
 @Composable
-private fun rememberVectorMap(): VectorMapHolder {
+private fun rememberVectorMap(cacheKey: String? = null): VectorMapHolder {
     val context = LocalContext.current
-    val holder = remember { VectorMapHolder(context) }
+    val holder = remember(cacheKey) { if (cacheKey != null) VectorMapCache.get(context, cacheKey) else VectorMapHolder(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, holder) {
         val mapView = holder.mapView
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -315,7 +355,8 @@ private fun rememberVectorMap(): VectorMapHolder {
             lifecycleOwner.lifecycle.removeObserver(observer)
             mapView.onPause()
             mapView.onStop()
-            mapView.onDestroy()
+            // A cached map is only put to sleep; the cache destroys it with the activity.
+            if (cacheKey == null) holder.destroy()
         }
     }
     return holder
@@ -332,41 +373,47 @@ private fun VectorAppMap(
     refreshKey: Any?,
     latest: LatLng?,
     onMapClick: ((Double, Double) -> Unit)?,
+    cacheKey: String?,
     modifier: Modifier,
 ) {
-    val context = LocalContext.current
-    val holder = rememberVectorMap()
-    val overlay = remember { TileOverlayView(context) }
-    val clickHandler by rememberUpdatedState(onMapClick)
+    val holder = rememberVectorMap(cacheKey)
+    val overlay = holder.overlay
+    SideEffect { holder.onClick = onMapClick }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(camera) {
+        holder.camera = camera
         holder.withMap { m ->
-            m.moveCamera(
-                org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
-                    MLatLng(camera.initialLat, camera.initialLon), camera.initialZoom.toVectorZoom(),
+            // Listeners are added once per map and report to whichever camera is current.
+            if (!holder.setUp) {
+                holder.setUp = true
+                m.moveCamera(
+                    org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
+                        MLatLng(camera.initialLat, camera.initialLon), camera.initialZoom.toVectorZoom(),
+                    )
                 )
-            )
-            overlay.attach(m)
-            m.addOnCameraMoveListener {
-                camera.bearing = m.cameraPosition.bearing.toFloat()
-                camera.cameraTick++
+                overlay.attach(m)
+                val report = {
+                    holder.camera?.let {
+                        it.bearing = m.cameraPosition.bearing.toFloat()
+                        it.cameraTick++
+                    }
+                }
+                m.addOnCameraMoveListener { report() }
+                m.addOnCameraIdleListener { report() }
+                // Returning false lets the map handle the tap as usual.
+                m.addOnMapClickListener { p ->
+                    holder.onClick?.invoke(p.latitude, p.longitude)
+                    false
+                }
             }
-            m.addOnCameraIdleListener {
-                camera.bearing = m.cameraPosition.bearing.toFloat()
-                camera.cameraTick++
-            }
-            // Returning false lets the map handle the tap as usual.
-            m.addOnMapClickListener { p ->
-                clickHandler?.invoke(p.latitude, p.longitude)
-                false
-            }
+            camera.bearing = m.cameraPosition.bearing.toFloat()
             camera.projector = { lat, lon ->
                 m.projection.toScreenLocation(MLatLng(lat, lon)).let { Offset(it.x, it.y) }
             }
         }
         onDispose {
             camera.projector = null
-            overlay.release()
+            if (holder.camera === camera) holder.camera = null
         }
     }
 

@@ -209,6 +209,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 layers = layers,
                 modifier = Modifier.fillMaxSize(),
                 refreshKey = data,
+                cacheKey = "timeline",
                 onMapClick = if (editing) {
                     { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
                 } else {
