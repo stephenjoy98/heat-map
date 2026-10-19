@@ -121,7 +121,7 @@ class LocationTickerService : Service() {
         val highAccuracy = Prefs.highAccuracy.value
         handler.post {
             intervalMs = interval
-            maxAccuracyM = if (highAccuracy) 100f else 500f
+            maxAccuracyM = accuracyLimitM(highAccuracy)
             if (lastSavedAt == 0L) lastSavedAt = store.latest()?.time ?: 0L
         }
 
@@ -221,6 +221,9 @@ class LocationTickerService : Service() {
         const val CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "io.github.stephenjoy98.heatmap.STOP"
+
+        /** Fixes less accurate than this (in metres) aren't recorded. */
+        fun accuracyLimitM(highAccuracy: Boolean): Float = if (highAccuracy) 100f else 500f
 
         fun hasLocationPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==

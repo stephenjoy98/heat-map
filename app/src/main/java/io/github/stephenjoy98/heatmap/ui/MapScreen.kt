@@ -106,6 +106,9 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf(false) }
     var layersOpen by remember { mutableStateOf(false) }
+    var accuracyOpen by rememberSaveable { mutableStateOf(false) }
+    val liveFix = rememberLiveFix(hasLocation, detailed = accuracyOpen)
+    val signal = rememberFixQuality(liveFix)
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads, editing) {
         // While editing, the heatmap fades back so the dots stand out.
         val heat = HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)
@@ -208,7 +211,15 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
             horizontalAlignment = Alignment.End,
         ) {
+            if (accuracyOpen && !editing) {
+                AccuracyCard(liveFix)
+                Spacer(Modifier.size(8.dp))
+            }
             Row {
+                if (hasLocation && !editing) {
+                    AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
+                    Spacer(Modifier.width(8.dp))
+                }
                 if (!editing) {
                     SmallFloatingActionButton(
                         onClick = {
