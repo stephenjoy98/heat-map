@@ -133,8 +133,11 @@ private var avatarBounds by mutableStateOf<Rect?>(null)
 @Composable
 fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val pending = LocalReviewCount.current
-    IconButton(onClick = onClick, modifier = modifier.trackBounds { avatarBounds = it }) {
-        BadgedBox(badge = { if (pending > 0) Badge { Text(pending.toString()) } }) { Avatar(32) }
+    val tip = if (pending > 0) "Your account · $pending waiting on the Review page" else "Your account: profile, friends, review, backup and settings"
+    Tip(tip, modifier) {
+        IconButton(onClick = onClick, modifier = Modifier.trackBounds { avatarBounds = it }) {
+            BadgedBox(badge = { if (pending > 0) Badge { Text(pending.toString()) } }) { Avatar(32) }
+        }
     }
 }
 
@@ -180,8 +183,8 @@ fun AccountMenu(
         ) {
             Column(Modifier.padding(vertical = 12.dp)) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                    IconButton(onClick = close, modifier = Modifier.align(Alignment.CenterStart)) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                    Tip("Close", Modifier.align(Alignment.CenterStart)) {
+                        IconButton(onClick = close) { Icon(Icons.Filled.Close, contentDescription = "Close") }
                     }
                     Text("Location Ticker", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center))
                 }

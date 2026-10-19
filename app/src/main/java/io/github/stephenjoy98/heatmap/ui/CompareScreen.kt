@@ -154,7 +154,7 @@ fun CompareScreen(friend: Friend, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("You and ${friend.name}") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    BackButton(onBack)
                 },
                 actions = {
                     IconButton(onClick = { reload++ }) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }

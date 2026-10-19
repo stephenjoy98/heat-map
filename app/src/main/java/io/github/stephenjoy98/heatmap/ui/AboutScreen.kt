@@ -94,7 +94,7 @@ fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
             LargeTopAppBar(
                 title = { Text("About") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    BackButton(onBack)
                 },
                 scrollBehavior = scrollBehavior,
             )

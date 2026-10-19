@@ -34,6 +34,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -231,14 +233,16 @@ fun SignalBars(quality: FixQuality, modifier: Modifier = Modifier) {
 /** The map button: signal bars that open the accuracy card. */
 @Composable
 fun AccuracyButton(quality: FixQuality, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-        shadowElevation = 3.dp,
-        modifier = Modifier.size(48.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) { SignalBars(quality, Modifier.size(width = 20.dp, height = 16.dp)) }
+    Tip("GPS accuracy and satellites") {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+            shadowElevation = 3.dp,
+            modifier = Modifier.size(48.dp).semantics { contentDescription = "GPS accuracy" },
+        ) {
+            Box(contentAlignment = Alignment.Center) { SignalBars(quality, Modifier.size(width = 20.dp, height = 16.dp)) }
+        }
     }
 }
 
@@ -295,12 +299,14 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailInset: Dp = 
                             Text(quality.label, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { explaining = true }, modifier = Modifier.size(36.dp)) {
-                            Box(
-                                Modifier.size(26.dp).border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text("?", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                        Tip("What accuracy means") {
+                            IconButton(onClick = { explaining = true }, modifier = Modifier.size(36.dp)) {
+                                Box(
+                                    Modifier.size(26.dp).border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text("?", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                                }
                             }
                         }
                     }

@@ -167,11 +167,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             title = { Text(if (editing) "Edit dots" else "Timeline") },
             actions = {
                 if (!editing) {
-                    IconButton(onClick = {
-                        edit.day = anchor
-                        edit.showingDeleted = false
-                        editing = true
-                    }) { Icon(Icons.Filled.Edit, contentDescription = "Edit dots") }
+                    Tip("Edit or delete dots for this day") {
+                        IconButton(onClick = {
+                            edit.day = anchor
+                            edit.showingDeleted = false
+                            editing = true
+                        }) { Icon(Icons.Filled.Edit, contentDescription = "Edit dots") }
+                    }
                 }
                 ProfileButton(onClick = onProfile)
             },
@@ -187,14 +189,18 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 }
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { anchor = period.previous().anchor }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
+                Tip("Previous ${scale.label.lowercase()}") {
+                    IconButton(onClick = { anchor = period.previous().anchor }) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
+                    }
                 }
                 TextButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
                     Text(period.label, style = MaterialTheme.typography.titleMedium)
                 }
-                IconButton(onClick = { anchor = period.next().anchor }, enabled = !period.isCurrent) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
+                Tip("Next ${scale.label.lowercase()}") {
+                    IconButton(onClick = { anchor = period.next().anchor }, enabled = !period.isCurrent) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
+                    }
                 }
             }
         }

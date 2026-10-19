@@ -118,7 +118,7 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
             LargeTopAppBar(
                 title = { Text("Profile") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    BackButton(onBack)
                 },
                 scrollBehavior = scrollBehavior,
             )

@@ -109,7 +109,7 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
             LargeTopAppBar(
                 title = { Text("Review") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    BackButton(onBack)
                 },
                 scrollBehavior = scrollBehavior,
             )

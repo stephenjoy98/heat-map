@@ -136,7 +136,7 @@ fun ChangelogScreen(onBack: () -> Unit) {
             LargeTopAppBar(
                 title = { Text("Changelog") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    BackButton(onBack)
                 },
                 scrollBehavior = scrollBehavior,
             )

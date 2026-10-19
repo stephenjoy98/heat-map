@@ -47,22 +47,26 @@ fun MapControls(camera: MapCamera, modifier: Modifier = Modifier, onLayers: (() 
 /** Opens the map layers sheet. */
 @Composable
 fun LayersButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, shape = CircleShape, color = controlColor(), shadowElevation = 3.dp, modifier = modifier.size(48.dp)) {
-        Box(contentAlignment = Alignment.Center) { Icon(LayersIcon, contentDescription = "Map layers") }
+    Tip("Map type and 3D buildings", modifier) {
+        Surface(onClick = onClick, shape = CircleShape, color = controlColor(), shadowElevation = 3.dp, modifier = Modifier.size(48.dp)) {
+            Box(contentAlignment = Alignment.Center) { Icon(LayersIcon, contentDescription = "Map layers") }
+        }
     }
 }
 
 /** A compass that follows the map's rotation; tap to turn the map north up. */
 @Composable
 fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = { camera.northUp() },
-        shape = CircleShape,
-        color = controlColor(),
-        shadowElevation = 3.dp,
-        modifier = modifier.size(48.dp).semantics { contentDescription = "Compass: turn map north up" },
-    ) {
-        CompassNeedle(bearing = camera.bearing, modifier = Modifier.size(48.dp))
+    Tip("Turn the map back to north", modifier) {
+        Surface(
+            onClick = { camera.northUp() },
+            shape = CircleShape,
+            color = controlColor(),
+            shadowElevation = 3.dp,
+            modifier = Modifier.size(48.dp).semantics { contentDescription = "Compass: turn map north up" },
+        ) {
+            CompassNeedle(bearing = camera.bearing, modifier = Modifier.size(48.dp))
+        }
     }
 }
 
@@ -71,13 +75,17 @@ fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
 fun ZoomButtons(camera: MapCamera, modifier: Modifier = Modifier) {
     Surface(shape = RoundedCornerShape(24.dp), color = controlColor(), shadowElevation = 3.dp, modifier = modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            IconButton(onClick = { camera.zoomIn() }, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = "Zoom in")
+            Tip("Zoom in") {
+                IconButton(onClick = { camera.zoomIn() }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.Add, contentDescription = "Zoom in")
+                }
             }
             HorizontalDivider(Modifier.width(28.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            IconButton(onClick = { camera.zoomOut() }, modifier = Modifier.size(48.dp)) {
-                // A plain minus sign; the core icon set has no "remove" glyph.
-                Text("−", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface)
+            Tip("Zoom out") {
+                IconButton(onClick = { camera.zoomOut() }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom out" }) {
+                    // A plain minus sign; the core icon set has no "remove" glyph.
+                    Text("−", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
             }
         }
     }

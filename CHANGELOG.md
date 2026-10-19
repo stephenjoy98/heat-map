@@ -20,6 +20,10 @@ The app shows the entries since your last version as "What's new" after an updat
   ribbon over a translucent curtain, so climbs and descents stand out among the buildings.
 - Map layers button while editing dots on the Timeline.
 - GPX exports include elevation.
+- Long-press any button to see what it does.
+
+### Fixed
+- Tapping the map outside the GPS accuracy card closes it.
 
 ### Changed
 - Backups now include elevation. Older backups and dots recorded before this version have none, so

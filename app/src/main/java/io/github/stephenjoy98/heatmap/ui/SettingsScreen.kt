@@ -170,7 +170,7 @@ fun SettingsScreen(
             LargeTopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    BackButton(onBack)
                 },
                 scrollBehavior = scrollBehavior,
             )

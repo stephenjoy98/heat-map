@@ -153,7 +153,7 @@ private fun AccountPage(
                 title = { Text(title) },
                 navigationIcon = {
                     onBack?.let {
-                        IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                        BackButton(it)
                     }
                 },
                 scrollBehavior = scrollBehavior,

@@ -174,14 +174,18 @@ fun EditPanel(
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Stop editing") }
+                Tip("Stop editing") { IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Stop editing") } }
                 Text("Edit dots", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                IconButton(onClick = { onDay(state.day.minusDays(1)) }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous day")
+                Tip("Previous day") {
+                    IconButton(onClick = { onDay(state.day.minusDays(1)) }) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous day")
+                    }
                 }
                 TextButton(onClick = { picking = true }) { Text(state.day.format(dayFormat)) }
-                IconButton(onClick = { onDay(state.day.plusDays(1)) }, enabled = state.day < LocalDate.now()) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next day")
+                Tip("Next day") {
+                    IconButton(onClick = { onDay(state.day.plusDays(1)) }, enabled = state.day < LocalDate.now()) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next day")
+                    }
                 }
             }
 
@@ -213,14 +217,18 @@ fun EditPanel(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(
-                                onClick = { state.selected = (state.selected!! - 1).also { onFocus(pts[it]) } },
-                                enabled = state.selected!! > 0,
-                            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous dot") }
-                            IconButton(
-                                onClick = { state.selected = (state.selected!! + 1).also { onFocus(pts[it]) } },
-                                enabled = state.selected!! < pts.size - 1,
-                            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next dot") }
+                            Tip("Previous dot") {
+                                IconButton(
+                                    onClick = { state.selected = (state.selected!! - 1).also { onFocus(pts[it]) } },
+                                    enabled = state.selected!! > 0,
+                                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous dot") }
+                            }
+                            Tip("Next dot") {
+                                IconButton(
+                                    onClick = { state.selected = (state.selected!! + 1).also { onFocus(pts[it]) } },
+                                    enabled = state.selected!! < pts.size - 1,
+                                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next dot") }
+                            }
                         }
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { state.selected = null }) { Text("Back to range") }

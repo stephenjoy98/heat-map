@@ -53,6 +53,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -148,6 +151,20 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             cacheKey = "map",
             route3d = route3d,
         )
+        // While the accuracy card is open, touching the map anywhere else closes it. The buttons drawn above
+        // this still work as usual.
+        if (accuracyOpen) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            accuracyOpen = false
+                        }
+                    },
+            )
+        }
 
         Column(
             Modifier
@@ -222,22 +239,24 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 Spacer(Modifier.width(12.dp))
                 // Bottom right, from the corner up: map layers, zoom, then your latest position.
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Surface(
-                        onClick = {
-                            val latest = stats?.latest
-                            if (latest == null) {
-                                scope.launch { snackbar.showSnackbar("No points recorded yet") }
-                            } else {
-                                camera.animateTo(latest.lat, latest.lon, 16f)
+                    Tip("Go to your latest position") {
+                        Surface(
+                            onClick = {
+                                val latest = stats?.latest
+                                if (latest == null) {
+                                    scope.launch { snackbar.showSnackbar("No points recorded yet") }
+                                } else {
+                                    camera.animateTo(latest.lat, latest.lon, 16f)
+                                }
+                            },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                            shadowElevation = 3.dp,
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position")
                             }
-                        },
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                        shadowElevation = 3.dp,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position")
                         }
                     }
                     ZoomButtons(camera)
@@ -274,16 +293,18 @@ private val FilterIcon: ImageVector by lazy {
 /** Shows or hides the travel-mode chips. A dot marks that the map is filtered, even with the chips hidden. */
 @Composable
 private fun FilterButton(open: Boolean, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = if (open) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-        shadowElevation = 3.dp,
-        modifier = modifier.size(48.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            BadgedBox(badge = { if (active) Badge(containerColor = MaterialTheme.colorScheme.primary) }) {
-                Icon(FilterIcon, contentDescription = if (open) "Hide travel mode filters" else "Filter by travel mode")
+    Tip(if (open) "Hide the travel mode filters" else "Filter the map by how you travelled", modifier) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = if (open) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+            shadowElevation = 3.dp,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                BadgedBox(badge = { if (active) Badge(containerColor = MaterialTheme.colorScheme.primary) }) {
+                    Icon(FilterIcon, contentDescription = if (open) "Hide travel mode filters" else "Filter by travel mode")
+                }
             }
         }
     }
@@ -373,18 +394,20 @@ private fun ControlPanel(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilledIconButton(
-                onClick = onToggle,
-                modifier = Modifier.size(60.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = if (tracking) RecordRed else MaterialTheme.colorScheme.primary,
-                ),
-            ) {
-                if (tracking) {
-                    // Stop symbol.
-                    Box(Modifier.size(20.dp).background(Color.White, RoundedCornerShape(3.dp)))
-                } else {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Start recording", modifier = Modifier.size(34.dp), tint = Color.White)
+            Tip(if (tracking) "Stop recording" else "Start recording your location") {
+                FilledIconButton(
+                    onClick = onToggle,
+                    modifier = Modifier.size(60.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = if (tracking) RecordRed else MaterialTheme.colorScheme.primary,
+                    ),
+                ) {
+                    if (tracking) {
+                        // Stop symbol.
+                        Box(Modifier.size(20.dp).background(Color.White, RoundedCornerShape(3.dp)))
+                    } else {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "Start recording", modifier = Modifier.size(34.dp), tint = Color.White)
+                    }
                 }
             }
             Spacer(Modifier.width(16.dp))
