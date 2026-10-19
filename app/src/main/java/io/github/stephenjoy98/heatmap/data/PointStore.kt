@@ -125,7 +125,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 4) {
+    SQLiteOpenHelper(context, "points.db", null, 5) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -225,6 +225,23 @@ class PointStore private constructor(context: Context) :
             db.execSQL("ALTER TABLE places ADD COLUMN state TEXT")
             db.execSQL("ALTER TABLE places ADD COLUMN country_code TEXT")
         }
+        if (oldVersion < 5) {
+            // Soft-deleted points, kept so they can be restored. Same columns as points, plus when it was deleted.
+            db.execSQL(
+                """CREATE TABLE deleted_points (
+                    id INTEGER PRIMARY KEY,
+                    time INTEGER NOT NULL,
+                    lat REAL NOT NULL,
+                    lon REAL NOT NULL,
+                    accuracy REAL NOT NULL,
+                    interval_ms INTEGER NOT NULL,
+                    mode INTEGER NOT NULL DEFAULT 0,
+                    activity INTEGER NOT NULL DEFAULT -1,
+                    deleted_at INTEGER NOT NULL
+                )"""
+            )
+            db.execSQL("CREATE INDEX deleted_points_time ON deleted_points(time)")
+        }
     }
 
     private fun changed() = _changes.update { it + 1 }
@@ -238,14 +255,19 @@ class PointStore private constructor(context: Context) :
         return id != -1L
     }
 
-    /** Inserts many points in one transaction, skipping timestamps already present. Returns how many were new. */
+    /**
+     * Inserts many points in one transaction, skipping timestamps already present and points the user has
+     * deleted (so restoring an older backup doesn't bring them back). Returns how many were new.
+     */
     fun insertAll(points: List<LocationPoint>): Int {
         if (points.isEmpty()) return 0
         val db = writableDatabase
+        val deleted = deletedTimes(points.minOf { it.time }, points.maxOf { it.time } + 1)
         var added = 0
         db.beginTransaction()
         try {
             for (p in points) {
+                if (p.time in deleted) continue
                 if (db.insertWithOnConflict("points", null, p.toValues(), SQLiteDatabase.CONFLICT_IGNORE) != -1L) added++
             }
             db.setTransactionSuccessful()
@@ -272,6 +294,7 @@ class PointStore private constructor(context: Context) :
         db.delete("trips", null, null)
         db.delete("trip_paths", null, null)
         db.delete("road_questions", null, null)
+        db.delete("deleted_points", null, null)
         changed()
     }
 
@@ -362,16 +385,30 @@ class PointStore private constructor(context: Context) :
             buildList { while (c.moveToNext()) add(EditablePoint(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4))) }
         }
 
+    /** Deleted points in the range with their row ids, so they can be restored. */
+    fun deletedPoints(from: Long, to: Long): List<EditablePoint> =
+        readableDatabase.rawQuery(
+            "SELECT id, time, lat, lon, accuracy FROM deleted_points WHERE time >= $from AND time < $to ORDER BY time", null
+        ).use { c ->
+            buildList { while (c.moveToNext()) add(EditablePoint(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4))) }
+        }
+
+    private fun deletedTimes(from: Long, to: Long): Set<Long> =
+        readableDatabase.rawQuery("SELECT time FROM deleted_points WHERE time >= $from AND time < $to", null)
+            .use { c -> buildSet { while (c.moveToNext()) add(c.getLong(0)) } }
+
     /**
-     * Deletes points. Trips they belonged to are dissolved so the trip detector rebuilds them from what's
-     * left (points keep their travel mode, so answers aren't asked again). Returns the edited days and the
-     * remote ids of shared routes that no longer exist.
+     * Soft-deletes points: they move to the deleted_points table, out of the map, stats and backups, and can
+     * be brought back with [restorePoints]. Trips they belonged to are dissolved so the trip detector
+     * rebuilds them from what's left (points keep their travel mode, so answers aren't asked again).
+     * Returns the edited days and the remote ids of shared routes that no longer exist.
      */
     fun deletePoints(ids: Collection<Long>): DeleteResult {
         if (ids.isEmpty()) return DeleteResult(emptySet(), emptyList())
         val db = writableDatabase
         val days = HashSet<String>()
         val remoteIds = mutableListOf<String>()
+        val now = System.currentTimeMillis()
         db.beginTransaction()
         try {
             for (chunk in ids.chunked(500)) {
@@ -380,15 +417,11 @@ class PointStore private constructor(context: Context) :
                     .use { c -> while (c.moveToNext()) days += c.getString(0) }
                 val tripIds = db.rawQuery("SELECT DISTINCT trip_id FROM points WHERE id IN ($list) AND trip_id > 0", null)
                     .use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
-                if (tripIds.isNotEmpty()) {
-                    val trips = tripIds.joinToString(",")
-                    db.rawQuery("SELECT remote_id FROM trips WHERE id IN ($trips) AND remote_id IS NOT NULL", null)
-                        .use { c -> while (c.moveToNext()) remoteIds += c.getString(0) }
-                    db.execSQL("DELETE FROM trips WHERE id IN ($trips)")
-                    db.execSQL("DELETE FROM trip_paths WHERE trip_id IN ($trips)")
-                    db.execSQL("DELETE FROM road_questions WHERE trip_id IN ($trips)")
-                    db.execSQL("UPDATE points SET trip_id = 0 WHERE trip_id IN ($trips)")
-                }
+                dissolveTrips(db, tripIds, remoteIds)
+                db.execSQL(
+                    """INSERT OR REPLACE INTO deleted_points (id, time, lat, lon, accuracy, interval_ms, mode, activity, deleted_at)
+                       SELECT id, time, lat, lon, accuracy, interval_ms, mode, activity, $now FROM points WHERE id IN ($list)"""
+                )
                 db.execSQL("DELETE FROM points WHERE id IN ($list)")
             }
             db.setTransactionSuccessful()
@@ -397,6 +430,55 @@ class PointStore private constructor(context: Context) :
         }
         changed()
         return DeleteResult(days, remoteIds)
+    }
+
+    /**
+     * Brings soft-deleted points back. Trips around them are dissolved so the trip detector rebuilds them with
+     * the restored points included. Returns the edited days and the remote ids of shared routes replaced.
+     */
+    fun restorePoints(ids: Collection<Long>): DeleteResult {
+        if (ids.isEmpty()) return DeleteResult(emptySet(), emptyList())
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        db.beginTransaction()
+        try {
+            for (chunk in ids.chunked(500)) {
+                val list = chunk.joinToString(",")
+                db.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM deleted_points WHERE id IN ($list)", null)
+                    .use { c -> while (c.moveToNext()) days += c.getString(0) }
+                val span = db.rawQuery("SELECT MIN(time), MAX(time) FROM deleted_points WHERE id IN ($list)", null)
+                    .use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) to c.getLong(1) else null } ?: continue
+                // Any trip the restored points could belong to, with some slack for the gap rules.
+                val slack = 30 * 60_000L
+                val tripIds = db.rawQuery(
+                    "SELECT id FROM trips WHERE start_time <= ${span.second + slack} AND end_time >= ${span.first - slack}", null
+                ).use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
+                dissolveTrips(db, tripIds, remoteIds)
+                db.execSQL(
+                    """INSERT OR IGNORE INTO points (id, time, lat, lon, accuracy, interval_ms, mode, activity, trip_id)
+                       SELECT id, time, lat, lon, accuracy, interval_ms, mode, activity, 0 FROM deleted_points WHERE id IN ($list)"""
+                )
+                db.execSQL("DELETE FROM deleted_points WHERE id IN ($list)")
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
+
+    /** Removes trips (and their road data) and hands their points back to the trip detector. */
+    private fun dissolveTrips(db: SQLiteDatabase, tripIds: List<Long>, remoteIds: MutableList<String>) {
+        if (tripIds.isEmpty()) return
+        val trips = tripIds.joinToString(",")
+        db.rawQuery("SELECT remote_id FROM trips WHERE id IN ($trips) AND remote_id IS NOT NULL", null)
+            .use { c -> while (c.moveToNext()) remoteIds += c.getString(0) }
+        db.execSQL("DELETE FROM trips WHERE id IN ($trips)")
+        db.execSQL("DELETE FROM trip_paths WHERE trip_id IN ($trips)")
+        db.execSQL("DELETE FROM road_questions WHERE trip_id IN ($trips)")
+        db.execSQL("UPDATE points SET trip_id = 0 WHERE trip_id IN ($trips)")
     }
 
     // ---- Trips ----

@@ -33,7 +33,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Edit dots**: tap the pencil to fix mapping errors. Pick a day, narrow it down with a **start–end
   slider** (the dots in range are highlighted and joined in time order), or tap a single dot and step
   through its neighbours, then delete. Trips touching deleted dots are rebuilt from what's left, and
-  backups and shared routes are updated on the next sync.
+  backups and shared routes are updated on the next sync. Deleting is a **soft delete**: deleted dots
+  move to a Deleted list for that day (with Undo right after), and you can restore them at any time.
 
 ### Recording
 - Interval slider (15 s … 1 day) plus an exact value in seconds, minutes, hours or days.
@@ -183,3 +184,12 @@ Requires JDK 17 and the Android SDK (API 36).
 The renderer strokes each route at 12% alpha onto an offscreen 512 px tile. Overlaps combine as
 `1 - (1 - a)^n`, so the alpha channel measures how often you've been somewhere, saturating after about
 20 trips. That value is then looked up in the theme's colour ramp.
+
+## Licence
+
+Location Ticker is open source under the [MIT License](LICENSE). It uses third-party libraries, map
+data and emoji artwork under their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+or **About** in the app.
+
+Made with ❤️ by [@stephenjoy98](https://github.com/stephenjoy98) with the help of Claude by Anthropic,
+in Canada.

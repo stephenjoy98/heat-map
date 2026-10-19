@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -126,8 +127,8 @@ fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * Google-style account menu: who's signed in, then Profile, Friends, Backup, Settings and signing
- * in or out.
+ * Google-style account menu: who's signed in, then Profile, Friends, Backup, Settings, About and
+ * signing in or out.
  */
 @Composable
 fun AccountMenu(
@@ -136,6 +137,7 @@ fun AccountMenu(
     onFriends: () -> Unit,
     onBackup: () -> Unit,
     onSettings: () -> Unit,
+    onAbout: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -220,6 +222,7 @@ fun AccountMenu(
                 MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas") { go(onFriends) }
                 MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history") { go(onBackup) }
                 MenuRow(Icons.Filled.Settings, "Settings", null) { go(onSettings) }
+                MenuRow(Icons.Filled.Info, "About", "Who made it, open source and licences") { go(onAbout) }
                 if (user != null) {
                     HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
                     MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign out", null) {

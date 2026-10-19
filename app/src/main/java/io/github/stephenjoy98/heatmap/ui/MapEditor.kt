@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,12 +26,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,14 +55,19 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
-/** What's being edited on the map: one day's dots, the start–end range picked, and a single tapped dot. */
+/**
+ * What's being edited on the map: one day's dots (or its deleted dots, when [showingDeleted]), the start–end
+ * range picked, and a single tapped dot.
+ */
 class DotEditState(day: LocalDate) {
     var day by mutableStateOf(day)
+    var showingDeleted by mutableStateOf(false)
+    var deletedCount by mutableIntStateOf(0)
     var points by mutableStateOf<List<EditablePoint>>(emptyList())
     var range by mutableStateOf(0..0)
     var selected by mutableStateOf<Int?>(null)
 
-    /** The dots a delete would remove: the tapped dot if there is one, otherwise the range. */
+    /** The dots a delete (or restore) would act on: the tapped dot if there is one, otherwise the range. */
     val target: List<EditablePoint>
         get() = selected?.let { listOfNotNull(points.getOrNull(it)) }
             ?: if (points.isEmpty()) emptyList() else points.subList(range.first, range.last + 1)
@@ -75,7 +85,7 @@ class DotEditState(day: LocalDate) {
  */
 @Composable
 fun DotsOverlay(camera: MapCamera, state: DotEditState, modifier: Modifier = Modifier) {
-    val inRange = MaterialTheme.colorScheme.primary
+    val inRange = if (state.showingDeleted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     val outside = MaterialTheme.colorScheme.outline
     val ring = MaterialTheme.colorScheme.surface
     val pick = Color(0xFFE53935)
@@ -141,6 +151,7 @@ fun EditPanel(
     onFocus: (EditablePoint) -> Unit,
     onShow: (List<EditablePoint>) -> Unit,
     onDelete: (List<EditablePoint>) -> Unit,
+    onRestore: (List<EditablePoint>) -> Unit,
     onClose: () -> Unit,
 ) {
     var picking by remember { mutableStateOf(false) }
@@ -167,9 +178,22 @@ fun EditPanel(
                 }
             }
 
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                SegmentedButton(
+                    selected = !state.showingDeleted,
+                    onClick = { state.showingDeleted = false },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                ) { Text("On map") }
+                SegmentedButton(
+                    selected = state.showingDeleted,
+                    onClick = { state.showingDeleted = true },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                ) { Text(if (state.deletedCount > 0) "Deleted (${state.deletedCount})" else "Deleted") }
+            }
+
             when {
                 loading -> Hint("Loading dots…")
-                pts.isEmpty() -> Hint("No dots on this day.")
+                pts.isEmpty() -> Hint(if (state.showingDeleted) "No deleted dots on this day." else "No dots on this day.")
                 else -> {
                     val sel = state.selected?.let { pts.getOrNull(it) }
                     if (sel != null) {
@@ -194,7 +218,11 @@ fun EditPanel(
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { state.selected = null }) { Text("Back to range") }
                             Spacer(Modifier.width(8.dp))
-                            DeleteButton("Delete dot") { confirming = listOf(sel) }
+                            if (state.showingDeleted) {
+                                RestoreButton("Restore dot") { onRestore(listOf(sel)) }
+                            } else {
+                                DeleteButton("Delete dot") { confirming = listOf(sel) }
+                            }
                         }
                     } else {
                         val first = pts[state.range.first]
@@ -224,7 +252,11 @@ fun EditPanel(
                                 modifier = Modifier.weight(1f),
                             )
                             TextButton(onClick = { onShow(state.target) }) { Text("Show") }
-                            DeleteButton(if (count == 1) "Delete dot" else "Delete $count") { confirming = state.target }
+                            if (state.showingDeleted) {
+                                RestoreButton(if (count == 1) "Restore dot" else "Restore $count") { onRestore(state.target) }
+                            } else {
+                                DeleteButton(if (count == 1) "Delete dot" else "Delete $count") { confirming = state.target }
+                            }
                         }
                     }
                 }
@@ -242,7 +274,7 @@ fun EditPanel(
                     "Recorded ${time(doomed.first().time)}" +
                         (if (doomed.size > 1) " – ${time(doomed.last().time)}" else "") +
                         " on ${state.day.format(dayFormat)}. Trips on this stretch are rebuilt from the dots that are left. " +
-                        "This can't be undone."
+                        "You can bring them back later from Deleted."
                 )
             },
             confirmButton = {
@@ -280,6 +312,15 @@ private fun Hint(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 12.dp),
     )
+}
+
+@Composable
+private fun RestoreButton(label: String, onClick: () -> Unit) {
+    Button(onClick = onClick) {
+        Icon(Icons.Filled.Refresh, contentDescription = null)
+        Spacer(Modifier.width(6.dp))
+        Text(label)
+    }
 }
 
 @Composable

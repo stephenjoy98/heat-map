@@ -40,7 +40,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
+import io.github.stephenjoy98.heatmap.data.DeleteResult
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Stats
@@ -113,7 +116,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     var editLoading by remember { mutableStateOf(false) }
     var editReload by remember { mutableIntStateOf(0) }
     var framedDay by remember { mutableStateOf<LocalDate?>(null) }
-    LaunchedEffect(editing, edit.day, editReload) {
+    LaunchedEffect(editing, edit.day, edit.showingDeleted, editReload) {
         if (!editing) {
             framedDay = null
             return@LaunchedEffect
@@ -122,7 +125,11 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
         val zone = ZoneId.systemDefault()
         val from = edit.day.atStartOfDay(zone).toInstant().toEpochMilli()
         val to = edit.day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val pts = withContext(Dispatchers.IO) { store.editablePoints(from, to) }
+        val (pts, deleted) = withContext(Dispatchers.IO) {
+            val deleted = store.deletedPoints(from, to)
+            (if (edit.showingDeleted) deleted else store.editablePoints(from, to)) to deleted.size
+        }
+        edit.deletedCount = deleted
         edit.load(pts)
         editLoading = false
         if (framedDay != edit.day) {
@@ -237,15 +244,24 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     onDelete = { doomed ->
                         scope.launch {
                             val result = withContext(Dispatchers.IO) { store.deletePoints(doomed.map { it.id }) }
-                            // Make sure backups and shared routes drop the deleted dots too.
-                            Prefs.addDirtyBackupDays(result.days)
-                            if (result.removedRemoteIds.isNotEmpty()) {
-                                Prefs.setPendingRouteDeletes(Prefs.pendingRouteDeletes + result.removedRemoteIds)
-                            }
-                            withContext(Dispatchers.IO) { TripDetector.process(context) }
-                            RoadSnapWorker.runNow(context)
+                            afterDotEdit(context, result)
                             editReload++
-                            snackbar.showSnackbar(if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted")
+                            val undo = snackbar.showSnackbar(
+                                if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted",
+                                actionLabel = "Undo",
+                                duration = SnackbarDuration.Long,
+                            )
+                            if (undo == SnackbarResult.ActionPerformed) {
+                                afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(doomed.map { it.id }) })
+                                editReload++
+                            }
+                        }
+                    },
+                    onRestore = { back ->
+                        scope.launch {
+                            afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(back.map { it.id }) })
+                            editReload++
+                            snackbar.showSnackbar(if (back.size == 1) "Dot restored" else "${back.size} dots restored")
                         }
                     },
                     onClose = { editing = false },
@@ -264,6 +280,16 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             )
         }
     }
+}
+
+/** After deleting or restoring dots: rebuild trips, and make sure backups and shared routes catch up. */
+private suspend fun afterDotEdit(context: Context, result: DeleteResult) {
+    Prefs.addDirtyBackupDays(result.days)
+    if (result.removedRemoteIds.isNotEmpty()) {
+        Prefs.setPendingRouteDeletes(Prefs.pendingRouteDeletes + result.removedRemoteIds)
+    }
+    withContext(Dispatchers.IO) { TripDetector.process(context) }
+    RoadSnapWorker.runNow(context)
 }
 
 @Composable

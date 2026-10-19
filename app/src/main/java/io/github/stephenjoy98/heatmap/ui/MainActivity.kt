@@ -111,6 +111,7 @@ private fun AppScaffold(
     var backupOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
+    var aboutOpen by rememberSaveable { mutableStateOf(false) }
     val friendsRequested by openFriends.collectAsStateWithLifecycle()
     var resumeTick by remember { mutableIntStateOf(0) }
     val pendingInvite by invite.collectAsStateWithLifecycle()
@@ -159,11 +160,17 @@ private fun AppScaffold(
             onFriends = { friendsOpen = true },
             onBackup = { backupOpen = true },
             onSettings = { settingsOpen = true },
+            onAbout = { aboutOpen = true },
         )
     }
 
     if (settingsOpen) {
         SettingsScreen(store = store, resumeTick = resumeTick, onBack = { settingsOpen = false })
+        return
+    }
+
+    if (aboutOpen) {
+        AboutScreen(onBack = { aboutOpen = false })
         return
     }
 
