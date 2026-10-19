@@ -113,13 +113,17 @@ object VectorMaps {
         if (below != null) style.addLayerBelow(hillshade, below) else style.addLayer(hillshade)
     }
 
-    /** The elevation source behind terrain shading. A new one is needed for each style. */
+    /**
+     * The elevation source behind terrain shading. A new one is needed for each style. The tiles are 256 px,
+     * but declaring them as 128 makes MapLibre fetch tiles two zoom levels more detailed than it otherwise
+     * would (up to the data's maximum, zoom 15), so hills stay sharp on high-density screens.
+     */
     fun terrainSource(): RasterDemSource {
         val tiles = TileSet("2.2.0", "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png").apply {
             encoding = "terrarium"
             setMaxZoom(15f)
         }
-        return RasterDemSource(TERRAIN_SOURCE, tiles, 256)
+        return RasterDemSource(TERRAIN_SOURCE, tiles, TERRAIN_TILE_SIZE)
     }
 
     /** Hill shading from [terrainSource], softer on the dark map. */
@@ -208,6 +212,7 @@ object VectorMaps {
         style.layers.firstOrNull { match(it.id.lowercase(), it) }?.id
 
     private const val TERRAIN_SOURCE = "terrain-dem"
+    private const val TERRAIN_TILE_SIZE = 128
     private const val BUILDINGS_LAYER = "buildings-3d"
     private val building3dLight = Color.parseColor("#DADCE0")
     private val building3dDark = Color.parseColor("#262626")

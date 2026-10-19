@@ -113,7 +113,7 @@ def render(suffix, t):
     d.line([(0, 300), (90, 280), (170, 315), (260, 300), (S, 340)], fill=hexc(t['stream']), width=8, joint='curve')
     d.line([(20, S), (80, 250), (150, 210), (210, 150), (300, 120), (S, 90)], fill=hexc(t['trail']), width=7, joint='curve')
     terrain = marker(terrain, 150, 210)
-    terrain.filter(ImageFilter.SMOOTH).save(f'{out}/layer_terrain{suffix}.webp', quality=85, method=6)
+    terrain.save(f'{out}/layer_terrain{suffix}.webp', quality=94, method=6)
 
 for suffix, theme in THEMES.items():
     render(suffix, theme)

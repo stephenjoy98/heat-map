@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-10-19
+
+### Changed
+- Sharper terrain: hill shading uses elevation data two zoom levels more detailed, so it no longer looks
+  blurry on high-resolution screens.
+- Crisper Terrain picture in the layers sheet.
+
 ## [2.15.0] - 2026-10-19
 
 ### Removed
