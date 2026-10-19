@@ -38,7 +38,9 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type
   (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) on
   OpenStreetMap; Google's terrain map with a key), and **3D buildings** under Map details, which tilts
-  the map so buildings stand up.
+  the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
+  routes are drawn as a ribbon at their recorded height (relative to the lowest point in view,
+  exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain. OpenStreetMap maps only.
 - **GPS accuracy** (signal-bars button, like Fog of World): live accuracy in metres with a Good / Fair /
   Poor / Too weak badge, satellites in use and in view (by constellation: GPS, Galileo, GLONASS,
   BeiDou…), heading and speed, and the time of the fix. The **?** explains what accuracy

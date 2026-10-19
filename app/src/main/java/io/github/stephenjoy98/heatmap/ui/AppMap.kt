@@ -9,6 +9,15 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Dispatchers
+import io.github.stephenjoy98.heatmap.data.Route3d
+import io.github.stephenjoy98.heatmap.data.GeoBox
+import io.github.stephenjoy98.heatmap.data.ElevationPoint
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -142,6 +151,9 @@ fun AppMap(
     showMyLocation: Boolean = false,
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
     cacheKey: String? = null,
+    // Loads routes with heights for an area; with 3D buildings on, they're drawn as a 3D route. Runs off
+    // the main thread. OpenStreetMap maps only.
+    route3d: ((GeoBox) -> List<List<ElevationPoint>>)? = null,
 ) {
     val dark = isDarkTheme()
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
@@ -150,7 +162,7 @@ fun AppMap(
     if (useGoogleMaps()) {
         GoogleAppMap(camera, layers, style, refreshKey, showMyLocation, onMapClick, modifier)
     } else {
-        VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, modifier)
+        VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, route3d, modifier)
     }
 }
 
@@ -267,6 +279,9 @@ private class VectorMapHolder(context: Context) {
     var onClick: ((Double, Double) -> Unit)? = null
     var setUp = false
 
+    /** Goes up each time a style finishes loading, so extra layers can be added back. */
+    var styleVersion by mutableIntStateOf(0)
+
     fun destroy() {
         overlay.release()
         mapView.onDestroy()
@@ -304,6 +319,7 @@ private class VectorMapHolder(context: Context) {
             if (look.terrain) VectorMaps.addTerrain(style, look.dark)
             if (look.buildings) VectorMaps.addBuildings(style, look.dark)
             onLoaded(style)
+            styleVersion++
         }
     }
 }
@@ -365,6 +381,7 @@ private fun rememberVectorMap(cacheKey: String? = null): VectorMapHolder {
 // Google Maps zoom levels count 256 px tiles; MapLibre counts 512 px tiles, so it's one level lower.
 private fun Float.toVectorZoom(): Double = (this - 1f).toDouble().coerceAtLeast(0.0)
 
+@OptIn(FlowPreview::class)
 @Composable
 private fun VectorAppMap(
     camera: MapCamera,
@@ -374,9 +391,11 @@ private fun VectorAppMap(
     latest: LatLng?,
     onMapClick: ((Double, Double) -> Unit)?,
     cacheKey: String?,
+    route3d: ((GeoBox) -> List<List<ElevationPoint>>)?,
     modifier: Modifier,
 ) {
     val holder = rememberVectorMap(cacheKey)
+    val loadRoute3d by rememberUpdatedState(route3d)
     val overlay = holder.overlay
     SideEffect { holder.onClick = onMapClick }
 
@@ -435,6 +454,25 @@ private fun VectorAppMap(
     LaunchedEffect(refreshKey) {
         delay(1500)
         overlay.refresh()
+    }
+
+    // 3D route: while 3D buildings are on, load the routes in view whenever the camera settles (or the style
+    // reloads, or new dots arrive) and draw them at their recorded heights.
+    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey) {
+        if (!look.buildings || route3d == null) {
+            holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
+            return@LaunchedEffect
+        }
+        snapshotFlow { camera.cameraTick to holder.styleVersion }
+            .debounce(400)
+            .collectLatest {
+                val m = holder.map ?: return@collectLatest
+                val b = m.projection.visibleRegion.latLngBounds
+                val box = GeoBox(b.latitudeNorth, b.latitudeSouth, b.longitudeEast, b.longitudeWest)
+                val load = loadRoute3d ?: return@collectLatest
+                val segments = withContext(Dispatchers.IO) { Route3d.build(load(box)) }
+                m.style?.let { VectorMaps.showRoute3d(it, segments) }
+            }
     }
 
     LaunchedEffect(camera) {

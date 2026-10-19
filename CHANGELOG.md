@@ -12,6 +12,19 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-10-19
+
+### Added
+- Elevation is recorded with every dot (height above sea level where your phone provides it).
+- 3D routes: with 3D buildings on, your routes are drawn at the heights they were recorded at, as a
+  ribbon over a translucent curtain, so climbs and descents stand out among the buildings.
+- Map layers button while editing dots on the Timeline.
+- GPX exports include elevation.
+
+### Changed
+- Backups now include elevation. Older backups and dots recorded before this version have none, so
+  they stay flat in 3D.
+
 ## [2.13.1] - 2026-10-19
 
 ### Changed

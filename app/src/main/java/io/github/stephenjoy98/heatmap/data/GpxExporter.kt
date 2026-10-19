@@ -2,6 +2,7 @@ package io.github.stephenjoy98.heatmap.data
 
 import java.io.OutputStream
 import java.time.Instant
+import java.util.Locale
 
 /** Writes all points as GPX, one track segment per continuous route. */
 object GpxExporter {
@@ -17,7 +18,9 @@ object GpxExporter {
                     if (last != null) w.write("</trkseg>\n")
                     w.write("<trkseg>\n")
                 }
-                w.write("<trkpt lat=\"${p.lat}\" lon=\"${p.lon}\"><time>${Instant.ofEpochMilli(p.time)}</time></trkpt>\n")
+                // GPX puts elevation before time.
+                val ele = p.altitude?.let { "<ele>${"%.1f".format(Locale.US, it)}</ele>" } ?: ""
+                w.write("<trkpt lat=\"${p.lat}\" lon=\"${p.lon}\">$ele<time>${Instant.ofEpochMilli(p.time)}</time></trkpt>\n")
                 prev = p
             }
             if (prev != null) w.write("</trkseg>\n")

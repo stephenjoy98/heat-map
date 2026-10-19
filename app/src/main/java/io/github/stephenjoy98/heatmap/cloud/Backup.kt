@@ -69,6 +69,8 @@ object Backup {
         "iv" to points.map { it.intervalMs },
         "at" to points.map { it.activity },
         "md" to points.map { it.mode },
+        // Firestore lists can't hold nulls, so a missing altitude is stored as NaN.
+        "al" to points.map { it.altitude ?: Double.NaN },
     )
 
     private fun decode(data: Map<String, Any>): List<LocationPoint> {
@@ -80,6 +82,7 @@ object Backup {
         val iv = nums("iv")
         val at = nums("at")
         val md = nums("md")
+        val al = nums("al")
         return t.indices.mapNotNull { i ->
             if (i >= la.size || i >= lo.size) return@mapNotNull null
             LocationPoint(
@@ -90,6 +93,7 @@ object Backup {
                 intervalMs = iv.getOrNull(i)?.toInt() ?: 60_000,
                 activity = at.getOrNull(i)?.toInt() ?: -1,
                 mode = md.getOrNull(i)?.toInt() ?: 0,
+                altitude = al.getOrNull(i)?.toDouble()?.takeUnless { it.isNaN() },
             )
         }
     }

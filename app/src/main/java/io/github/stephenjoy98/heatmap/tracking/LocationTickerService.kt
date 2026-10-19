@@ -147,6 +147,7 @@ class LocationTickerService : Service() {
                 accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
                 intervalMs = intervalMs.toInt(),
                 activity = ActivityTracker.current,
+                altitude = altitudeOf(location),
             )
         )
         lastSavedAt = location.time
@@ -218,6 +219,13 @@ class LocationTickerService : Service() {
     }
 
     companion object {
+        /** Height above sea level where Android provides it (14+), otherwise GPS height; null if neither. */
+        fun altitudeOf(location: Location): Double? = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && location.hasMslAltitude() -> location.mslAltitudeMeters
+            location.hasAltitude() -> location.altitude
+            else -> null
+        }
+
         const val CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "io.github.stephenjoy98.heatmap.STOP"

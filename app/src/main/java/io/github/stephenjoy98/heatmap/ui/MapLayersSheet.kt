@@ -110,7 +110,8 @@ fun MapLayersSheet(onDismiss: () -> Unit, center: Pair<Double, Double>? = null) 
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "3D buildings tilt the map; drag up or down with two fingers to change the angle.",
+                "3D buildings tilt the map and show your routes at the heights they were recorded at. Drag up or down " +
+                    "with two fingers to change the angle.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

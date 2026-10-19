@@ -20,6 +20,8 @@ data class LocationPoint(
     val intervalMs: Int,
     val activity: Int = -1,
     val mode: Int = TravelMode.UNKNOWN.id,
+    /** Height in metres (above sea level where the phone reports it), or null if the fix had none. */
+    val altitude: Double? = null,
 )
 
 data class GeoBox(val north: Double, val south: Double, val east: Double, val west: Double) {
@@ -127,7 +129,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 6) {
+    SQLiteOpenHelper(context, "points.db", null, 7) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -260,6 +262,11 @@ class PointStore private constructor(context: Context) :
                 )"""
             )
         }
+        if (oldVersion < 7) {
+            // Elevation of each dot, for 3D routes. Older dots have none.
+            db.execSQL("ALTER TABLE points ADD COLUMN altitude REAL")
+            db.execSQL("ALTER TABLE deleted_points ADD COLUMN altitude REAL")
+        }
     }
 
     private fun changed() = _changes.update { it + 1 }
@@ -308,6 +315,7 @@ class PointStore private constructor(context: Context) :
         put("interval_ms", intervalMs)
         put("activity", activity)
         put("mode", mode)
+        if (altitude == null) putNull("altitude") else put("altitude", altitude)
     }
 
     fun deleteAll() {
@@ -336,6 +344,39 @@ class PointStore private constructor(context: Context) :
         long("SELECT COUNT(*) FROM points WHERE ${where(box)}${modeClause(modes)}").toInt()
 
     /** Points in time order; with [skipSnapped], leaves out trips that have a road-snapped shape. */
+    /**
+     * Dots with a height in [box], split into continuous routes with the same rules as the map. Capped so a
+     * zoomed-out view of a long history stays quick; dots without a height are left out.
+     */
+    fun elevationTracksIn(box: GeoBox, modes: Set<TravelMode>, limit: Int = 60_000): List<List<ElevationPoint>> {
+        val tracks = ArrayList<List<ElevationPoint>>()
+        var current = ArrayList<ElevationPoint>()
+        var prevTime = 0L
+        var prevLat = 0.0
+        var prevLon = 0.0
+        readableDatabase.rawQuery(
+            "SELECT time, lat, lon, interval_ms, altitude FROM points WHERE ${where(box)}${modeClause(modes)} " +
+                "AND altitude IS NOT NULL ORDER BY time LIMIT $limit",
+            null,
+        ).use { c ->
+            while (c.moveToNext()) {
+                val time = c.getLong(0)
+                val lat = c.getDouble(1)
+                val lon = c.getDouble(2)
+                if (current.isNotEmpty() && TrackRules.isBreak(prevTime, prevLat, prevLon, time, lat, lon, c.getInt(3))) {
+                    if (current.size >= 2) tracks += current
+                    current = ArrayList()
+                }
+                current += ElevationPoint(lat, lon, c.getDouble(4))
+                prevTime = time
+                prevLat = lat
+                prevLon = lon
+            }
+        }
+        if (current.size >= 2) tracks += current
+        return tracks
+    }
+
     fun tracksIn(box: GeoBox, modes: Set<TravelMode>, skipSnapped: Boolean = false): TrackData =
         readableDatabase.rawQuery(
             "SELECT time, lat, lon, interval_ms FROM points WHERE ${where(box)}${modeClause(modes)}" +
@@ -442,8 +483,8 @@ class PointStore private constructor(context: Context) :
                     .use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
                 dissolveTrips(db, tripIds, remoteIds)
                 db.execSQL(
-                    """INSERT OR REPLACE INTO deleted_points (id, time, lat, lon, accuracy, interval_ms, mode, activity, deleted_at)
-                       SELECT id, time, lat, lon, accuracy, interval_ms, mode, activity, $now FROM points WHERE id IN ($list)"""
+                    """INSERT OR REPLACE INTO deleted_points (id, time, lat, lon, accuracy, interval_ms, mode, activity, altitude, deleted_at)
+                       SELECT id, time, lat, lon, accuracy, interval_ms, mode, activity, altitude, $now FROM points WHERE id IN ($list)"""
                 )
                 db.execSQL("DELETE FROM points WHERE id IN ($list)")
             }
@@ -480,8 +521,8 @@ class PointStore private constructor(context: Context) :
                 ).use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
                 dissolveTrips(db, tripIds, remoteIds)
                 db.execSQL(
-                    """INSERT OR IGNORE INTO points (id, time, lat, lon, accuracy, interval_ms, mode, activity, trip_id)
-                       SELECT id, time, lat, lon, accuracy, interval_ms, mode, activity, 0 FROM deleted_points WHERE id IN ($list)"""
+                    """INSERT OR IGNORE INTO points (id, time, lat, lon, accuracy, interval_ms, mode, activity, altitude, trip_id)
+                       SELECT id, time, lat, lon, accuracy, interval_ms, mode, activity, altitude, 0 FROM deleted_points WHERE id IN ($list)"""
                 )
                 db.execSQL("DELETE FROM deleted_points WHERE id IN ($list)")
             }
@@ -1081,7 +1122,10 @@ class PointStore private constructor(context: Context) :
     private fun Cursor.getStringOrNull(i: Int): String? = if (isNull(i)) null else getString(i)
 
     private fun Cursor.toPoint() =
-        LocationPoint(getLong(0), getDouble(1), getDouble(2), getFloat(3), getInt(4), getInt(5), getInt(6))
+        LocationPoint(
+            getLong(0), getDouble(1), getDouble(2), getFloat(3), getInt(4), getInt(5), getInt(6),
+            if (isNull(7)) null else getDouble(7),
+        )
 
     // Box values are doubles we computed ourselves, so inlining them into SQL is safe.
     private fun where(box: GeoBox) =
@@ -1091,7 +1135,7 @@ class PointStore private constructor(context: Context) :
         if (modes.size >= TravelMode.entries.size) "" else " AND mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
 
     companion object {
-        private const val POINT_COLS = "time, lat, lon, accuracy, interval_ms, activity, mode"
+        private const val POINT_COLS = "time, lat, lon, accuracy, interval_ms, activity, mode, altitude"
 
         @Volatile
         private var instance: PointStore? = null

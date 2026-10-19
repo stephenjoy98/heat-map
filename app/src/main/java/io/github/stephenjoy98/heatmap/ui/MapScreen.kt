@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
+import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Stats
@@ -112,6 +113,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val covered = LocalCovered.current
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
     val signal = rememberFixQuality(liveFix)
+    // Routes at their recorded heights, for the 3D buildings view.
+    val route3d = remember(filter) { { box: GeoBox -> store.elevationTracksIn(box, filter) } }
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
         listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
     }
@@ -143,6 +146,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             latest = stats?.latest?.let { LatLng(it.lat, it.lon) },
             showMyLocation = hasLocation,
             cacheKey = "map",
+            route3d = route3d,
         )
 
         Column(

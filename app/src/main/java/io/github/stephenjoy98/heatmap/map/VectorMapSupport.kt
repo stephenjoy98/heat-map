@@ -11,6 +11,12 @@ import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
 import android.view.View
+import io.github.stephenjoy98.heatmap.data.Route3d
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.style.expressions.Expression
@@ -140,6 +146,63 @@ object VectorMaps {
         val below = firstLayerAbove(style) { _, layer -> layer is SymbolLayer }
         if (below != null) style.addLayerBelow(extrusion, below) else style.addLayer(extrusion)
     }
+
+    /**
+     * Shows routes in 3D: a translucent curtain from the ground up to each hop's height, topped by a solid
+     * ribbon, so the route visibly climbs and descends among the 3D buildings. Replaces any previous route.
+     */
+    fun showRoute3d(style: Style, segments: List<Route3d.Segment>) {
+        if (!style.isFullyLoaded) return
+        val features = segments.map { seg ->
+            val c = seg.corners
+            val ring = listOf(
+                Point.fromLngLat(c[1], c[0]), Point.fromLngLat(c[3], c[2]),
+                Point.fromLngLat(c[5], c[4]), Point.fromLngLat(c[7], c[6]),
+                Point.fromLngLat(c[1], c[0]),
+            )
+            Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
+                addNumberProperty("h", seg.heightM)
+                addNumberProperty("t", seg.heightM + RIBBON_M)
+            }
+        }
+        val data = FeatureCollection.fromFeatures(features)
+        val source = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)
+        if (source != null) {
+            source.setGeoJson(data)
+            return
+        }
+        style.addSource(GeoJsonSource(ROUTE_SOURCE, data))
+        val curtain = FillExtrusionLayer(ROUTE_CURTAIN, ROUTE_SOURCE).withProperties(
+            PropertyFactory.fillExtrusionColor(routeColor),
+            PropertyFactory.fillExtrusionBase(0f),
+            PropertyFactory.fillExtrusionHeight(Expression.get("h")),
+            PropertyFactory.fillExtrusionOpacity(0.28f),
+        )
+        val ribbon = FillExtrusionLayer(ROUTE_RIBBON, ROUTE_SOURCE).withProperties(
+            PropertyFactory.fillExtrusionColor(routeColor),
+            PropertyFactory.fillExtrusionBase(Expression.get("h")),
+            PropertyFactory.fillExtrusionHeight(Expression.get("t")),
+            PropertyFactory.fillExtrusionOpacity(0.95f),
+        )
+        // Labels stay on top.
+        val below = firstLayerAbove(style) { _, layer -> layer is SymbolLayer }
+        for (layer in listOf(curtain, ribbon)) {
+            if (below != null) style.addLayerBelow(layer, below) else style.addLayer(layer)
+        }
+    }
+
+    fun clearRoute3d(style: Style) {
+        if (!style.isFullyLoaded) return
+        style.removeLayer(ROUTE_RIBBON)
+        style.removeLayer(ROUTE_CURTAIN)
+        style.removeSource(ROUTE_SOURCE)
+    }
+
+    private const val ROUTE_SOURCE = "route-3d"
+    private const val ROUTE_CURTAIN = "route-3d-curtain"
+    private const val ROUTE_RIBBON = "route-3d-ribbon"
+    private const val RIBBON_M = 1.5
+    private val routeColor = Color.parseColor("#FF7A1A")
 
     private fun firstLayerAbove(style: Style, match: (id: String, layer: Layer) -> Boolean): String? =
         style.layers.firstOrNull { match(it.id.lowercase(), it) }?.id

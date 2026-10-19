@@ -120,6 +120,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val editSnackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val tapRadiusPx = 32 * context.resources.displayMetrics.density
+    var layersOpen by remember { mutableStateOf(false) }
+    val route3d = remember { { box: GeoBox -> store.elevationTracksIn(box, TravelMode.entries.toSet()) } }
 
     val layers = remember(data, dark, editing) {
         val d = data ?: return@remember emptyList()
@@ -210,6 +212,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 modifier = Modifier.fillMaxSize(),
                 refreshKey = data,
                 cacheKey = "timeline",
+                route3d = route3d,
                 onMapClick = if (editing) {
                     { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
                 } else {
@@ -218,6 +221,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             )
             if (editing) {
                 DotsOverlay(camera, edit, Modifier.fillMaxSize())
+                // Map type and 3D buildings, right where you're editing.
+                LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
                 SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
             } else if (data == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -294,6 +299,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 }
             }
         }
+    }
+
+    if (layersOpen) {
+        MapLayersSheet(
+            onDismiss = { layersOpen = false },
+            center = edit.points.getOrNull(edit.points.size / 2)?.let { it.lat to it.lon },
+        )
     }
 
     if (picking) {
