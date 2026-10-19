@@ -218,7 +218,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 .padding(top = 8.dp + 48.dp + 12.dp, end = 12.dp),
         )
 
-        if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false }, center = stats?.latest?.let { it.lat to it.lon })
+        if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false })
 
         Column(modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {

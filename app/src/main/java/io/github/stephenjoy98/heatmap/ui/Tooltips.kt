@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,13 +21,16 @@ import androidx.compose.ui.Modifier
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Tip(text: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(text) } },
-        state = rememberTooltipState(),
-        modifier = modifier,
-        content = content,
-    )
+    // The outer Box carries the layout modifiers, so alignment inside a parent Box (which only applies to
+    // direct children) still works.
+    Box(modifier) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = { PlainTooltip { Text(text) } },
+            state = rememberTooltipState(),
+            content = content,
+        )
+    }
 }
 
 /** The back arrow for page top bars, with its tooltip. */

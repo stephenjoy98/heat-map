@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.14.2] - 2026-10-19
+
+### Changed
+- The Default and Terrain tiles in the layers sheet show clear pictures of a street map and a terrain map.
+
+### Fixed
+- The compass sits under the profile button on the right again (it had slipped to the left).
+- Buttons with long-press tips keep their places on the map.
+
 ## [2.14.1] - 2026-10-19
 
 ### Changed

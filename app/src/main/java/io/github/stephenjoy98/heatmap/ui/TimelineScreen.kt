@@ -309,10 +309,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     }
 
     if (layersOpen) {
-        MapLayersSheet(
-            onDismiss = { layersOpen = false },
-            center = edit.points.getOrNull(edit.points.size / 2)?.let { it.lat to it.lon },
-        )
+        MapLayersSheet(onDismiss = { layersOpen = false })
     }
 
     if (picking) {
