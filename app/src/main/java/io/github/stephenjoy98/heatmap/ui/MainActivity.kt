@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
     /** Friend code from an invite link, waiting to be confirmed. */
     private val invite = MutableStateFlow<String?>(null)
     private val requestedTab = MutableStateFlow<Int?>(null)
+    private val openFriends = MutableStateFlow(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +66,7 @@ class MainActivity : ComponentActivity() {
             }
             TickerTheme(dark) {
                 val onboarded by Prefs.onboarded.collectAsStateWithLifecycle()
-                if (onboarded) AppScaffold(invite, requestedTab) else OnboardingScreen()
+                if (onboarded) AppScaffold(invite, requestedTab, openFriends) else OnboardingScreen()
             }
         }
     }
@@ -80,7 +81,7 @@ class MainActivity : ComponentActivity() {
         intent.data?.takeIf { it.scheme == "locationticker" && it.host == "friend" }?.let { uri ->
             Account.parseCode(uri.toString())?.let {
                 invite.value = it
-                requestedTab.value = TAB_FRIENDS
+                openFriends.value = true
             }
         }
         if (intent.hasExtra(EXTRA_TAB)) requestedTab.value = intent.getIntExtra(EXTRA_TAB, TAB_MAP)
@@ -89,19 +90,26 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_TAB = "tab"
         const val TAB_MAP = 0
-        const val TAB_REVIEW = 1
-        const val TAB_FRIENDS = 2
+        const val TAB_TIMELINE = 1
+        const val TAB_REVIEW = 2
     }
 }
 
 @Composable
-private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: MutableStateFlow<Int?>) {
+private fun AppScaffold(
+    invite: MutableStateFlow<String?>,
+    requestedTab: MutableStateFlow<Int?>,
+    openFriends: MutableStateFlow<Boolean>,
+) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableIntStateOf(MainActivity.TAB_MAP) }
     var comparing by remember { mutableStateOf<Friend?>(null) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var friendsOpen by rememberSaveable { mutableStateOf(false) }
+    var profileOpen by remember { mutableStateOf(false) }
+    val friendsRequested by openFriends.collectAsStateWithLifecycle()
     var resumeTick by remember { mutableIntStateOf(0) }
     val pendingInvite by invite.collectAsStateWithLifecycle()
     val wantedTab by requestedTab.collectAsStateWithLifecycle()
@@ -109,6 +117,13 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
     val changes by store.changes.collectAsStateWithLifecycle()
     val questions by produceState(0, changes, resumeTick) {
         value = withContext(Dispatchers.IO) { store.tripsNeedingReview().size + store.openRoadQuestions().size }
+    }
+
+    LaunchedEffect(friendsRequested) {
+        if (friendsRequested) {
+            friendsOpen = true
+            openFriends.value = false
+        }
     }
 
     LaunchedEffect(wantedTab) {
@@ -134,6 +149,15 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
         if (user != null) SyncWorker.runNow(context)
     }
 
+    val openProfile = { profileOpen = true }
+    if (profileOpen) {
+        ProfileDialog(
+            onDismiss = { profileOpen = false },
+            onFriends = { friendsOpen = true },
+            onSettings = { settingsOpen = true },
+        )
+    }
+
     if (settingsOpen) {
         SettingsScreen(store = store, resumeTick = resumeTick, onBack = { settingsOpen = false })
         return
@@ -141,6 +165,20 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
 
     comparing?.let { friend ->
         CompareScreen(friend, onBack = { comparing = null })
+        return
+    }
+
+    if (friendsOpen) {
+        Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
+            FriendsScreen(
+                contentPadding = padding,
+                snackbar = snackbar,
+                pendingInvite = pendingInvite,
+                onInviteHandled = { invite.value = null },
+                onCompare = { comparing = it },
+                onBack = { friendsOpen = false },
+            )
+        }
         return
     }
 
@@ -157,34 +195,28 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
                     label = { Text("Map") },
                 )
                 NavigationBarItem(
+                    selected = tab == MainActivity.TAB_TIMELINE,
+                    onClick = { tab = MainActivity.TAB_TIMELINE },
+                    icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                    label = { Text("Timeline") },
+                )
+                NavigationBarItem(
                     selected = tab == MainActivity.TAB_REVIEW,
                     onClick = { tab = MainActivity.TAB_REVIEW },
                     icon = {
                         BadgedBox(badge = { if (questions > 0) Badge { Text(questions.toString()) } }) {
-                            Icon(Icons.Filled.DateRange, contentDescription = null)
+                            Icon(Icons.Filled.Star, contentDescription = null)
                         }
                     },
                     label = { Text("Review") },
-                )
-                NavigationBarItem(
-                    selected = tab == MainActivity.TAB_FRIENDS,
-                    onClick = { tab = MainActivity.TAB_FRIENDS },
-                    icon = { Icon(Icons.Filled.Person, contentDescription = null) },
-                    label = { Text("Friends") },
                 )
             }
         },
     ) { padding ->
         when (tab) {
-            MainActivity.TAB_REVIEW -> ReviewScreen(padding, resumeTick)
-            MainActivity.TAB_FRIENDS -> FriendsScreen(
-                contentPadding = padding,
-                snackbar = snackbar,
-                pendingInvite = pendingInvite,
-                onInviteHandled = { invite.value = null },
-                onCompare = { comparing = it },
-            )
-            else -> MapScreen(padding, snackbar, resumeTick, onOpenSettings = { settingsOpen = true })
+            MainActivity.TAB_TIMELINE -> TimelineScreen(padding, resumeTick, onProfile = openProfile)
+            MainActivity.TAB_REVIEW -> ReviewScreen(padding, resumeTick, onProfile = openProfile)
+            else -> MapScreen(padding, snackbar, resumeTick, onOpenProfile = openProfile)
         }
     }
 }

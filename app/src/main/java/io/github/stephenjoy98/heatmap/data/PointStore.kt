@@ -81,6 +81,14 @@ class Place(val city: String?, val country: String?)
 
 class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
+class PeriodStat(
+    val key: String,
+    val meters: Double,
+    val trips: Int,
+    val points: Int,
+    val metersByMode: Map<TravelMode, Double>,
+)
+
 class TripPathRow(val status: Int, val basePoly: String?, val poly: String?)
 
 /** One way a stretch of a trip could have gone: a road (named if known) or the recording itself. */
@@ -601,6 +609,74 @@ class PointStore private constructor(context: Context) :
 
     fun answerRoadQuestion(id: Long, choice: Int) {
         writableDatabase.execSQL("UPDATE road_questions SET chosen = $choice WHERE id = $id")
+    }
+
+    // ---- Timeline ----
+
+    fun tripsBetween(from: Long, to: Long): List<Trip> =
+        trips("WHERE start_time >= $from AND start_time < $to ORDER BY start_time")
+
+    /** Recorded points in the range that aren't part of any trip (sparse ticks, unprocessed runs). */
+    fun untrippedTracks(from: Long, to: Long): TrackData =
+        readableDatabase.rawQuery(
+            "SELECT time, lat, lon, interval_ms FROM points WHERE time >= $from AND time < $to AND trip_id <= 0 ORDER BY time",
+            null,
+        ).use { c ->
+            val n = c.count
+            val time = LongArray(n)
+            val lat = DoubleArray(n)
+            val lon = DoubleArray(n)
+            val interval = IntArray(n)
+            var i = 0
+            while (i < n && c.moveToNext()) {
+                time[i] = c.getLong(0)
+                lat[i] = c.getDouble(1)
+                lon[i] = c.getDouble(2)
+                interval[i] = c.getInt(3)
+                i++
+            }
+            TrackData(i, time, lat, lon, interval)
+        }
+
+    /** Bounding box of everything recorded in the range, or null if nothing was. */
+    fun boundsBetween(from: Long, to: Long): GeoBox? =
+        readableDatabase.rawQuery(
+            "SELECT MAX(lat), MIN(lat), MAX(lon), MIN(lon), COUNT(*) FROM points WHERE time >= $from AND time < $to", null
+        ).use { c ->
+            if (c.moveToFirst() && c.getLong(4) > 0) GeoBox(c.getDouble(0), c.getDouble(1), c.getDouble(2), c.getDouble(3)) else null
+        }
+
+    /**
+     * Distance and trip count per local day ("yyyy-MM-dd") or, with [byMonth], per month ("yyyy-MM"),
+     * including periods that only have recorded points.
+     */
+    fun periodStats(from: Long, to: Long, byMonth: Boolean): List<PeriodStat> {
+        val fmt = if (byMonth) "%Y-%m" else "%Y-%m-%d"
+        val out = LinkedHashMap<String, PeriodStat>()
+        readableDatabase.rawQuery(
+            """SELECT strftime('$fmt', time / 1000, 'unixepoch', 'localtime') k, COUNT(*) FROM points
+               WHERE time >= $from AND time < $to GROUP BY k ORDER BY k""",
+            null,
+        ).use { c -> while (c.moveToNext()) out[c.getString(0)] = PeriodStat(c.getString(0), 0.0, 0, c.getInt(1), emptyMap()) }
+        readableDatabase.rawQuery(
+            """SELECT strftime('$fmt', start_time / 1000, 'unixepoch', 'localtime') k, mode, SUM(distance_m), COUNT(*) FROM trips
+               WHERE start_time >= $from AND start_time < $to GROUP BY k, mode""",
+            null,
+        ).use { c ->
+            while (c.moveToNext()) {
+                val key = c.getString(0)
+                val prev = out[key] ?: PeriodStat(key, 0.0, 0, 0, emptyMap())
+                val mode = TravelMode.fromId(c.getInt(1))
+                out[key] = PeriodStat(
+                    key,
+                    prev.meters + c.getDouble(2),
+                    prev.trips + c.getInt(3),
+                    prev.points,
+                    prev.metersByMode + (mode to c.getDouble(2)),
+                )
+            }
+        }
+        return out.values.sortedBy { it.key }
     }
 
     // ---- Areas ----

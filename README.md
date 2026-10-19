@@ -51,6 +51,20 @@ up to your Google account, and lets you compare explored areas with friends.
 - Trips that stray almost everywhere (trail walks, trains) keep their smoothed recording. Changing a trip's
   travel mode re-matches it. Both features can be switched off in Settings.
 
+### Timeline tab
+- Browse your history by **Day, Week, Month or Year**, like Google Maps' Timeline: ‹ › to step through
+  periods, or tap the date to pick one.
+- A map of the period's routes, drawn as solid lines in each travel mode's colour, framed to fit.
+- **Day**: a vertical timeline of trips (mode, distance, times) and the stays between them, named by
+  street and town. Tap a trip or stay to zoom the map to it.
+- **Week / Month**: a row per day; **Year**: a row per month, each with distance, trips and a bar split by
+  travel mode. Tap a row to drill in.
+
+### Profile
+- An account button in the top-right corner of every tab (your initial, or a person icon) opens a
+  Google-style card with your name, email and friend ID, plus **Friends & backup**, **Settings**, and
+  sign in or sign out.
+
 ### Review tab
 - Week / Month / Year / All time: distance (total and per mode), **new areas explored** (~220 m
   squares you'd never visited before), **cities and countries** visited (reverse-geocoded on the

@@ -72,7 +72,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int, onOpenSettings: () -> Unit) {
+fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int, onOpenProfile: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     val scope = rememberCoroutineScope()
@@ -133,10 +133,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
         ) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 StatsBar(stats, Modifier.align(Alignment.Center))
-                FilledTonalIconButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier.align(Alignment.CenterEnd).size(48.dp),
-                ) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                    shadowElevation = 3.dp,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                ) {
+                    ProfileButton(onClick = onOpenProfile, modifier = Modifier.size(48.dp))
+                }
             }
             Spacer(Modifier.size(8.dp))
             ModeFilterRow(filter)

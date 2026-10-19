@@ -26,6 +26,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LargeTopAppBar
@@ -83,7 +88,9 @@ fun FriendsScreen(
     pendingInvite: String?,
     onInviteHandled: () -> Unit,
     onCompare: (Friend) -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
+    onBack?.let { BackHandler(onBack = it) }
     val context = LocalContext.current
     val configured = remember { FirebaseGate.isConfigured(context) }
     val user by Account.user.collectAsStateWithLifecycle()
@@ -92,7 +99,17 @@ fun FriendsScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0),
-        topBar = { LargeTopAppBar(title = { Text("Friends") }, scrollBehavior = scrollBehavior) },
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Friends & backup") },
+                navigationIcon = {
+                    onBack?.let {
+                        IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
     ) { inner ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),

@@ -84,7 +84,7 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int) {
+fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     var period by rememberSaveable { mutableStateOf(ReviewPeriod.WEEK) }
@@ -101,7 +101,13 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int) {
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0),
-        topBar = { LargeTopAppBar(title = { Text("Review") }, scrollBehavior = scrollBehavior) },
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Review") },
+                actions = { ProfileButton(onClick = onProfile) },
+                scrollBehavior = scrollBehavior,
+            )
+        },
     ) { inner ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
