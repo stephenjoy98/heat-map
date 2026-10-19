@@ -139,8 +139,9 @@ fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
                     Text("Open source", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Location Ticker is free and open source under the MIT License. You're welcome to read the " +
-                            "code, report issues, suggest changes or build your own version.",
+                        "Location Ticker is free and open source under the GNU General Public License v3.0 or later. " +
+                            "You're free to use, study, share and change it; versions you share must stay open under " +
+                            "the same licence, with their source code.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(4.dp))

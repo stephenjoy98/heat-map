@@ -19,6 +19,10 @@ The app shows the entries since your last version as "What's new" after an updat
 - "What's new" appears after an update and lists everything that changed since your last version.
 - The full changelog is available any time from About.
 
+### Changed
+- Location Ticker is now licensed under the GNU GPL v3.0 or later, so it and any versions based on it
+  stay open source.
+
 ## [2.10.0] - 2026-10-19
 
 ### Added

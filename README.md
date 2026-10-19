@@ -212,9 +212,12 @@ To release:
 
 ## Licence
 
-Location Ticker is open source under the [MIT License](LICENSE). It uses third-party libraries, map
-data and emoji artwork under their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-or **About** in the app.
+Location Ticker is free software under the [GNU General Public License v3.0 or later](LICENSE)
+(GPL-3.0-or-later): you can use, study, share and change it, and anything you distribute that's based on
+it must be shared under the same licence, with its source code. [NOTICE](NOTICE) has the copyright notice
+and an additional permission (GPL section 7) for linking Google's proprietary libraries (Play services,
+Maps, Firebase, ML Kit), which the app needs. Third-party libraries, map data and emoji artwork stay under
+their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) or **About** in the app.
 
 Made with ❤️ by [@stephenjoy98](https://github.com/stephenjoy98) with the help of Claude by Anthropic,
 in Canada.
