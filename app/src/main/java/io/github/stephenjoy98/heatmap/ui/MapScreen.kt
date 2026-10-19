@@ -211,15 +211,12 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
             horizontalAlignment = Alignment.End,
         ) {
-            if (accuracyOpen && !editing) {
-                AccuracyCard(liveFix)
-                Spacer(Modifier.size(8.dp))
+            if (accuracyOpen && hasLocation && !editing) {
+                // The tail lines up with the accuracy button, the second from the right (40 dp buttons, 8 dp gaps).
+                AccuracyCard(liveFix, tailEndPadding = 59.dp)
+                Spacer(Modifier.size(4.dp))
             }
             Row {
-                if (hasLocation && !editing) {
-                    AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
-                    Spacer(Modifier.width(8.dp))
-                }
                 if (!editing) {
                     SmallFloatingActionButton(
                         onClick = {
@@ -230,6 +227,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                         },
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ) { Icon(Icons.Filled.Edit, contentDescription = "Edit dots") }
+                    Spacer(Modifier.width(8.dp))
+                }
+                if (hasLocation && !editing) {
+                    AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
                     Spacer(Modifier.width(8.dp))
                 }
                 SmallFloatingActionButton(

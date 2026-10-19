@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -71,15 +73,17 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** How good the current GPS fix is, in the spirit of Fog of World's accuracy readout. */
 enum class FixQuality(val label: String, val bars: Int, val color: Color) {
-    GOOD("GOOD", 4, Color(0xFF2E7D32)),
-    FAIR("FAIR", 3, Color(0xFFF9A825)),
-    POOR("POOR", 2, Color(0xFFEF6C00)),
-    TOO_WEAK("TOO WEAK", 1, Color(0xFFD32F2F)),
-    NONE("ERROR", 0, Color(0xFFD32F2F)),
+    PERFECT("PERFECT", 4, Color(0xFF34C759)),
+    GOOD("GOOD", 3, Color(0xFF43A047)),
+    FAIR("FAIR", 2, Color(0xFFF9A825)),
+    POOR("POOR", 1, Color(0xFFEF6C00)),
+    TOO_WEAK("TOO WEAK", 1, Color(0xFFE53935)),
+    NONE("ERROR", 0, Color(0xFFE53935)),
 }
 
 /** A fix older than this counts as no signal. */
@@ -87,6 +91,7 @@ private const val STALE_MS = 20_000L
 
 fun fixQuality(fix: Location?, now: Long, limitM: Float): FixQuality = when {
     fix == null || !fix.hasAccuracy() || now - fix.time > STALE_MS -> FixQuality.NONE
+    fix.accuracy <= 10f -> FixQuality.PERFECT
     fix.accuracy <= 20f -> FixQuality.GOOD
     fix.accuracy <= 50f -> FixQuality.FAIR
     fix.accuracy <= limitM -> FixQuality.POOR
@@ -234,9 +239,12 @@ fun AccuracyButton(quality: FixQuality, onClick: () -> Unit) {
 
 private val clockFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
-/** Live accuracy readout: metres, a quality badge, heading and speed, and when the fix was taken. */
+/**
+ * Live accuracy readout: metres, a quality badge, coordinates, satellites and when the fix was taken. A
+ * speech-bubble tail points down at the button that opened it, [tailEndPadding] from the right edge.
+ */
 @Composable
-fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier) {
+fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailEndPadding: Dp = 12.dp) {
     val satellites = rememberSatellites(enabled = true)
     val context = LocalContext.current
     val precise = remember { context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED }
@@ -254,82 +262,95 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier) {
     val mono = FontFamily.Monospace
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Surface(
-        modifier = modifier.widthIn(max = 360.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
-        shadowElevation = 4.dp,
-    ) {
-        Row(Modifier.height(IntrinsicSize.Min).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(84.dp)) {
-                Text("ACCURACY", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = muted)
-                Text(
-                    if (quality == FixQuality.NONE) "--" else fix!!.accuracy.roundToInt().toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text("METERS", style = MaterialTheme.typography.labelSmall, color = muted)
-            }
-            VerticalDivider(Modifier.fillMaxHeight().padding(horizontal = 12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.background(quality.color, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Text(quality.label, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    Column(modifier, horizontalAlignment = Alignment.End) {
+        Surface(
+            modifier = Modifier.widthIn(max = 360.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = cardColor,
+            shadowElevation = 4.dp,
+        ) {
+            Row(Modifier.height(IntrinsicSize.Min).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(84.dp)) {
+                    Text("ACCURACY", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = muted)
+                    Text(
+                        if (quality == FixQuality.NONE) "--" else fix!!.accuracy.roundToInt().toString(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text("METERS", style = MaterialTheme.typography.labelSmall, color = muted)
+                }
+                VerticalDivider(Modifier.fillMaxHeight().padding(horizontal = 12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.background(quality.color, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(quality.label, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { explaining = true }, modifier = Modifier.size(36.dp)) {
+                            Box(
+                                Modifier.size(26.dp).border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("?", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                            }
+                        }
                     }
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { explaining = true }, modifier = Modifier.size(32.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val current = fix?.takeIf { quality != FixQuality.NONE }
+                        // Points the way you're heading when moving, otherwise north.
+                        val heading = current?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 0.5f }?.bearing ?: 0f
+                        HeadingArrow(heading, enabled = current != null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            "?",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), CircleShape)
-                                .padding(top = 2.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            current?.let { String.format(Locale.US, "%.5f,%.5f", it.latitude, it.longitude) } ?: "Not available",
+                            fontFamily = mono,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SatelliteGlyph(Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            satellites?.let { "${it.used} in use · ${it.visible} in view" }
+                                ?: if (precise) "Searching for satellites…" else "Satellites need precise location",
+                            fontFamily = mono,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    satellites?.takeIf { it.visible > 0 }?.let { sats ->
+                        Text(
+                            sats.byConstellation.joinToString("  ") { (name, n) -> "$name $n" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = muted,
+                            modifier = Modifier.padding(start = 24.dp),
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ClockGlyph(Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            Instant.ofEpochMilli(fix?.time ?: now).atZone(ZoneId.systemDefault()).format(clockFormat),
+                            fontFamily = mono,
+                            fontSize = 13.sp,
                         )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val bearing = fix?.takeIf { quality != FixQuality.NONE && it.hasBearing() && it.hasSpeed() && it.speed > 0.5f }
-                    HeadingArrow(bearing?.bearing, Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        bearing?.let { "${it.bearing.roundToInt()}° · ${(it.speed * 3.6f).roundToInt()} km/h" } ?: "Not available",
-                        fontFamily = mono,
-                        fontSize = 13.sp,
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SatelliteGlyph(Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        satellites?.let { "${it.used} in use · ${it.visible} in view" }
-                            ?: if (precise) "Searching for satellites…" else "Satellites need precise location",
-                        fontFamily = mono,
-                        fontSize = 13.sp,
-                    )
-                }
-                satellites?.takeIf { it.visible > 0 }?.let { sats ->
-                    Text(
-                        sats.byConstellation.joinToString("  ") { (name, n) -> "$name $n" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = muted,
-                        modifier = Modifier.padding(start = 24.dp),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ClockGlyph(Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        Instant.ofEpochMilli(fix?.time ?: now).atZone(ZoneId.systemDefault()).format(clockFormat),
-                        fontFamily = mono,
-                        fontSize = 13.sp,
-                    )
-                }
             }
+        }
+        // Speech-bubble tail pointing at the accuracy button.
+        Canvas(Modifier.padding(end = tailEndPadding).size(width = 18.dp, height = 9.dp)) {
+            drawPath(
+                Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(size.width, 0f)
+                    lineTo(size.width / 2, size.height)
+                    close()
+                },
+                cardColor,
+            )
         }
     }
 
@@ -353,11 +374,11 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier) {
     }
 }
 
-/** A navigation arrow pointing along [bearing] (degrees from north), greyed out when there's none. */
+/** A navigation arrow pointing along [bearing] (degrees from north), greyed out when there's no fix. */
 @Composable
-private fun HeadingArrow(bearing: Float?, modifier: Modifier = Modifier) {
-    val color = if (bearing == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
-    Canvas(modifier.rotate(bearing ?: 0f)) {
+private fun HeadingArrow(bearing: Float, enabled: Boolean, modifier: Modifier = Modifier) {
+    val color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+    Canvas(modifier.rotate(bearing)) {
         val w = size.width
         val h = size.height
         drawPath(
