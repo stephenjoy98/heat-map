@@ -45,7 +45,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import android.content.Context
+import io.github.stephenjoy98.heatmap.data.DeleteResult
 import io.github.stephenjoy98.heatmap.data.EditablePoint
+import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
+import io.github.stephenjoy98.heatmap.tracking.TripDetector
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import java.time.Instant
 import java.time.LocalDate
@@ -336,4 +343,14 @@ private fun DeleteButton(label: String, onClick: () -> Unit) {
         Spacer(Modifier.width(6.dp))
         Text(label)
     }
+}
+
+/** After deleting or restoring dots: rebuild trips, and make sure backups and shared routes catch up. */
+suspend fun afterDotEdit(context: Context, result: DeleteResult) {
+    Prefs.addDirtyBackupDays(result.days)
+    if (result.removedRemoteIds.isNotEmpty()) {
+        Prefs.setPendingRouteDeletes(Prefs.pendingRouteDeletes + result.removedRemoteIds)
+    }
+    withContext(Dispatchers.IO) { TripDetector.process(context) }
+    RoadSnapWorker.runNow(context)
 }

@@ -4,9 +4,13 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +31,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -40,15 +43,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -58,11 +58,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
-import io.github.stephenjoy98.heatmap.data.DeleteResult
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Stats
@@ -71,16 +71,11 @@ import io.github.stephenjoy98.heatmap.map.HeatRamps
 import io.github.stephenjoy98.heatmap.map.HeatTiles
 import io.github.stephenjoy98.heatmap.map.heatTilePx
 import io.github.stephenjoy98.heatmap.map.OwnTracks
-import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
-import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 
 @Composable
 fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int, onOpenProfile: () -> Unit) {
@@ -104,44 +99,16 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val camera = rememberMapCamera()
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
     val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
-    var editing by rememberSaveable { mutableStateOf(false) }
     var layersOpen by remember { mutableStateOf(false) }
     var accuracyOpen by rememberSaveable { mutableStateOf(false) }
-    val liveFix = rememberLiveFix(hasLocation, detailed = accuracyOpen)
+    // Live GPS pauses while a page covers the map.
+    val covered = LocalCovered.current
+    val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
     val signal = rememberFixQuality(liveFix)
-    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads, editing) {
-        // While editing, the heatmap fades back so the dots stand out.
-        val heat = HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)
-        listOf(MapLayer("heat", heat, alpha = if (editing) 0.35f else 1f))
+    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
+        listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
     }
 
-    val edit = remember { DotEditState(LocalDate.now()) }
-    var editLoading by remember { mutableStateOf(false) }
-    var editReload by remember { mutableIntStateOf(0) }
-    var framedDay by remember { mutableStateOf<LocalDate?>(null) }
-    LaunchedEffect(editing, edit.day, edit.showingDeleted, editReload) {
-        if (!editing) {
-            framedDay = null
-            return@LaunchedEffect
-        }
-        editLoading = true
-        val zone = ZoneId.systemDefault()
-        val from = edit.day.atStartOfDay(zone).toInstant().toEpochMilli()
-        val to = edit.day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val (pts, deleted) = withContext(Dispatchers.IO) {
-            val deleted = store.deletedPoints(from, to)
-            (if (edit.showingDeleted) deleted else store.editablePoints(from, to)) to deleted.size
-        }
-        edit.deletedCount = deleted
-        edit.load(pts)
-        editLoading = false
-        if (framedDay != edit.day) {
-            framedDay = edit.day
-            frameDots(camera, pts)
-        }
-    }
-    BackHandler(enabled = editing) { editing = false }
-    val tapRadiusPx = 32 * context.resources.displayMetrics.density
     LaunchedEffect(stats) {
         val latest = stats?.latest
         if (!centered && latest != null) {
@@ -168,13 +135,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             refreshKey = changes,
             latest = stats?.latest?.let { LatLng(it.lat, it.lon) },
             showMyLocation = hasLocation,
-            onMapClick = if (editing) {
-                { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
-            } else {
-                null
-            },
         )
-        if (editing) DotsOverlay(camera, edit, Modifier.fillMaxSize())
 
         Column(
             Modifier
@@ -194,10 +155,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     ProfileButton(onClick = onOpenProfile, modifier = Modifier.size(48.dp))
                 }
             }
-            if (!editing) {
-                Spacer(Modifier.size(8.dp))
-                ModeFilterRow(filter)
-            }
+            Spacer(Modifier.size(8.dp))
+            ModeFilterRow(filter)
         }
 
         MapControls(
@@ -211,25 +170,20 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
             horizontalAlignment = Alignment.End,
         ) {
-            if (accuracyOpen && hasLocation && !editing) {
-                // The tail lines up with the accuracy button, the second from the right (40 dp buttons, 8 dp gaps).
-                AccuracyCard(liveFix, tailEndPadding = 59.dp)
-                Spacer(Modifier.size(4.dp))
+            // The card grows out of the accuracy button and shrinks back into it.
+            AnimatedVisibility(
+                visible = accuracyOpen && hasLocation,
+                enter = scaleIn(spatialSpring(), initialScale = 0.3f, transformOrigin = TransformOrigin(0.85f, 1f)) + fadeIn(),
+                exit = scaleOut(targetScale = 0.3f, transformOrigin = TransformOrigin(0.85f, 1f)) + fadeOut(),
+            ) {
+                Column(horizontalAlignment = Alignment.End) {
+                    // The tail lines up with the accuracy button, the second from the right (40 dp buttons, 8 dp gaps).
+                    AccuracyCard(liveFix, tailEndPadding = 59.dp)
+                    Spacer(Modifier.size(4.dp))
+                }
             }
             Row {
-                if (!editing) {
-                    SmallFloatingActionButton(
-                        onClick = {
-                            // Start on the day of the latest dot, where a stray one is most likely to be noticed.
-                            edit.day = stats?.latest?.let { Instant.ofEpochMilli(it.time).atZone(ZoneId.systemDefault()).toLocalDate() }
-                                ?: LocalDate.now()
-                            editing = true
-                        },
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ) { Icon(Icons.Filled.Edit, contentDescription = "Edit dots") }
-                    Spacer(Modifier.width(8.dp))
-                }
-                if (hasLocation && !editing) {
+                if (hasLocation) {
                     AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
                     Spacer(Modifier.width(8.dp))
                 }
@@ -246,39 +200,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 ) { Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position") }
             }
             Spacer(Modifier.size(8.dp))
-            if (editing) {
-                EditPanel(
-                    state = edit,
-                    loading = editLoading,
-                    onDay = { edit.day = it },
-                    onFocus = { camera.animateTo(it.lat, it.lon, 17f) },
-                    onShow = { frameDots(camera, it) },
-                    onDelete = { doomed ->
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) { store.deletePoints(doomed.map { it.id }) }
-                            afterDotEdit(context, result)
-                            editReload++
-                            val undo = snackbar.showSnackbar(
-                                if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted",
-                                actionLabel = "Undo",
-                                duration = SnackbarDuration.Long,
-                            )
-                            if (undo == SnackbarResult.ActionPerformed) {
-                                afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(doomed.map { it.id }) })
-                                editReload++
-                            }
-                        }
-                    },
-                    onRestore = { back ->
-                        scope.launch {
-                            afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(back.map { it.id }) })
-                            editReload++
-                            snackbar.showSnackbar(if (back.size == 1) "Dot restored" else "${back.size} dots restored")
-                        }
-                    },
-                    onClose = { editing = false },
-                )
-            } else ControlPanel(
+            ControlPanel(
                 tracking = tracking,
                 intervalSec = intervalSec,
                 onToggle = {
@@ -292,16 +214,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             )
         }
     }
-}
-
-/** After deleting or restoring dots: rebuild trips, and make sure backups and shared routes catch up. */
-private suspend fun afterDotEdit(context: Context, result: DeleteResult) {
-    Prefs.addDirtyBackupDays(result.days)
-    if (result.removedRemoteIds.isNotEmpty()) {
-        Prefs.setPendingRouteDeletes(Prefs.pendingRouteDeletes + result.removedRemoteIds)
-    }
-    withContext(Dispatchers.IO) { TripDetector.process(context) }
-    RoadSnapWorker.runNow(context)
 }
 
 @Composable

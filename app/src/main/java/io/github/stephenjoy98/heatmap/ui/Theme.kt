@@ -8,7 +8,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
@@ -60,19 +69,63 @@ fun isDarkTheme(): Boolean {
     }
 }
 
+/** Whether Material expressive is on: Monet wallpaper colours, rounder shapes and springier motion. */
+val LocalExpressive = staticCompositionLocalOf { false }
+
+/** Material expressive needs Android 12's Monet colour engine. */
+val expressiveSupported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+// Expressive shapes: generously rounded, in the spirit of Material 3 Expressive.
+private val expressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(36.dp),
+)
+
+// Emphasised type for headings when expressive is on.
+private val expressiveTypography = Typography().run {
+    copy(
+        displaySmall = displaySmall.copy(fontWeight = FontWeight.SemiBold),
+        headlineLarge = headlineLarge.copy(fontWeight = FontWeight.SemiBold),
+        headlineMedium = headlineMedium.copy(fontWeight = FontWeight.SemiBold),
+        headlineSmall = headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+        titleLarge = titleLarge.copy(fontWeight = FontWeight.SemiBold),
+        titleMedium = titleMedium.copy(fontWeight = FontWeight.SemiBold),
+    )
+}
+
 /**
- * Material 3 theme. On Android 12+ it uses Material You dynamic colour from the wallpaper (unless turned
- * off in Settings); otherwise the heatmap's orange palette. The heat ramps themselves never change.
+ * Spatial motion (moving and resizing things): a gentle bouncy spring with Material expressive, a quick
+ * settle without overshoot otherwise.
+ */
+@Composable
+fun <T> spatialSpring(): FiniteAnimationSpec<T> =
+    if (LocalExpressive.current) spring(dampingRatio = 0.72f, stiffness = 380f) else spring(dampingRatio = 1f, stiffness = 600f)
+
+/**
+ * Material 3 theme. Light, dark or following the system; with Material expressive on (Android 12+), colours
+ * come from the wallpaper through Android's Monet engine, with expressive shapes, type and motion. Otherwise
+ * the heatmap's orange palette. The heat ramps themselves never change.
  */
 @Composable
 fun TickerTheme(dark: Boolean = isDarkTheme(), content: @Composable () -> Unit) {
-    val dynamic by Prefs.dynamicColor.collectAsStateWithLifecycle()
+    val wanted by Prefs.dynamicColor.collectAsStateWithLifecycle()
+    val expressive = wanted && expressiveSupported
     val context = LocalContext.current
     val scheme = when {
-        dynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+        expressive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> darkColors
         else -> lightColors
     }
-    MaterialTheme(colorScheme = scheme, content = content)
+    CompositionLocalProvider(LocalExpressive provides expressive) {
+        MaterialTheme(
+            colorScheme = scheme,
+            shapes = if (expressive) expressiveShapes else MaterialTheme.shapes,
+            typography = if (expressive) expressiveTypography else MaterialTheme.typography,
+            content = content,
+        )
+    }
 }

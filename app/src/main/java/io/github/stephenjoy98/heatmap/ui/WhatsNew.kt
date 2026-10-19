@@ -1,6 +1,5 @@
 package io.github.stephenjoy98.heatmap.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -128,7 +127,6 @@ fun ReleaseNotes(release: Release, showHeader: Boolean = true) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangelogScreen(onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val releases = remember { Changelog.load(context) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()

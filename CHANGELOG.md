@@ -12,6 +12,28 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-19
+
+### Added
+- Material expressive theme switch: colours from your wallpaper through Android's Monet engine, with
+  rounder shapes, bolder headings and springier motion.
+- Predictive back: the page shrinks and follows your swipe, showing where you'll land.
+- Back now walks back through the pages you opened, then returns to the map, and asks before you leave
+  the app.
+- The account menu, place lists and the GPS accuracy card grow out of the button you tapped.
+- A badge on the account button when trips or roads are waiting for your answer.
+
+### Changed
+- Edit dots has moved to the Timeline tab.
+- Review has moved from the bottom bar to the account menu.
+- Theme options are now Light, Dark and System.
+- Locations explored on your profile matches the other cards and follows your theme.
+- Page titles collapse into the top bar as you scroll, on every page including your profile.
+- Your profile opens faster: km explored is kept up to date in the background.
+
+### Fixed
+- The Undo message no longer covers the edit buttons.
+
 ## [2.12.0] - 2026-10-19
 
 ### Added

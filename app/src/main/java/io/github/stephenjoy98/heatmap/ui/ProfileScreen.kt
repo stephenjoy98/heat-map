@@ -1,6 +1,5 @@
 package io.github.stephenjoy98.heatmap.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -14,10 +13,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -40,10 +37,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -76,7 +80,6 @@ import io.github.stephenjoy98.heatmap.review.Places
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,9 +96,9 @@ import kotlin.math.roundToInt
 private val capsLabel = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp)
 
 /** Your travel passport: who you are, how much you've captured and where it's taken you. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
-    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     val user by Account.user.collectAsStateWithLifecycle()
@@ -107,21 +110,29 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
         value = withContext(Dispatchers.IO) { ProfileRepository.load(context, year, created) }
     }
 
-    // A Surface sets the content colour, so every text gets proper contrast with the background.
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    // The large title collapses into the top bar as the page scrolls.
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Profile") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { inner ->
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .statusBarsPadding()
-            .navigationBarsPadding()
+            .padding(inner)
             .padding(horizontal = 16.dp)
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconButton(onClick = onBack, modifier = Modifier.padding(top = 4.dp)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Avatar(52)
             Spacer(Modifier.width(14.dp))
@@ -338,15 +349,18 @@ private fun continentEmoji(continent: String) = when (continent) {
 
 @Composable
 private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
-    val bg = MaterialTheme.colorScheme.inverseSurface
-    val fg = MaterialTheme.colorScheme.inverseOnSurface
+    // Same surfaces as the other cards, so it follows the light, dark and dynamic themes.
+    val bg = MaterialTheme.colorScheme.surfaceContainerHigh
+    val fg = MaterialTheme.colorScheme.onSurface
     var showing by remember { mutableStateOf<PlaceKind?>(null) }
+    // Where each tile is, so its list can grow out of it.
+    val tileBounds = remember { mutableStateMapOf<PlaceKind, Rect>() }
     Card(color = bg) {
         Column(Modifier.padding(20.dp)) {
-            Surface(shape = RoundedCornerShape(50), color = fg) {
+            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primary) {
                 Text(
                     "LOCATIONS EXPLORED",
-                    color = bg,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = capsLabel,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 )
@@ -362,20 +376,20 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
                         onClick = { showing = kind },
                         enabled = count > 0,
                         shape = RoundedCornerShape(20.dp),
-                        color = fg.copy(alpha = 0.08f),
-                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.weight(1f).trackBounds { tileBounds[kind] = it },
                     ) {
                         Column(Modifier.padding(12.dp)) {
                             JoyEmoji(emoji, 26)
                             Spacer(Modifier.height(6.dp))
                             Text(count.toString(), color = fg, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text(kind.title.uppercase(), color = fg.copy(alpha = 0.75f), style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp), maxLines = 1)
+                            Text(kind.title.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp), maxLines = 1)
                         }
                     }
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Surface(shape = RoundedCornerShape(20.dp), color = fg.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     JoyEmoji("🧭", 26)
                     Spacer(Modifier.width(12.dp))
@@ -386,7 +400,7 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                         )
-                        Text("KM EXPLORED", color = fg.copy(alpha = 0.75f), style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp))
+                        Text("KM EXPLORED", color = MaterialTheme.colorScheme.onSurfaceVariant, style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp))
                     }
                 }
             }
@@ -394,14 +408,13 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
             Text(
                 "Km explored counts new ground only, so repeat trips don't add to it; km travelled above includes them. " +
                     "Tap a number to see the list.",
-                color = fg.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                 Button(
                     onClick = onExplore,
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = fg, contentColor = bg),
                 ) {
                     Text("Explore")
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
@@ -410,12 +423,12 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
         }
     }
 
-    showing?.let { kind -> PlacesDialog(kind, s) { showing = null } }
+    showing?.let { kind -> PlacesDialog(kind, s, tileBounds[kind]) { showing = null } }
 }
 
 /** A popup listing every country, city or continent visited in the selected period. */
 @Composable
-private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, onDismiss: () -> Unit) {
+private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDismiss: () -> Unit) {
     val rows: List<Triple<String, String, String?>> = when (kind) {
         PlaceKind.COUNTRIES -> s.countries.map { Triple(JoyPixels.flag(it.code), it.name, Places.continentOf(it.code)) }
         PlaceKind.CITIES -> s.cities.map { c ->
@@ -430,27 +443,32 @@ private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, onDismiss: () -> Unit
             Triple(continentEmoji(continent), continent, "$n ${if (n == 1) "country" else "countries"}")
         }
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("${kind.title} · ${rows.size}") },
-        text = {
-            LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                items(rows) { (emoji, name, detail) ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        JoyEmoji(emoji, 28)
-                        Spacer(Modifier.width(14.dp))
-                        Column {
-                            Text(name, style = MaterialTheme.typography.bodyLarge)
-                            detail?.let {
-                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Grows out of the tile that was tapped, and shrinks back into it.
+    GrowFromSource(source = source, onDismiss = onDismiss, modifier = Modifier.padding(horizontal = 24.dp)) { close ->
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(24.dp)) {
+                Text("${kind.title} · ${rows.size}", style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(12.dp))
+                LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                    items(rows) { (emoji, name, detail) ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            JoyEmoji(emoji, 28)
+                            Spacer(Modifier.width(14.dp))
+                            Column {
+                                Text(name, style = MaterialTheme.typography.bodyLarge)
+                                detail?.let {
+                                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     }
                 }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    TextButton(onClick = close) { Text("Done") }
+                }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-    )
+        }
+    }
 }
 
 @Composable

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +22,9 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,8 +52,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import io.github.stephenjoy98.heatmap.cloud.Account
@@ -120,10 +123,19 @@ fun Avatar(size: Int = 32) {
     }
 }
 
-/** The account button for the top-right corner of every tab, like Google's apps. */
+/** Where the account button is on screen, so the account menu can grow out of it. */
+private var avatarBounds by mutableStateOf<Rect?>(null)
+
+/**
+ * The account button for the top-right corner of every tab, like Google's apps. A badge shows how many
+ * trips and roads are waiting for an answer on the Review page.
+ */
 @Composable
 fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    IconButton(onClick = onClick, modifier = modifier) { Avatar(32) }
+    val pending = LocalReviewCount.current
+    IconButton(onClick = onClick, modifier = modifier.trackBounds { avatarBounds = it }) {
+        BadgedBox(badge = { if (pending > 0) Badge { Text(pending.toString()) } }) { Avatar(32) }
+    }
 }
 
 /**
@@ -136,8 +148,10 @@ fun AccountMenu(
     onProfile: () -> Unit,
     onFriends: () -> Unit,
     onBackup: () -> Unit,
+    onReview: () -> Unit,
     onSettings: () -> Unit,
     onAbout: () -> Unit,
+    reviewCount: Int = 0,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -147,12 +161,18 @@ fun AccountMenu(
     var signingIn by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    fun go(action: () -> Unit) {
-        onDismiss()
-        action()
-    }
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // Grows out of the account button, and shrinks back into it when closed.
+    GrowFromSource(
+        source = avatarBounds,
+        onDismiss = onDismiss,
+        alignment = Alignment.TopCenter,
+        modifier = Modifier.statusBarsPadding().padding(top = 8.dp),
+    ) { close ->
+        // Opens the page, while the menu shrinks back into the account button.
+        fun go(action: () -> Unit) {
+            action()
+            close()
+        }
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -160,7 +180,7 @@ fun AccountMenu(
         ) {
             Column(Modifier.padding(vertical = 12.dp)) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) {
+                    IconButton(onClick = close, modifier = Modifier.align(Alignment.CenterStart)) {
                         Icon(Icons.Filled.Close, contentDescription = "Close")
                     }
                     Text("Location Ticker", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center))
@@ -221,6 +241,11 @@ fun AccountMenu(
                 MenuRow(Icons.Filled.AccountCircle, "Profile", "Your stats and the places you've explored") { go(onProfile) }
                 MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas") { go(onFriends) }
                 MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history") { go(onBackup) }
+                MenuRow(
+                    Icons.Filled.Star,
+                    "Review",
+                    if (reviewCount > 0) "$reviewCount waiting for your answer · insights and stats" else "Insights, stats and questions about your trips",
+                ) { go(onReview) }
                 MenuRow(Icons.Filled.Settings, "Settings", null) { go(onSettings) }
                 MenuRow(Icons.Filled.Info, "About", "Who made it, open source and licences") { go(onAbout) }
                 if (user != null) {

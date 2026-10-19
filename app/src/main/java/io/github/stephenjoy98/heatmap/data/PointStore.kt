@@ -8,6 +8,8 @@ import android.database.sqlite.SQLiteOpenHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import java.time.Instant
+import java.time.ZoneId
 import java.util.Calendar
 
 data class LocationPoint(
@@ -125,7 +127,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 5) {
+    SQLiteOpenHelper(context, "points.db", null, 6) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -242,6 +244,22 @@ class PointStore private constructor(context: Context) :
             )
             db.execSQL("CREATE INDEX deleted_points_time ON deleted_points(time)")
         }
+        if (oldVersion < 6) {
+            // Cache for km explored: squares visited, new ground per local day, and where the walk got to.
+            db.execSQL("CREATE TABLE explored_cells (cell INTEGER PRIMARY KEY)")
+            db.execSQL("CREATE TABLE explored_days (day TEXT PRIMARY KEY, meters REAL NOT NULL)")
+            db.execSQL(
+                """CREATE TABLE explored_state (
+                    id INTEGER PRIMARY KEY,
+                    watermark INTEGER NOT NULL,
+                    prev_time INTEGER NOT NULL,
+                    prev_lat REAL NOT NULL,
+                    prev_lon REAL NOT NULL,
+                    first_pass INTEGER,
+                    first_pass_m REAL NOT NULL
+                )"""
+            )
+        }
     }
 
     private fun changed() = _changes.update { it + 1 }
@@ -274,7 +292,11 @@ class PointStore private constructor(context: Context) :
         } finally {
             db.endTransaction()
         }
-        if (added > 0) changed()
+        if (added > 0) {
+            // Restored points can be older than what km explored has already counted.
+            invalidateExplored(db)
+            changed()
+        }
         return added
     }
 
@@ -295,6 +317,7 @@ class PointStore private constructor(context: Context) :
         db.delete("trip_paths", null, null)
         db.delete("road_questions", null, null)
         db.delete("deleted_points", null, null)
+        invalidateExplored(db)
         changed()
     }
 
@@ -424,6 +447,7 @@ class PointStore private constructor(context: Context) :
                 )
                 db.execSQL("DELETE FROM points WHERE id IN ($list)")
             }
+            invalidateExplored(db)
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -461,6 +485,7 @@ class PointStore private constructor(context: Context) :
                 )
                 db.execSQL("DELETE FROM deleted_points WHERE id IN ($list)")
             }
+            invalidateExplored(db)
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -759,14 +784,83 @@ class PointStore private constructor(context: Context) :
         ).use { c -> if (c.moveToFirst()) intArrayOf(c.getInt(0), c.getInt(1), c.getInt(2), c.getInt(3)) else IntArray(4) }
 
     /**
-     * Distance over ground covered for the first time, in metres, for fixes in the range. Reads the whole
-     * history (earlier fixes mark ground as already visited), so call it off the main thread.
+     * Distance over ground covered for the first time, in metres, for fixes in the range. Served from a
+     * cache that's brought up to date with any new fixes first; call it off the main thread.
      */
     fun exploredMeters(from: Long, to: Long): Double {
-        val explored = ExploredDistance(from, to)
-        readableDatabase.rawQuery("SELECT time, lat, lon, interval_ms FROM points WHERE time < $to ORDER BY time", null)
-            .use { c -> while (c.moveToNext()) explored.add(c.getLong(0), c.getDouble(1), c.getDouble(2), c.getInt(3)) }
-        return explored.meters
+        updateExplored()
+        val zone = ZoneId.systemDefault()
+        val where = buildList {
+            if (from > 0) add("day >= '${Instant.ofEpochMilli(from).atZone(zone).toLocalDate()}'")
+            if (to < Long.MAX_VALUE) add("day < '${Instant.ofEpochMilli(to).atZone(zone).toLocalDate()}'")
+        }.joinToString(" AND ").ifEmpty { "1" }
+        return readableDatabase.rawQuery("SELECT COALESCE(SUM(meters), 0) FROM explored_days WHERE $where", null)
+            .use { c -> if (c.moveToFirst()) c.getDouble(0) else 0.0 }
+    }
+
+    /**
+     * Brings the km explored cache up to date: only fixes newer than the last run are walked, carrying on
+     * from where it stopped. After edits to older history (deletes, restores, backup restores) it starts over.
+     */
+    @Synchronized
+    fun updateExplored() {
+        val db = writableDatabase
+        val saved = db.rawQuery(
+            "SELECT watermark, prev_time, prev_lat, prev_lon, first_pass, first_pass_m FROM explored_state WHERE id = 0", null
+        ).use { c ->
+            if (!c.moveToFirst()) null
+            else c.getLong(0) to ExploredDistance.State(
+                c.getLong(1), c.getDouble(2), c.getDouble(3), if (c.isNull(4)) null else c.getLong(4), c.getDouble(5),
+            )
+        }
+        val watermark = saved?.first ?: Long.MIN_VALUE
+        val visited = HashSet<Long>()
+        if (saved == null) {
+            db.delete("explored_cells", null, null)
+            db.delete("explored_days", null, null)
+        } else {
+            db.rawQuery("SELECT cell FROM explored_cells", null).use { c -> while (c.moveToNext()) visited += c.getLong(0) }
+        }
+        val zone = ZoneId.systemDefault()
+        val perDay = HashMap<String, Double>()
+        val walk = ExploredDistance(visited = visited, state = saved?.second) { time, meters ->
+            val day = Instant.ofEpochMilli(time).atZone(zone).toLocalDate().toString()
+            perDay[day] = (perDay[day] ?: 0.0) + meters
+        }
+        var last = watermark
+        db.rawQuery("SELECT time, lat, lon, interval_ms FROM points WHERE time > $watermark ORDER BY time", null).use { c ->
+            while (c.moveToNext()) {
+                last = c.getLong(0)
+                walk.add(last, c.getDouble(1), c.getDouble(2), c.getInt(3))
+            }
+        }
+        val state = walk.state() ?: return
+        if (last == watermark) return
+        db.beginTransaction()
+        try {
+            for (cell in walk.newCells) db.execSQL("INSERT OR IGNORE INTO explored_cells (cell) VALUES ($cell)")
+            for ((day, meters) in perDay) {
+                db.execSQL("INSERT OR IGNORE INTO explored_days (day, meters) VALUES (?, 0)", arrayOf(day))
+                db.execSQL("UPDATE explored_days SET meters = meters + ? WHERE day = ?", arrayOf<Any>(meters, day))
+            }
+            db.insertWithOnConflict("explored_state", null, ContentValues().apply {
+                put("id", 0)
+                put("watermark", last)
+                put("prev_time", state.prevTime)
+                put("prev_lat", state.prevLat)
+                put("prev_lon", state.prevLon)
+                if (state.firstPass == null) putNull("first_pass") else put("first_pass", state.firstPass)
+                put("first_pass_m", state.firstPassMeters)
+            }, SQLiteDatabase.CONFLICT_REPLACE)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Older history changed, so km explored must be worked out again from the start. */
+    private fun invalidateExplored(db: SQLiteDatabase = writableDatabase) {
+        db.delete("explored_state", null, null)
     }
 
     /**

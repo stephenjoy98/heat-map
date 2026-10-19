@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -22,6 +19,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -97,6 +102,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Pending review questions, shown as a badge on the account button. */
+val LocalReviewCount = compositionLocalOf { 0 }
+
 @Composable
 private fun AppScaffold(
     invite: MutableStateFlow<String?>,
@@ -107,14 +115,10 @@ private fun AppScaffold(
     val store = remember { PointStore.get(context) }
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableIntStateOf(MainActivity.TAB_MAP) }
+    val stack = rememberPageStack()
     var comparing by remember { mutableStateOf<Friend?>(null) }
-    var settingsOpen by rememberSaveable { mutableStateOf(false) }
-    var friendsOpen by rememberSaveable { mutableStateOf(false) }
-    var backupOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
-    var profileOpen by rememberSaveable { mutableStateOf(false) }
-    var aboutOpen by rememberSaveable { mutableStateOf(false) }
-    var changelogOpen by rememberSaveable { mutableStateOf(false) }
+    var confirmExit by remember { mutableStateOf(false) }
     // After an update, the changes since the version the user last saw.
     var whatsNew by remember {
         mutableStateOf(Changelog.whatsNew(Changelog.load(context), Prefs.lastSeenVersion, BuildConfig.VERSION_NAME))
@@ -124,21 +128,27 @@ private fun AppScaffold(
     val pendingInvite by invite.collectAsStateWithLifecycle()
     val wantedTab by requestedTab.collectAsStateWithLifecycle()
     val user by Account.user.collectAsStateWithLifecycle()
+    val tracking by Prefs.tracking.collectAsStateWithLifecycle()
     val changes by store.changes.collectAsStateWithLifecycle()
     val questions by produceState(0, changes, resumeTick) {
         value = withContext(Dispatchers.IO) { store.tripsNeedingReview().size + store.openRoadQuestions().size }
     }
 
+    // Back, when no page is open: from another tab go to the map; on the map, ask before leaving.
+    // Pages handle their own back (with the predictive animation) inside PageHost.
+    BackHandler(enabled = stack.pages.isEmpty() && tab != MainActivity.TAB_MAP) { tab = MainActivity.TAB_MAP }
+    BackHandler(enabled = stack.pages.isEmpty() && tab == MainActivity.TAB_MAP) { confirmExit = true }
+
     LaunchedEffect(friendsRequested) {
         if (friendsRequested) {
-            friendsOpen = true
+            stack.push(Page.FRIENDS)
             openFriends.value = false
         }
     }
 
     LaunchedEffect(wantedTab) {
         wantedTab?.let {
-            tab = it
+            if (it == MainActivity.TAB_REVIEW) stack.push(Page.REVIEW) else tab = it
             requestedTab.value = null
         }
     }
@@ -154,7 +164,11 @@ private fun AppScaffold(
 
     // Catch up on trip detection and sync whenever the app comes to the front.
     LaunchedEffect(resumeTick) {
-        withContext(Dispatchers.IO) { TripDetector.process(context) }
+        withContext(Dispatchers.IO) {
+            TripDetector.process(context)
+            // Keeps km explored current, so the profile opens without recalculating it.
+            store.updateExplored()
+        }
         RoadSnapWorker.runNow(context)
         if (user != null) SyncWorker.runNow(context)
     }
@@ -169,110 +183,114 @@ private fun AppScaffold(
                 Prefs.setLastSeenVersion(BuildConfig.VERSION_NAME)
                 whatsNew = emptyList()
             },
-            onFullChangelog = { changelogOpen = true },
+            onFullChangelog = { stack.push(Page.CHANGELOG) },
         )
     }
 
-    val openProfile = { menuOpen = true }
+    if (confirmExit) {
+        val activity = context.findActivity()
+        AlertDialog(
+            onDismissRequest = { confirmExit = false },
+            title = { Text("Exit Location Ticker?") },
+            text = {
+                Text(if (tracking) "Recording keeps going in the background." else "Recording is paused.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmExit = false
+                    activity?.finish()
+                }) { Text("Exit") }
+            },
+            dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("Stay") } },
+        )
+    }
+
+    val openMenu = { menuOpen = true }
     if (menuOpen) {
         AccountMenu(
+            reviewCount = questions,
             onDismiss = { menuOpen = false },
-            onProfile = { profileOpen = true },
-            onFriends = { friendsOpen = true },
-            onBackup = { backupOpen = true },
-            onSettings = { settingsOpen = true },
-            onAbout = { aboutOpen = true },
+            onProfile = { stack.push(Page.PROFILE) },
+            onFriends = { stack.push(Page.FRIENDS) },
+            onBackup = { stack.push(Page.BACKUP) },
+            onReview = { stack.push(Page.REVIEW) },
+            onSettings = { stack.push(Page.SETTINGS) },
+            onAbout = { stack.push(Page.ABOUT) },
         )
     }
 
-    if (settingsOpen) {
-        SettingsScreen(store = store, resumeTick = resumeTick, onBack = { settingsOpen = false })
-        return
-    }
-
-    if (changelogOpen) {
-        ChangelogScreen(onBack = { changelogOpen = false })
-        return
-    }
-
-    if (aboutOpen) {
-        AboutScreen(onBack = { aboutOpen = false }, onChangelog = { changelogOpen = true })
-        return
-    }
-
-    comparing?.let { friend ->
-        CompareScreen(friend, onBack = { comparing = null })
-        return
-    }
-
-    if (backupOpen) {
-        Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
-            BackupScreen(contentPadding = padding, snackbar = snackbar, onBack = { backupOpen = false })
-        }
-        return
-    }
-
-    if (friendsOpen) {
-        Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
-            FriendsScreen(
-                contentPadding = padding,
-                snackbar = snackbar,
-                pendingInvite = pendingInvite,
-                onInviteHandled = { invite.value = null },
-                onCompare = { comparing = it },
-                onBack = { friendsOpen = false },
-            )
-        }
-        return
-    }
-
-    if (profileOpen) {
-        ProfileScreen(
-            resumeTick = resumeTick,
-            onBack = { profileOpen = false },
-            onExplore = {
-                profileOpen = false
-                tab = MainActivity.TAB_REVIEW
-            },
-        )
-        return
-    }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0),
-        snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = tab == MainActivity.TAB_MAP,
-                    onClick = { tab = MainActivity.TAB_MAP },
-                    icon = { Icon(Icons.Filled.Place, contentDescription = null) },
-                    label = { Text("Map") },
-                )
-                NavigationBarItem(
-                    selected = tab == MainActivity.TAB_TIMELINE,
-                    onClick = { tab = MainActivity.TAB_TIMELINE },
-                    icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
-                    label = { Text("Timeline") },
-                )
-                NavigationBarItem(
-                    selected = tab == MainActivity.TAB_REVIEW,
-                    onClick = { tab = MainActivity.TAB_REVIEW },
-                    icon = {
-                        BadgedBox(badge = { if (questions > 0) Badge { Text(questions.toString()) } }) {
-                            Icon(Icons.Filled.Star, contentDescription = null)
+    CompositionLocalProvider(LocalReviewCount provides questions) {
+        PageHost(
+            stack = stack,
+            base = {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    contentWindowInsets = WindowInsets(0),
+                    snackbarHost = { SnackbarHost(snackbar) },
+                    bottomBar = {
+                        NavigationBar {
+                            NavigationBarItem(
+                                selected = tab == MainActivity.TAB_MAP,
+                                onClick = { tab = MainActivity.TAB_MAP },
+                                icon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                                label = { Text("Map") },
+                            )
+                            NavigationBarItem(
+                                selected = tab == MainActivity.TAB_TIMELINE,
+                                onClick = { tab = MainActivity.TAB_TIMELINE },
+                                icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                                label = { Text("Timeline") },
+                            )
                         }
                     },
-                    label = { Text("Review") },
-                )
-            }
-        },
-    ) { padding ->
-        when (tab) {
-            MainActivity.TAB_TIMELINE -> TimelineScreen(padding, resumeTick, onProfile = openProfile)
-            MainActivity.TAB_REVIEW -> ReviewScreen(padding, resumeTick, onProfile = openProfile)
-            else -> MapScreen(padding, snackbar, resumeTick, onOpenProfile = openProfile)
-        }
+                ) { padding ->
+                    Crossfade(targetState = tab, label = "tab") { t ->
+                        when (t) {
+                            MainActivity.TAB_TIMELINE -> TimelineScreen(padding, resumeTick, onProfile = openMenu)
+                            else -> MapScreen(padding, snackbar, resumeTick, onOpenProfile = openMenu)
+                        }
+                    }
+                }
+            },
+            page = { p ->
+                val back = { stack.pop() }
+                when (p) {
+                    Page.PROFILE -> ProfileScreen(
+                        resumeTick = resumeTick,
+                        onBack = back,
+                        onExplore = { stack.push(Page.REVIEW) },
+                    )
+                    Page.FRIENDS -> Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
+                        FriendsScreen(
+                            contentPadding = padding,
+                            snackbar = snackbar,
+                            pendingInvite = pendingInvite,
+                            onInviteHandled = { invite.value = null },
+                            onCompare = {
+                                comparing = it
+                                stack.push(Page.COMPARE)
+                            },
+                            onBack = back,
+                        )
+                    }
+                    Page.BACKUP -> Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
+                        BackupScreen(contentPadding = padding, snackbar = snackbar, onBack = back)
+                    }
+                    Page.SETTINGS -> SettingsScreen(store = store, resumeTick = resumeTick, onBack = back)
+                    Page.ABOUT -> AboutScreen(onBack = back, onChangelog = { stack.push(Page.CHANGELOG) })
+                    Page.CHANGELOG -> ChangelogScreen(onBack = back)
+                    Page.REVIEW -> ReviewScreen(WindowInsets.navigationBars.asPaddingValues(), resumeTick, onBack = back)
+                    Page.COMPARE -> {
+                        val friend = comparing
+                        if (friend != null) {
+                            CompareScreen(friend, onBack = back)
+                        } else {
+                            // The friend isn't kept across process death; go back to the list.
+                            LaunchedEffect(Unit) { stack.pop() }
+                        }
+                    }
+                }
+            },
+        )
     }
 }

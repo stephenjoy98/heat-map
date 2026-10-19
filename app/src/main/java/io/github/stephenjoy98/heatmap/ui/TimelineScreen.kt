@@ -39,6 +39,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import java.time.ZoneId
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -100,10 +110,51 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val camera = rememberMapCamera()
     val tilePx = remember { heatTilePx(context.resources.displayMetrics.density) }
     val casing = if (dark) Color(0xCC000000) else Color(0xCCFFFFFF)
-    val layers = remember(data, dark) {
+    // Editing dots: pick a day, narrow down with the start–end slider or tap a dot, delete or restore.
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val edit = remember { DotEditState(anchor) }
+    var editLoading by remember { mutableStateOf(false) }
+    var editReload by remember { mutableIntStateOf(0) }
+    var framedDay by remember { mutableStateOf<LocalDate?>(null) }
+    // Undo shows over the map, so it never covers the edit panel's buttons.
+    val editSnackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val tapRadiusPx = 32 * context.resources.displayMetrics.density
+
+    val layers = remember(data, dark, editing) {
         val d = data ?: return@remember emptyList()
-        listOf(MapLayer("timeline-${d.period}", TimelineTiles(d.routes, tilePx, casing.toArgb())))
+        // While editing, the routes fade back so the dots stand out.
+        listOf(MapLayer("timeline-${d.period}", TimelineTiles(d.routes, tilePx, casing.toArgb()), alpha = if (editing) 0.35f else 1f))
     }
+
+    LaunchedEffect(editing, edit.day, edit.showingDeleted, editReload) {
+        if (!editing) {
+            framedDay = null
+            return@LaunchedEffect
+        }
+        editLoading = true
+        val zone = ZoneId.systemDefault()
+        val from = edit.day.atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = edit.day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val (pts, deleted) = withContext(Dispatchers.IO) {
+            val deleted = store.deletedPoints(from, to)
+            (if (edit.showingDeleted) deleted else store.editablePoints(from, to)) to deleted.size
+        }
+        edit.deletedCount = deleted
+        edit.load(pts)
+        editLoading = false
+        if (framedDay != edit.day) {
+            framedDay = edit.day
+            frameDots(camera, pts)
+        }
+    }
+    val stopEditing = {
+        // Land on the day that was being edited.
+        anchor = edit.day
+        scale = TimelineScale.DAY
+        editing = false
+    }
+    BackHandler(enabled = editing && !LocalCovered.current) { stopEditing() }
     // Frame the period's travels whenever a new period loads.
     LaunchedEffect(data?.period, data?.bounds) {
         data?.bounds?.let { frame(camera, it) }
@@ -111,70 +162,131 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
 
     Column(Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding())) {
         TopAppBar(
-            title = { Text("Timeline") },
-            actions = { ProfileButton(onClick = onProfile) },
+            title = { Text(if (editing) "Edit dots" else "Timeline") },
+            actions = {
+                if (!editing) {
+                    IconButton(onClick = {
+                        edit.day = anchor
+                        edit.showingDeleted = false
+                        editing = true
+                    }) { Icon(Icons.Filled.Edit, contentDescription = "Edit dots") }
+                }
+                ProfileButton(onClick = onProfile)
+            },
         )
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            TimelineScale.entries.forEachIndexed { i, s ->
-                SegmentedButton(
-                    selected = s == scale,
-                    onClick = { scale = s },
-                    shape = SegmentedButtonDefaults.itemShape(index = i, count = TimelineScale.entries.size),
-                ) { Text(s.label, maxLines = 1) }
+        if (!editing) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                TimelineScale.entries.forEachIndexed { i, s ->
+                    SegmentedButton(
+                        selected = s == scale,
+                        onClick = { scale = s },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = TimelineScale.entries.size),
+                    ) { Text(s.label, maxLines = 1) }
+                }
             }
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { anchor = period.previous().anchor }) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
-            }
-            TextButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
-                Text(period.label, style = MaterialTheme.typography.titleMedium)
-            }
-            IconButton(onClick = { anchor = period.next().anchor }, enabled = !period.isCurrent) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { anchor = period.previous().anchor }) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
+                }
+                TextButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
+                    Text(period.label, style = MaterialTheme.typography.titleMedium)
+                }
+                IconButton(onClick = { anchor = period.next().anchor }, enabled = !period.isCurrent) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
+                }
             }
         }
 
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .then(if (editing) Modifier.weight(1f) else Modifier.height(260.dp))
                 .padding(horizontal = 12.dp)
                 .clip(RoundedCornerShape(20.dp)),
         ) {
-            AppMap(camera = camera, layers = layers, modifier = Modifier.fillMaxSize(), refreshKey = data)
-            if (data == null) CircularProgressIndicator(Modifier.align(Alignment.Center))
+            AppMap(
+                camera = camera,
+                layers = layers,
+                modifier = Modifier.fillMaxSize(),
+                refreshKey = data,
+                onMapClick = if (editing) {
+                    { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
+                } else {
+                    null
+                },
+            )
+            if (editing) {
+                DotsOverlay(camera, edit, Modifier.fillMaxSize())
+                SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
+            } else if (data == null) {
+                CircularProgressIndicator(Modifier.align(Alignment.Center))
+            }
         }
 
-        val d = data
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            if (d == null) return@LazyColumn
-            item { Summary(d) }
-            when (scale) {
-                TimelineScale.DAY -> {
-                    if (d.entries.isEmpty()) item { Empty("Nothing recorded on this day.") }
-                    items(d.entries, key = { "${it.javaClass.simpleName}-${it.start}" }) { entry ->
-                        when (entry) {
-                            is DayEntry.Move -> MoveRow(entry) { entry.box?.let { frame(camera, it) } }
-                            is DayEntry.Stay -> StayRow(entry) { camera.animateTo(entry.lat, entry.lon, 16f) }
+        if (editing) {
+            Box(Modifier.padding(12.dp)) {
+                EditPanel(
+                    state = edit,
+                    loading = editLoading,
+                    onDay = { edit.day = it },
+                    onFocus = { camera.animateTo(it.lat, it.lon, 17f) },
+                    onShow = { frameDots(camera, it) },
+                    onDelete = { doomed ->
+                        scope.launch {
+                            afterDotEdit(context, withContext(Dispatchers.IO) { store.deletePoints(doomed.map { it.id }) })
+                            editReload++
+                            val undo = editSnackbar.showSnackbar(
+                                if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted",
+                                actionLabel = "Undo",
+                                duration = SnackbarDuration.Long,
+                            )
+                            if (undo == SnackbarResult.ActionPerformed) {
+                                afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(doomed.map { it.id }) })
+                                editReload++
+                            }
+                        }
+                    },
+                    onRestore = { back ->
+                        scope.launch {
+                            afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(back.map { it.id }) })
+                            editReload++
+                            editSnackbar.showSnackbar(if (back.size == 1) "Dot restored" else "${back.size} dots restored")
+                        }
+                    },
+                    onClose = stopEditing,
+                )
+            }
+        } else {
+            val d = data
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (d == null) return@LazyColumn
+                item { Summary(d) }
+                when (scale) {
+                    TimelineScale.DAY -> {
+                        if (d.entries.isEmpty()) item { Empty("Nothing recorded on this day.") }
+                        items(d.entries, key = { "${it.javaClass.simpleName}-${it.start}" }) { entry ->
+                            when (entry) {
+                                is DayEntry.Move -> MoveRow(entry) { entry.box?.let { frame(camera, it) } }
+                                is DayEntry.Stay -> StayRow(entry) { camera.animateTo(entry.lat, entry.lon, 16f) }
+                            }
                         }
                     }
-                }
-                else -> {
-                    if (d.stats.isEmpty()) item { Empty("Nothing recorded in this ${scale.label.lowercase()}.") }
-                    val max = d.stats.maxOfOrNull { it.meters } ?: 0.0
-                    items(d.stats, key = { it.key }) { stat ->
-                        PeriodRow(stat, scale, max) {
-                            if (scale == TimelineScale.YEAR) {
-                                anchor = YearMonth.parse(stat.key).atDay(1)
-                                scale = TimelineScale.MONTH
-                            } else {
-                                anchor = LocalDate.parse(stat.key)
-                                scale = TimelineScale.DAY
+                    else -> {
+                        if (d.stats.isEmpty()) item { Empty("Nothing recorded in this ${scale.label.lowercase()}.") }
+                        val max = d.stats.maxOfOrNull { it.meters } ?: 0.0
+                        items(d.stats, key = { it.key }) { stat ->
+                            PeriodRow(stat, scale, max) {
+                                if (scale == TimelineScale.YEAR) {
+                                    anchor = YearMonth.parse(stat.key).atDay(1)
+                                    scale = TimelineScale.MONTH
+                                } else {
+                                    anchor = LocalDate.parse(stat.key)
+                                    scale = TimelineScale.DAY
+                                }
                             }
                         }
                     }

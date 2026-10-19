@@ -11,9 +11,26 @@ import kotlin.math.floor
  * counts if its grid square hasn't been visited before. Going down the same street again adds nothing,
  * while a parallel street a block over does. Steps are only added up for fixes in [countFrom, countTo), but
  * everything earlier still marks ground as visited, so a year's figure is the ground first covered that year.
+ *
+ * To resume later without re-reading the whole history, pass the squares already [visited] and a saved
+ * [State]; [onCredit] reports each bit of new ground with the time of the fix that reached it, and squares
+ * seen for the first time are collected in [newCells].
  */
-class ExploredDistance(private val countFrom: Long = 0L, private val countTo: Long = Long.MAX_VALUE) {
-    private val visited = HashSet<Long>()
+class ExploredDistance(
+    private val countFrom: Long = 0L,
+    private val countTo: Long = Long.MAX_VALUE,
+    private val visited: MutableSet<Long> = HashSet(),
+    state: State? = null,
+    private val onCredit: ((time: Long, meters: Double) -> Unit)? = null,
+) {
+    /** Where the walk got to: enough to carry on from the next fix. */
+    class State(
+        val prevTime: Long, val prevLat: Double, val prevLon: Double,
+        val firstPass: Long?, val firstPassMeters: Double,
+    )
+
+    /** Squares visited for the first time since this was created. */
+    val newCells = ArrayList<Long>()
 
     // The square the route is passing through for the first time, if any: steps count until it leaves, up
     // to the square's diagonal, so GPS jitter while standing still in a new square can't keep adding up.
@@ -28,6 +45,22 @@ class ExploredDistance(private val countFrom: Long = 0L, private val countTo: Lo
     var meters = 0.0
         private set
 
+    init {
+        if (state != null) {
+            hasPrev = true
+            prevTime = state.prevTime
+            prevLat = state.prevLat
+            prevLon = state.prevLon
+            firstPass = state.firstPass
+            firstPassMeters = state.firstPassMeters
+        }
+    }
+
+    /** The current position in the walk, or null before the first fix. */
+    fun state(): State? = if (hasPrev) State(prevTime, prevLat, prevLon, firstPass, firstPassMeters) else null
+
+    private fun visit(cell: Long): Boolean = visited.add(cell).also { if (it) newCells += cell }
+
     fun add(time: Long, lat: Double, lon: Double, intervalMs: Int) {
         if (hasPrev && !TrackRules.isBreak(prevTime, prevLat, prevLon, time, lat, lon, intervalMs)) {
             val d = TrackRules.distanceMeters(prevLat, prevLon, lat, lon)
@@ -39,7 +72,7 @@ class ExploredDistance(private val countFrom: Long = 0L, private val countTo: Lo
                 val f = (i + 0.5) / steps
                 val cell = cellOf(prevLat + (lat - prevLat) * f, prevLon + (lon - prevLon) * f)
                 when {
-                    visited.add(cell) -> {
+                    visit(cell) -> {
                         firstPass = cell
                         firstPassMeters = 0.0
                     }
@@ -48,13 +81,16 @@ class ExploredDistance(private val countFrom: Long = 0L, private val countTo: Lo
                 if (firstPass != null && firstPassMeters < MAX_PER_CELL_M) {
                     val credit = minOf(stepLength, MAX_PER_CELL_M - firstPassMeters)
                     firstPassMeters += credit
-                    if (counting) meters += credit
+                    if (counting) {
+                        meters += credit
+                        onCredit?.invoke(time, credit)
+                    }
                 }
             }
         } else {
             // The start of a new route: no distance yet, but leaving a square never seen before counts.
             val cell = cellOf(lat, lon)
-            firstPass = if (visited.add(cell)) cell else null
+            firstPass = if (visit(cell)) cell else null
             firstPassMeters = 0.0
         }
         hasPrev = true

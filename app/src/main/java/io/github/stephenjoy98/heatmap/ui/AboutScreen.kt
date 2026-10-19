@@ -1,6 +1,5 @@
 package io.github.stephenjoy98.heatmap.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -87,7 +86,6 @@ private val dataSources = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
-    BackHandler(onBack = onBack)
     val uri = LocalUriHandler.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(

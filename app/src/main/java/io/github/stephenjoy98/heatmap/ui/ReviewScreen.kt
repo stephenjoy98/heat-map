@@ -44,6 +44,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -84,7 +88,7 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: () -> Unit) {
+fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     var period by rememberSaveable { mutableStateOf(ReviewPeriod.WEEK) }
@@ -104,7 +108,9 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: () -
         topBar = {
             LargeTopAppBar(
                 title = { Text("Review") },
-                actions = { ProfileButton(onClick = onProfile) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
                 scrollBehavior = scrollBehavior,
             )
         },

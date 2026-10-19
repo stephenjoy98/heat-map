@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -90,7 +89,6 @@ fun FriendsScreen(
     onCompare: (Friend) -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
-    onBack?.let { BackHandler(onBack = it) }
     val context = LocalContext.current
     val configured = remember { FirebaseGate.isConfigured(context) }
     val user by Account.user.collectAsStateWithLifecycle()
@@ -115,7 +113,6 @@ fun FriendsScreen(
 /** Backup and restore of the full history to the signed-in account. */
 @Composable
 fun BackupScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val configured = remember { FirebaseGate.isConfigured(context) }
     val user by Account.user.collectAsStateWithLifecycle()

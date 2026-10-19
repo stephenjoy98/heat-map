@@ -1,6 +1,5 @@
 package io.github.stephenjoy98.heatmap.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -83,7 +82,6 @@ private class Comparison(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompareScreen(friend: Friend, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     val dark = isDarkTheme()

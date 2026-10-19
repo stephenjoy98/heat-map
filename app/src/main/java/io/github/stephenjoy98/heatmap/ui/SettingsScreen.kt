@@ -40,7 +40,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -98,7 +97,6 @@ fun SettingsScreen(
     resumeTick: Int,
     onBack: () -> Unit,
 ) {
-    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -249,19 +247,25 @@ fun SettingsScreen(
                     Text("Theme", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
                     SegmentedChoice(
-                        options = listOf(MapTheme.DARK to "Dark", MapTheme.LIGHT to "Light", MapTheme.SYSTEM to "System"),
+                        options = listOf(MapTheme.LIGHT to "Light", MapTheme.DARK to "Dark", MapTheme.SYSTEM to "System"),
                         selected = mapTheme,
                         onSelect = Prefs::setMapTheme,
                     )
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    ItemDivider()
-                    SettingRow(
-                        title = "Wallpaper colours",
-                        subtitle = "Material You: match the app's colours to your wallpaper",
-                    ) {
-                        Switch(checked = dynamicColor, onCheckedChange = Prefs::setDynamicColor)
-                    }
+                ItemDivider()
+                SettingRow(
+                    title = "Material expressive",
+                    subtitle = if (expressiveSupported) {
+                        "Colours from your wallpaper through Android's Monet engine, with rounder shapes and springier motion"
+                    } else {
+                        "Needs Android 12 or later for wallpaper colours"
+                    },
+                ) {
+                    Switch(
+                        checked = dynamicColor && expressiveSupported,
+                        enabled = expressiveSupported,
+                        onCheckedChange = Prefs::setDynamicColor,
+                    )
                 }
                 if (BuildConfig.HAS_MAPS_KEY) {
                     ItemDivider()

@@ -4,15 +4,23 @@ Your most travelled routes on a map.
 
 **Location Ticker** is an Android app that records your position on a fixed tick, anywhere from every
 15 seconds to once a day, and draws everything as a Strava-style heatmap on OpenStreetMap or Google Maps. It works out
-how you travelled, gives you a Review tab with AI insights, reads your steps from Health Connect, backs
+how you travelled, gives you a Review page with AI insights, reads your steps from Health Connect, backs
 up to your Google account, and lets you compare explored areas with friends.
 
 ## Features
 
 ### Design
 - **Material Design 3** throughout: large collapsing top app bars, segmented buttons, M3 navigation bar,
-  cards and sheets, and **Material You** dynamic colour from your wallpaper on Android 12+ (switchable
-  in Settings; otherwise the orange heat palette). The heat colours themselves never change.
+  cards and sheets. **Light**, **Dark** or **System** theme, plus a separate **Material expressive**
+  switch (Android 12+): colours from your wallpaper through Android's Monet engine, rounder shapes,
+  emphasised headings and springier motion. Otherwise the orange heat palette. The heat colours
+  themselves never change.
+- **Motion and navigation** follow Android's guidance: predictive back (the page shrinks and follows
+  your swipe, revealing the one underneath), menus and popups that grow out of what you tapped, and
+  large page titles that collapse into the top bar as you scroll. Back walks back through the pages
+  you opened, then returns to the map, and asks before leaving the app from the map.
+- Two tabs, **Map** and **Timeline**. Profile, Friends, Backup, Review, Settings and About open from
+  the account button, which shows a badge when trips or roads are waiting for your answer.
 
 ### Map
 - **Works with no setup**: without a Google Maps API key the app uses sharp **vector maps** from
@@ -20,7 +28,7 @@ up to your Google account, and lets you compare explored areas with friends.
   at your screen's full resolution. With a key, Google Maps is used, and Settings lets you switch.
 - Two looks either way: a **dark** map in the near-black greys of Google's dark theme, so routes glow
   like Strava's heatmap, and a clean **light** white map in the spirit of Tesla's in-car map. Choose
-  Dark, Light or System; the whole app follows.
+  Light, Dark or System; the whole app follows.
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
   up. On the dark map roads used once are dark red and your most travelled ones burn orange, yellow and
   white. The light map uses light orange through deep crimson.
@@ -34,7 +42,7 @@ up to your Google account, and lets you compare explored areas with friends.
   Poor / Too weak badge, satellites in use and in view (by constellation: GPS, Galileo, GLONASS,
   BeiDou…), heading and speed, and the time of the fix. The **?** explains what accuracy
   means; fixes less precise than 100 m (500 m in battery-saver mode) are never recorded.
-- **Edit dots**: tap the pencil to fix mapping errors. Pick a day, narrow it down with a **start–end
+- **Edit dots** (pencil on the Timeline tab): fix mapping errors. Pick a day, narrow it down with a **start–end
   slider** (the dots in range are highlighted and joined in time order), or tap a single dot and step
   through its neighbours, then delete. Trips touching deleted dots are rebuilt from what's left, and
   backups and shared routes are updated on the next sync. Deleting is a **soft delete**: deleted dots
@@ -52,7 +60,7 @@ up to your Google account, and lets you compare explored areas with friends.
 - Each fix is tagged with Android's **activity recognition** (in vehicle, on bicycle, walking,
   running, still). Finished stretches are split into **trips** using that plus speed.
 - **When it's unsure, it asks.** Any vehicle trip could be driving, a car share or transit, and slow
-  "cycling" could be traffic, so these show up as questions on the Review tab, with a mini map of the
+  "cycling" could be traffic, so these show up as questions on the Review page, with a mini map of the
   trip and a notification. Your answer is remembered: the next trip between the same two places is
   classified automatically.
 
@@ -63,7 +71,7 @@ up to your Google account, and lets you compare explored areas with friends.
   [Valhalla](https://valhalla1.openstreetmap.de) service run by FOSSGIS, using the network for the trip's
   mode (footpaths, cycle routes, roads or bus routes). Only coordinates are sent, never times.
 - **Asking which road**: where the recording strays more than ~40 m from the matched road for a few fixes,
-  the Review tab asks "Which road did you take?" with a mini map of the options: the best match,
+  the Review page asks "Which road did you take?" with a mini map of the options: the best match,
   alternative roads between the same points (labelled by street name), and the line as recorded.
 - Trips that stray almost everywhere (trail walks, trains) keep their smoothed recording. Changing a trip's
   travel mode re-matches it. Both features can be switched off in Settings.
@@ -90,7 +98,7 @@ up to your Google account, and lets you compare explored areas with friends.
   Settings), loaded from the JoyPixels CDN and cached, with the system emoji as a fallback.
   Filter by all time or by year.
 
-### Review tab
+### Review page
 - Week / Month / Year / All time: distance (total and per mode), **new areas explored** (~220 m
   squares you'd never visited before), **cities and countries** visited (reverse-geocoded on the
   phone and cached), longest travel day, and **steps from Health Connect**.
@@ -159,7 +167,7 @@ The next push (or *Run workflow* on the Actions tab) builds an APK with everythi
 ### 3. On the phone
 - Allow **location** (and *Allow all the time* in Settings if you want recording to resume after a
   reboot), **notifications**, and **physical activity** (much better travel-mode detection).
-- Connect **Health Connect** from the Review tab or Settings to see steps.
+- Connect **Health Connect** from the Review page or Settings to see steps.
 - For long intervals, turn off battery optimization for the app (button in Settings).
 
 ## Build locally
