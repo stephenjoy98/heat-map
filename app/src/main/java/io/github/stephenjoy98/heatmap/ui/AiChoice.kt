@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -67,7 +68,7 @@ private val engines = listOf(
     EngineInfo(
         AiEngine.STATS,
         "Statistics only (no AI)",
-        "No AI. The Review tab shows highlights calculated from your own numbers on the phone. Fast, private and works everywhere.",
+        "No AI. Insights shows highlights calculated from your own numbers on the phone. Fast, private and works everywhere.",
         "Highlights like total distance, your main way of getting around, new areas explored, cities visited, " +
             "your longest travel day and average steps are worked out directly from your data. You can still ask " +
             "simple questions, like \"how far did I cycle?\", and get answers from the numbers, but it won't " +
@@ -190,10 +191,13 @@ fun AiChoiceDialog(onDismiss: () -> Unit) {
     var modelText by remember { mutableStateOf(model) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Review insights") },
+        // Wider than the standard dialog, so the option cards have room to breathe.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        title = { Text("Who writes your insights") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("Choose who writes the insights on your Review tab.", style = MaterialTheme.typography.bodyMedium)
+                Text("Choose who writes the insights on your Insights page.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
                 AiEngineChooser(choice, { choice = it })
                 if (choice == AiEngine.CLOUD) {

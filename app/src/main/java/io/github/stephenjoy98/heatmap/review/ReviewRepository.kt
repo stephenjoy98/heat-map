@@ -27,7 +27,7 @@ class ReviewData(
     val totalKm: Double get() = kmByMode.values.sum()
 }
 
-/** Gathers the numbers behind the Review tab and its insights. Call off the main thread. */
+/** Gathers the numbers behind the Insights page. Call off the main thread. */
 object ReviewRepository {
     private const val MAX_GEOCODES_PER_LOAD = 40
 

@@ -4,7 +4,7 @@ Your most travelled routes on a map.
 
 **Location Ticker** is an Android app that records your position on a fixed tick, anywhere from every
 15 seconds to once a day, and draws everything as a Strava-style heatmap on OpenStreetMap. It works out
-how you travelled, gives you a Review page with AI insights, reads your steps from Health Connect, backs
+how you travelled, gives you a Insights page with AI insights, reads your steps from Health Connect, backs
 up to your Google account, and lets you compare explored areas with friends.
 
 ## Features
@@ -19,7 +19,7 @@ up to your Google account, and lets you compare explored areas with friends.
   your swipe, revealing the one underneath), menus and popups that grow out of what you tapped, and
   large page titles that collapse into the top bar as you scroll. Back walks back through the pages
   you opened, then returns to the map, and asks before leaving the app from the map.
-- Two tabs, **Map** and **Timeline**. Profile, Friends, Backup, Review, Settings and About open from
+- Two tabs, **Map** and **Timeline**. Profile, Friends, Backup, Insights, Settings and About open from
   the account button, which shows a badge when trips or roads are waiting for your answer.
 
 ### Map
@@ -60,12 +60,14 @@ up to your Google account, and lets you compare explored areas with friends.
   3 s on foot, 5 s when unsure, 15 s when still and 1 min after 20 minutes in one place. It reacts straight away
   when activity recognition is allowed; otherwise it adapts from GPS fixes alone.
 - Foreground service with a Stop action in its notification; resumes after reboot when allowed.
+- **Permissions** in Settings: each permission the app uses, whether it's allowed, and a tap to change it
+  (Android's own dialog where there is one, otherwise the app's page in Android settings).
 
 ### How you travelled
 - Each fix is tagged with Android's **activity recognition** (in vehicle, on bicycle, walking,
   running, still). Finished stretches are split into **trips** using that plus speed.
 - **When it's unsure, it asks.** Any vehicle trip could be driving, a car share or transit, and slow
-  "cycling" could be traffic, so these show up as questions on the Review page, with a mini map of the
+  "cycling" could be traffic, so these show up as questions on the Insights page, with a mini map of the
   trip and a notification. Your answer is remembered: the next trip between the same two places is
   classified automatically.
 
@@ -76,7 +78,7 @@ up to your Google account, and lets you compare explored areas with friends.
   [Valhalla](https://valhalla1.openstreetmap.de) service run by FOSSGIS, using the network for the trip's
   mode (footpaths, cycle routes, roads or bus routes). Only coordinates are sent, never times.
 - **Asking which road**: where the recording strays more than ~40 m from the matched road for a few fixes,
-  the Review page asks "Which road did you take?" with a mini map of the options: the best match,
+  the Insights page asks "Which road did you take?" with a mini map of the options: the best match,
   alternative roads between the same points (labelled by street name), and the line as recorded.
 - Trips that stray almost everywhere (trail walks, trains) keep their smoothed recording. Changing a trip's
   travel mode re-matches it. Both features can be switched off in Settings.
@@ -103,7 +105,7 @@ up to your Google account, and lets you compare explored areas with friends.
   Settings), loaded from the JoyPixels CDN and cached, with the system emoji as a fallback.
   Filter by all time or by year.
 
-### Review page
+### Insights page
 - Week / Month / Year / All time: distance (total and per mode), **new areas explored** (~220 m
   squares you'd never visited before), **cities and countries** visited (reverse-geocoded on the
   phone and cached), longest travel day, and **steps from Health Connect**.
@@ -120,7 +122,7 @@ up to your Google account, and lets you compare explored areas with friends.
 
 ### Friends and backup (needs Firebase)
 - **Sign in with Google** (Credential Manager + Firebase Auth).
-- **Backup** of the full history to your private Firestore area, daily and on demand, with **Restore**
+- **Backup** of the full history to your private Firestore area, automatically (every 6 or 12 hours, daily or weekly) and on demand, with **Restore**
   that merges into the current phone's history.
 - **Friends** via an 8-character **ID**, a **QR code**, or a shared invite link
   (`locationticker://friend/ABCD2345`). Scan with the built-in Google code scanner.
@@ -135,7 +137,7 @@ Every push builds the APKs in GitHub Actions (**Actions → Android build → ar
 `location-ticker-apk`**). Install `app-release.apk` on Android 8.0+. You'll need to allow installing
 from unknown sources.
 
-Without any setup the app works fully on OpenStreetMap: recording, heatmap, travel modes, Review,
+Without any setup the app works fully on OpenStreetMap: recording, heatmap, travel modes, Insights,
 steps, on-device AI and statistics. Sign-in, backup, friends and cloud AI need Firebase (below).
 
 ## Setup
@@ -164,7 +166,7 @@ The next push (or *Run workflow* on the Actions tab) builds an APK with everythi
 ### 2. On the phone
 - Allow **location** (and *Allow all the time* in Settings if you want recording to resume after a
   reboot), **notifications**, and **physical activity** (much better travel-mode detection).
-- Connect **Health Connect** from the Review page or Settings to see steps.
+- Connect **Health Connect** from the Insights page or Settings to see steps.
 - For long intervals, turn off battery optimization for the app (button in Settings).
 
 ## Build locally
@@ -187,8 +189,8 @@ Requires JDK 17 and the Android SDK (API 36).
 | Heatmap rendering and map tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |
 | The map (MapLibre vector maps with heat tiles, 3D routes and a location marker) | `ui/AppMap.kt`, `map/VectorMapSupport.kt` |
 | Map styles (dark / light) | `map/MapStyles.kt`, `map/VectorMapSupport.kt` |
-| Review stats, steps, insights (Nano / cloud / statistics) | `review/` |
-| Sign-in, backup, friends, daily sync | `cloud/` |
+| Insights: stats, steps, AI write-ups (Nano / cloud / statistics) | `review/` |
+| Sign-in, backup, friends, scheduled sync | `cloud/` |
 | UI (Jetpack Compose) | `ui/` |
 
 The renderer strokes each route at 12% alpha onto an offscreen 512 px tile. Overlaps combine as

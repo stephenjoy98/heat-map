@@ -12,6 +12,23 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-10-19
+
+### Added
+- Permissions in Settings: location, location all the time, physical activity, notifications,
+  unrestricted battery and Health Connect, each showing whether it's allowed. Tap one to change it in
+  Android's own dialog, or on the app's page in Android settings where there's no dialog.
+- Backup frequency: every 6 hours, every 12 hours, daily or weekly.
+- The About page shows the app icon, what the app does and its main features.
+
+### Changed
+- Review is now called Insights.
+- The location marker is blue again.
+- The dialog for choosing who writes your insights is wider.
+
+### Removed
+- The source code link on the About page (the licence link still points to it).
+
 ## [2.15.1] - 2026-10-19
 
 ### Changed

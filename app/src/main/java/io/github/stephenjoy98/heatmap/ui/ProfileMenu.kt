@@ -128,12 +128,12 @@ private var avatarBounds by mutableStateOf<Rect?>(null)
 
 /**
  * The account button for the top-right corner of every tab, like Google's apps. A badge shows how many
- * trips and roads are waiting for an answer on the Review page.
+ * trips and roads are waiting for an answer on the Insights page.
  */
 @Composable
 fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val pending = LocalReviewCount.current
-    val tip = if (pending > 0) "Your account · $pending waiting on the Review page" else "Your account: profile, friends, review, backup and settings"
+    val tip = if (pending > 0) "Your account · $pending waiting in Insights" else "Your account: profile, friends, insights, backup and settings"
     Tip(tip, modifier) {
         IconButton(onClick = onClick, modifier = Modifier.trackBounds { avatarBounds = it }) {
             BadgedBox(badge = { if (pending > 0) Badge { Text(pending.toString()) } }) { Avatar(32) }
@@ -247,7 +247,7 @@ fun AccountMenu(
                 MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history") { go(onBackup) }
                 MenuRow(
                     Icons.Filled.Star,
-                    "Review",
+                    "Insights",
                     if (reviewCount > 0) "$reviewCount waiting for your answer · insights and stats" else "Insights, stats and questions about your trips",
                 ) { go(onReview) }
                 MenuRow(Icons.Filled.Settings, "Settings", null) { go(onSettings) }

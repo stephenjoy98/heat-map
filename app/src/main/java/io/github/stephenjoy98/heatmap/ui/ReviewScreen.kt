@@ -108,7 +108,7 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
         contentWindowInsets = WindowInsets(0),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Review") },
+                title = { Text("Insights") },
                 navigationIcon = {
                     BackButton(onBack)
                 },

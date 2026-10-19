@@ -405,7 +405,7 @@ private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit) {
         Text("${t.mode.label} · ${Insights.km(t.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
         Text(
             "${timeFormat.format(Date(t.startTime))} – ${timeFormat.format(Date(t.endTime))} · ${duration(t.endTime - t.startTime)}" +
-                (if (t.needsReview) " · needs your answer on Review" else ""),
+                (if (t.needsReview) " · needs your answer in Insights" else ""),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

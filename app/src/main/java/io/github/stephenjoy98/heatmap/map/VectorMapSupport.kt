@@ -333,10 +333,10 @@ class TileOverlayView(context: Context) : View(context) {
     private var map: MapLibreMap? = null
     private val renderers = LinkedHashMap<String, Pair<Float, TileLayerRenderer>>() // id -> (zIndex, renderer)
     private val density = resources.displayMetrics.density
-    // The location marker: red, matching the record button, with a white ring and a soft halo.
-    private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 229, 57, 53) }
+    // The location marker: a blue dot with a white ring and a soft halo, as in most map apps.
+    private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 66, 133, 244) }
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(229, 57, 53) }
+    private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(66, 133, 244) }
 
     var latest: LatLng? = null
         set(value) {

@@ -36,7 +36,7 @@ import kotlin.math.sqrt
  *
  * Each trip is map-matched with Valhalla using the network for its travel mode. Where the recorded trace
  * strays more than ~40 m from the matched road for a few fixes in a row, the app isn't sure which way you
- * went, so it asks: the Review tab shows the best match, Valhalla's alternative roads between the same two
+ * went, so it asks: the Insights page shows the best match, Valhalla's alternative roads between the same two
  * points, and the line as recorded. Trips that stray almost everywhere (a trail walk, a train) keep their
  * smoothed recording instead of being forced onto roads.
  */

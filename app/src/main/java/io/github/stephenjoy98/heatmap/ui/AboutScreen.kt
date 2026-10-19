@@ -30,6 +30,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Image
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -54,6 +60,29 @@ import kotlin.math.sin
 private const val GITHUB_USER = "stephenjoy98"
 private const val GITHUB_PROFILE = "https://github.com/$GITHUB_USER"
 private const val REPO_URL = "https://github.com/$GITHUB_USER/heat-map"
+
+/** What the app does, in a few lines for the About page. */
+private val FEATURES = listOf(
+    "🗺️" to "A heatmap of everywhere you've been, on OpenStreetMap",
+    "⏱️" to "Automatic recording that adapts to how you're moving",
+    "🚲" to "Travel modes, trips and a Timeline by day, week, month or year",
+    "⛰️" to "Terrain, 3D buildings and 3D routes at the heights you recorded",
+    "🌍" to "Your profile: places explored, distance explored and time captured",
+    "✨" to "Insights from on-device AI, with steps from Health Connect",
+    "☁️" to "Backups, and friends to compare routes and explored areas with",
+)
+
+/** The app's launcher icon, as installed. */
+@Composable
+private fun AppIcon(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val icon = remember {
+        runCatching { context.packageManager.getApplicationIcon(context.packageName).toBitmap(256, 256).asImageBitmap() }.getOrNull()
+    }
+    if (icon != null) {
+        Image(icon, contentDescription = "Location Ticker icon", modifier = modifier.clip(RoundedCornerShape(24.dp)))
+    }
+}
 
 /** A library or data source the app uses, and the licence it's used under. */
 private class Credit(val name: String, val licence: String, val url: String)
@@ -110,12 +139,31 @@ fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
         ) {
             Card {
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    AppIcon(Modifier.size(80.dp))
+                    Spacer(Modifier.height(12.dp))
                     Text("Location Ticker", style = MaterialTheme.typography.headlineSmall)
                     Text(
                         "Version ${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Location Ticker quietly records where you go and turns it into a heatmap of your life: " +
+                            "the streets you walk, ride and drive most glow brightest.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FEATURES.forEach { (emoji, text) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                JoyEmoji(emoji, size = 20)
+                                Spacer(Modifier.width(10.dp))
+                                Text(text, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(16.dp))
                     MadeWith(onProfile = { uri.openUri(GITHUB_PROFILE) })
                 }
@@ -126,8 +174,6 @@ fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
                     LinkRow("Changelog", "What's new in each version") { onChangelog() }
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     LinkRow("GitHub", "@$GITHUB_USER") { uri.openUri(GITHUB_PROFILE) }
-                    HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    LinkRow("Source code", REPO_URL.removePrefix("https://")) { uri.openUri(REPO_URL) }
                 }
             }
 

@@ -47,6 +47,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -297,12 +300,24 @@ private fun ProfileCard(snackbar: SnackbarHostState) {
     }
 }
 
+/** Automatic backup choices: hours between backups, and their labels. */
+private val BACKUP_FREQUENCIES = listOf(6 to "6 hours", 12 to "12 hours", 24 to "Daily", 168 to "Weekly")
+
+private fun backupFrequencyText(hours: Int) = when (hours) {
+    6 -> "Every 6 hours"
+    12 -> "Every 12 hours"
+    168 -> "Once a week"
+    else -> "Once a day"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BackupCard(snackbar: SnackbarHostState) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val last by Prefs.lastBackup.collectAsStateWithLifecycle()
     val auto by Prefs.autoBackup.collectAsStateWithLifecycle()
+    val every by Prefs.backupEveryHours.collectAsStateWithLifecycle()
     var busy by remember { mutableStateOf<String?>(null) }
     var confirmRestore by remember { mutableStateOf(false) }
 
@@ -336,7 +351,24 @@ private fun BackupCard(snackbar: SnackbarHostState) {
                 }
             }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
-            ToggleRow("Back up automatically", "Once a day when online", auto) { Prefs.setAutoBackup(it) }
+            ToggleRow("Back up automatically", "${backupFrequencyText(every)} when online", auto) { Prefs.setAutoBackup(it) }
+            if (auto) {
+                Spacer(Modifier.height(8.dp))
+                Text("Frequency", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    BACKUP_FREQUENCIES.forEachIndexed { i, (hours, label) ->
+                        SegmentedButton(
+                            selected = every == hours,
+                            onClick = {
+                                Prefs.setBackupEveryHours(hours)
+                                SyncWorker.schedule(context)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(i, BACKUP_FREQUENCIES.size),
+                        ) { Text(label, maxLines = 1) }
+                    }
+                }
+            }
         }
     }
 

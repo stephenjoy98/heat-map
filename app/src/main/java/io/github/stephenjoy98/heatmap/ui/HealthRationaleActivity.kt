@@ -28,7 +28,7 @@ class HealthRationaleActivity : ComponentActivity() {
                         Spacer(Modifier.height(16.dp))
                         Text(
                             "Location Ticker reads your daily step count from Health Connect to show steps " +
-                                "alongside the distance you travelled on the Review tab, and to include them in " +
+                                "alongside the distance you travelled in Insights, and to include them in " +
                                 "insights you ask for. It only reads steps, never writes health data, and keeps " +
                                 "them on your phone. Steps are only sent to Google's Gemini if you chose the " +
                                 "cloud AI option and ask for insights.",

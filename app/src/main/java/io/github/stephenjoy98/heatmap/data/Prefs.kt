@@ -81,6 +81,10 @@ object Prefs {
     private val _autoBackup = MutableStateFlow(true)
     val autoBackup: StateFlow<Boolean> = _autoBackup
 
+    /** How often automatic backups run, in hours: 6, 12, 24 or 168 (weekly). */
+    private val _backupEveryHours = MutableStateFlow(24)
+    val backupEveryHours: StateFlow<Int> = _backupEveryHours
+
 
     /** Material You: take the app's colours from the wallpaper (Android 12+). */
     private val _dynamicColor = MutableStateFlow(true)
@@ -114,6 +118,7 @@ object Prefs {
         _onboarded.value = sp.getBoolean("onboarded", false)
         _shareRoutes.value = sp.getBoolean("share_routes", true)
         _autoBackup.value = sp.getBoolean("auto_backup", true)
+        _backupEveryHours.value = sp.getInt("backup_every_hours", 24)
         _lastBackup.value = sp.getLong("last_backup", 0L)
         _dynamicColor.value = sp.getBoolean("dynamic_color", true)
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
@@ -190,6 +195,11 @@ object Prefs {
     fun setShareRoutes(on: Boolean) {
         _shareRoutes.value = on
         sp.edit().putBoolean("share_routes", on).apply()
+    }
+
+    fun setBackupEveryHours(hours: Int) {
+        _backupEveryHours.value = hours
+        sp.edit().putInt("backup_every_hours", hours).apply()
     }
 
     fun setAutoBackup(on: Boolean) {

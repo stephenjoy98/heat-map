@@ -20,7 +20,7 @@ import com.google.android.gms.location.DetectedActivity
 /**
  * Splits finished stretches of recording into trips and works out how each was travelled, from Android's
  * activity recognition plus speed. When it can't tell (any vehicle trip could be driving, a car share or
- * transit; slow "cycling" could be traffic), the trip is flagged so the Review tab asks the user.
+ * transit; slow "cycling" could be traffic), the trip is flagged so the Insights page asks the user.
  */
 object TripDetector {
     const val QUESTIONS_CHANNEL_ID = "questions"

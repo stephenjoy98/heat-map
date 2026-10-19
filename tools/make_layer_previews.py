@@ -26,18 +26,18 @@ def hexc(h):
     h = h.lstrip('#')
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-MARKER_RED = '#e53935'  # the same red as the location marker in the app
+MARKER = '#4285f4'  # the same blue as the location marker in the app
 
 
 def marker(img, cx, cy):
-    """The app's location marker: a soft red halo, a white ring and a red dot."""
+    """The app's location marker: a soft blue halo, a white ring and a blue dot."""
     halo = Image.new('RGBA', img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(halo).ellipse([cx - 40, cy - 40, cx + 40, cy + 40], fill=hexc(MARKER_RED) + (70,))
+    ImageDraw.Draw(halo).ellipse([cx - 40, cy - 40, cx + 40, cy + 40], fill=hexc(MARKER) + (70,))
     base = img.convert('RGBA')
     base.alpha_composite(halo)
     d = ImageDraw.Draw(base)
     d.ellipse([cx - 20, cy - 20, cx + 20, cy + 20], fill=(255, 255, 255, 255))
-    d.ellipse([cx - 14, cy - 14, cx + 14, cy + 14], fill=hexc(MARKER_RED) + (255,))
+    d.ellipse([cx - 14, cy - 14, cx + 14, cy + 14], fill=hexc(MARKER) + (255,))
     return base.convert('RGB')
 
 

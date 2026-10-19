@@ -113,7 +113,6 @@ fun SettingsScreen(
     val aiEngine by Prefs.aiEngine.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     var showAiChoice by remember { mutableStateOf(false) }
-    var healthTick by remember { mutableIntStateOf(0) }
 
     // A running recorder picks up new settings when it is (re)started.
     fun applyToService() {
@@ -138,29 +137,6 @@ fun SettingsScreen(
             }
             snackbar.showSnackbar(if (ok) "Exported GPX" else "Export failed")
         }
-    }
-
-    val backgroundLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* State is re-read on the next resume. */ }
-
-    val activityLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted && tracking) LocationTickerService.start(context) }
-
-    val healthLauncher = rememberLauncherForActivityResult(
-        PermissionController.createRequestPermissionResultContract()
-    ) { healthTick++ }
-    val healthAvailability = remember { HealthSteps.availability(context) }
-    val healthGranted by produceState(false, resumeTick, healthTick) {
-        value = runCatching { HealthSteps.hasPermission(context) }.getOrDefault(false)
-    }
-    val hasActivity = remember(resumeTick) { ActivityTracker.hasPermission(context) }
-
-    // Re-checked whenever the app resumes, e.g. after returning from system settings.
-    val hasBackground = remember(resumeTick) { LocationTickerService.hasBackgroundPermission(context) }
-    val ignoresBattery = remember(resumeTick) {
-        context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -228,18 +204,6 @@ fun SettingsScreen(
                         Prefs.setHighAccuracy(it)
                         applyToService()
                     })
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    ItemDivider()
-                    SettingRow(
-                        title = "Detect how you travel",
-                        subtitle = if (hasActivity) "Using motion sensors to tell walking, cycling and vehicles apart"
-                        else "Allow physical activity access for better walking, cycling and vehicle detection",
-                    ) {
-                        if (!hasActivity) {
-                            OutlinedButton(onClick = { activityLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) }) { Text("Allow") }
-                        }
-                    }
                 }
             }
 
@@ -310,69 +274,14 @@ fun SettingsScreen(
                 }
             }
 
-            Section("Insights & health") {
-                SettingRow(title = "Review insights", subtitle = engineLabel(aiEngine)) {
+            Section("Insights") {
+                SettingRow(title = "Who writes your insights", subtitle = engineLabel(aiEngine)) {
                     OutlinedButton(onClick = { showAiChoice = true }) { Text("Change") }
-                }
-                ItemDivider()
-                SettingRow(
-                    title = "Steps from Health Connect",
-                    subtitle = when {
-                        healthAvailability == HealthSteps.Availability.UNSUPPORTED -> "Health Connect isn't available on this phone"
-                        healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> "Install or update Health Connect to show steps"
-                        healthGranted -> "Connected"
-                        else -> "Show your daily steps on the Review tab"
-                    },
-                ) {
-                    when {
-                        healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> OutlinedButton(onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata"))
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                )
-                            }
-                        }) { Text("Get") }
-                        healthAvailability == HealthSteps.Availability.AVAILABLE && !healthGranted ->
-                            OutlinedButton(onClick = { healthLauncher.launch(HealthSteps.permissions) }) { Text("Connect") }
-                        else -> Unit
-                    }
                 }
             }
 
-            Section("Reliability") {
-                SettingRow(
-                    title = "Allow location all the time",
-                    subtitle = if (hasBackground) "Allowed: recording resumes by itself after a reboot"
-                    else "Lets recording resume by itself after a reboot",
-                ) {
-                    if (!hasBackground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        OutlinedButton(onClick = {
-                            if (LocationTickerService.hasLocationPermission(context)) {
-                                backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                            } else {
-                                scope.launch { snackbar.showSnackbar("Start recording once first") }
-                            }
-                        }) { Text("Allow") }
-                    }
-                }
-                ItemDivider()
-                SettingRow(
-                    title = "Ignore battery optimization",
-                    subtitle = if (ignoresBattery) "Allowed: long-interval recording won't be paused"
-                    else "Stops the system from pausing long-interval recording",
-                ) {
-                    if (!ignoresBattery) {
-                        OutlinedButton(onClick = {
-                            @SuppressLint("BatteryLife")
-                            val intent = Intent(
-                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                Uri.parse("package:${context.packageName}"),
-                            )
-                            runCatching { context.startActivity(intent) }
-                        }) { Text("Allow") }
-                    }
-                }
+            PermissionsSection(resumeTick) {
+                scope.launch { snackbar.showSnackbar("Allow location first, then \"all the time\"") }
             }
 
             Section("Data") {
@@ -425,7 +334,7 @@ fun SettingsScreen(
 
 /** A titled group of settings on a rounded card. */
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
@@ -442,7 +351,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun ItemDivider() {
+internal fun ItemDivider() {
     HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 

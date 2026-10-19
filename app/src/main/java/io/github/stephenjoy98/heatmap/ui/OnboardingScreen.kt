@@ -45,7 +45,7 @@ fun OnboardingScreen() {
                     Text("How should insights be written?", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "The Review tab can summarise where you've been, how far you went and how you got around. " +
+                        "Insights can summarise where you've been, how far you went and how you got around. " +
                             "Pick who writes those insights. You can change this any time in Settings.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -88,7 +88,7 @@ private fun Welcome() {
     listOf(
         "Records your position on a tick you choose, from every 15 seconds to once a day.",
         "Works out whether you walked, cycled, drove, took a car share or transit, and asks when it isn't sure.",
-        "Review tab with distance, cities, new areas explored and your steps from Health Connect.",
+        "Insights with distance, cities, new areas explored and your steps from Health Connect.",
         "Sign in with Google to back up, and add friends by ID or QR code to compare routes and explored areas.",
     ).forEach {
         Row(Modifier.padding(vertical = 6.dp)) {
