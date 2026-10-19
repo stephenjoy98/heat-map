@@ -62,7 +62,7 @@ up to your Google account, and lets you compare explored areas with friends.
 
 ### Profile
 - An account button in the top-right corner of every tab (your initial, or a person icon) opens a
-  Google-style card with your name, email and friend ID, plus **Friends & backup**, **Settings**, and
+  Google-style card with your name, email and friend ID, plus **Friends**, **Backup**, **Settings**, and
   sign in or sign out.
 
 ### Review tab

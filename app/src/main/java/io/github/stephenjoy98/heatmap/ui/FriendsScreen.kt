@@ -95,13 +95,66 @@ fun FriendsScreen(
     val configured = remember { FirebaseGate.isConfigured(context) }
     val user by Account.user.collectAsStateWithLifecycle()
 
+    AccountPage("Friends", contentPadding, onBack) {
+        when {
+            !configured -> item { SetupCard() }
+            user == null -> item { SignInCard(snackbar, "Sign in to add friends and compare routes, distances and the areas you've each explored.") }
+            else -> {
+                item { ProfileCard(snackbar) }
+                item { SharingCard() }
+                item { FriendsList(snackbar, onCompare) }
+            }
+        }
+    }
+
+    if (pendingInvite != null) {
+        InviteDialog(pendingInvite, signedIn = user != null, snackbar = snackbar, onDone = onInviteHandled)
+    }
+}
+}
+
+/** Backup and restore of the full history to the signed-in account. */
+@Composable
+fun BackupScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val context = LocalContext.current
+    val configured = remember { FirebaseGate.isConfigured(context) }
+    val user by Account.user.collectAsStateWithLifecycle()
+    AccountPage("Backup", contentPadding, onBack) {
+        when {
+            !configured -> item { SetupCard() }
+            user == null -> item { SignInCard(snackbar, "Sign in to back up your history, so it's safe if you lose or change your phone.") }
+            else -> {
+                item {
+                    Text(
+                        "Backing up to ${user?.email ?: "your Google account"}. Only you can see your backup.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+                item { BackupCard(snackbar) }
+            }
+        }
+    }
+}
+
+/** A full-screen page with a large collapsing title, a back arrow and a list of cards. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountPage(
+    title: String,
+    contentPadding: PaddingValues,
+    onBack: (() -> Unit)?,
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Friends & backup") },
+                title = { Text(title) },
                 navigationIcon = {
                     onBack?.let {
                         IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
@@ -120,24 +173,27 @@ fun FriendsScreen(
                 bottom = contentPadding.calculateBottomPadding() + 16.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when {
-                !configured -> item { SetupCard() }
-                user == null -> item { SignInCard(snackbar) }
-                else -> signedIn(this, snackbar, onCompare)
-            }
-        }
-    }
-
-    if (pendingInvite != null) {
-        InviteDialog(pendingInvite, signedIn = user != null, snackbar = snackbar, onDone = onInviteHandled)
+            content = content,
+        )
     }
 }
 
-private fun signedIn(scope: androidx.compose.foundation.lazy.LazyListScope, snackbar: SnackbarHostState, onCompare: (Friend) -> Unit) {
-    scope.item { ProfileCard(snackbar) }
-    scope.item { BackupCard(snackbar) }
-    scope.item { FriendsList(snackbar, onCompare) }
+@Composable
+private fun SharingCard() {
+    val context = LocalContext.current
+    val share by Prefs.shareRoutes.collectAsStateWithLifecycle()
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            ToggleRow(
+                "Share my routes with friends",
+                "Friends see your routes and travel modes, never dates or times",
+                share,
+            ) {
+                Prefs.setShareRoutes(it)
+                SyncWorker.runNow(context)
+            }
+        }
+    }
 }
 
 @Composable
@@ -156,7 +212,7 @@ private fun SetupCard() {
 }
 
 @Composable
-private fun SignInCard(snackbar: SnackbarHostState) {
+private fun SignInCard(snackbar: SnackbarHostState, message: String) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
@@ -164,11 +220,7 @@ private fun SignInCard(snackbar: SnackbarHostState) {
         Column(Modifier.padding(16.dp)) {
             Text("Sign in with Google", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
-            Text(
-                "Back up your history so it's safe if you change phones, and add friends to compare routes, " +
-                    "distances and the areas you've each explored.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            Text(message, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
             Button(enabled = !busy, onClick = {
                 val activity = context.findActivity() ?: return@Button
@@ -255,7 +307,6 @@ private fun BackupCard(snackbar: SnackbarHostState) {
     val scope = rememberCoroutineScope()
     val last by Prefs.lastBackup.collectAsStateWithLifecycle()
     val auto by Prefs.autoBackup.collectAsStateWithLifecycle()
-    val share by Prefs.shareRoutes.collectAsStateWithLifecycle()
     var busy by remember { mutableStateOf<String?>(null) }
     var confirmRestore by remember { mutableStateOf(false) }
 
@@ -290,14 +341,6 @@ private fun BackupCard(snackbar: SnackbarHostState) {
             }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             ToggleRow("Back up automatically", "Once a day when online", auto) { Prefs.setAutoBackup(it) }
-            ToggleRow(
-                "Share my routes with friends",
-                "Friends see your routes and travel modes, never dates or times",
-                share,
-            ) {
-                Prefs.setShareRoutes(it)
-                SyncWorker.runNow(context)
-            }
         }
     }
 

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
@@ -88,11 +89,11 @@ fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * Google-style account card: who's signed in, their friend ID, and the way to Friends & backup,
+ * Google-style account card: who's signed in, their friend ID, and the way to Friends, Backup,
  * Settings and signing in or out.
  */
 @Composable
-fun ProfileDialog(onDismiss: () -> Unit, onFriends: () -> Unit, onSettings: () -> Unit) {
+fun ProfileDialog(onDismiss: () -> Unit, onFriends: () -> Unit, onBackup: () -> Unit, onSettings: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val user by Account.user.collectAsStateWithLifecycle()
@@ -167,9 +168,13 @@ fun ProfileDialog(onDismiss: () -> Unit, onFriends: () -> Unit, onSettings: () -
                     }
                 }
 
-                MenuRow(Icons.Filled.Share, "Friends & backup", "Add friends, compare routes, back up your history") {
+                MenuRow(Icons.Filled.Share, "Friends", "Add friends and compare routes and explored areas") {
                     onDismiss()
                     onFriends()
+                }
+                MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history") {
+                    onDismiss()
+                    onBackup()
                 }
                 MenuRow(Icons.Filled.Settings, "Settings", null) {
                     onDismiss()

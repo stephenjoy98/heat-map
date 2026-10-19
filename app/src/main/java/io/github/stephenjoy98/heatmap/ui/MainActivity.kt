@@ -108,6 +108,7 @@ private fun AppScaffold(
     var comparing by remember { mutableStateOf<Friend?>(null) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var friendsOpen by rememberSaveable { mutableStateOf(false) }
+    var backupOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by remember { mutableStateOf(false) }
     val friendsRequested by openFriends.collectAsStateWithLifecycle()
     var resumeTick by remember { mutableIntStateOf(0) }
@@ -154,6 +155,7 @@ private fun AppScaffold(
         ProfileDialog(
             onDismiss = { profileOpen = false },
             onFriends = { friendsOpen = true },
+            onBackup = { backupOpen = true },
             onSettings = { settingsOpen = true },
         )
     }
@@ -165,6 +167,13 @@ private fun AppScaffold(
 
     comparing?.let { friend ->
         CompareScreen(friend, onBack = { comparing = null })
+        return
+    }
+
+    if (backupOpen) {
+        Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
+            BackupScreen(contentPadding = padding, snackbar = snackbar, onBack = { backupOpen = false })
+        }
         return
     }
 
