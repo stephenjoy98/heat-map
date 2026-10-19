@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-19
+
+### Changed
+- Your location on the map is a red marker (it was blue), on both OpenStreetMap and Google Maps.
+- The Default and Terrain pictures in the layers sheet show the same red marker.
+
 ## [2.14.3] - 2026-10-19
 
 ### Changed

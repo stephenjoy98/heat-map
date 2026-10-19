@@ -1,8 +1,8 @@
 package io.github.stephenjoy98.heatmap.ui
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.PointF
 import android.view.View
 import android.view.Gravity
@@ -49,6 +49,9 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.CameraMoveStartedReason
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
@@ -174,7 +177,7 @@ fun AppMap(
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
     if (useGoogleMaps()) {
-        GoogleAppMap(camera, layers, style, refreshKey, showMyLocation, onMapClick, modifier)
+        GoogleAppMap(camera, layers, style, refreshKey, latest, onMapClick, modifier)
     } else {
         VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, route3d, modifier)
     }
@@ -189,14 +192,13 @@ private const val TILT_3D = 45f
 private const val AUTO_3D_TILT = 8f
 private const val AUTO_FLAT_TILT = 2f
 
-@SuppressLint("MissingPermission") // showMyLocation is only true with location permission.
 @Composable
 private fun GoogleAppMap(
     camera: MapCamera,
     layers: List<MapLayer>,
     look: MapLook,
     refreshKey: Any?,
-    showMyLocation: Boolean,
+    latest: LatLng?,
     onMapClick: ((Double, Double) -> Unit)?,
     modifier: Modifier,
 ) {
@@ -277,7 +279,6 @@ private fun GoogleAppMap(
             mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light),
             mapType = if (look.terrain) MapType.TERRAIN else MapType.NORMAL,
             isBuildingEnabled = look.buildings,
-            isMyLocationEnabled = showMyLocation,
         ),
         onMapClick = { onMapClick?.invoke(it.latitude, it.longitude) },
         uiSettings = MapUiSettings(
@@ -287,6 +288,13 @@ private fun GoogleAppMap(
             compassEnabled = false,
         ),
     ) {
+        // Your latest position as the app's red marker; Google's own location dot is always blue.
+        latest?.let { position ->
+            val marker = remember { MarkerState(position) }
+            marker.position = position
+            val icon = remember(density) { BitmapDescriptorFactory.fromBitmap(locationMarker(density)) }
+            Marker(state = marker, icon = icon, anchor = Offset(0.5f, 0.5f), flat = true, zIndex = 10f)
+        }
         for (layer in layers) {
             // Recreate the overlay when its source changes (filter, display mode, theme).
             key(layer.id, layer.source) {
@@ -424,6 +432,22 @@ private fun rememberVectorMap(cacheKey: String? = null): VectorMapHolder {
         }
     }
     return holder
+}
+
+/** The location marker drawn on Google Maps: a red dot with a white ring and a soft red halo. */
+private fun locationMarker(density: Float): Bitmap {
+    val size = (28 * density).toInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val c = size / 2f
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    paint.color = android.graphics.Color.argb(70, 229, 57, 53)
+    canvas.drawCircle(c, c, 14 * density, paint)
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(c, c, 7 * density, paint)
+    paint.color = android.graphics.Color.rgb(229, 57, 53)
+    canvas.drawCircle(c, c, 5 * density, paint)
+    return bitmap
 }
 
 /** Metres covered by one screen pixel across the middle of the map. */
