@@ -111,7 +111,6 @@ fun FriendsScreen(
         InviteDialog(pendingInvite, signedIn = user != null, snackbar = snackbar, onDone = onInviteHandled)
     }
 }
-}
 
 /** Backup and restore of the full history to the signed-in account. */
 @Composable
