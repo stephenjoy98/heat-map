@@ -81,6 +81,10 @@ class Place(val city: String?, val country: String?, val state: String? = null, 
 
 class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
+class EditablePoint(val id: Long, val time: Long, val lat: Double, val lon: Double, val accuracy: Float)
+
+class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>)
+
 class PeriodStat(
     val key: String,
     val meters: Double,
@@ -349,6 +353,51 @@ class PointStore private constructor(context: Context) :
         readableDatabase.rawQuery(
             "SELECT $POINT_COLS FROM points WHERE time >= $from AND time < $to ORDER BY time", null
         ).use { c -> buildList { while (c.moveToNext()) add(c.toPoint()) } }
+
+    /** Points in the range with their row ids, for editing. */
+    fun editablePoints(from: Long, to: Long): List<EditablePoint> =
+        readableDatabase.rawQuery(
+            "SELECT id, time, lat, lon, accuracy FROM points WHERE time >= $from AND time < $to ORDER BY time", null
+        ).use { c ->
+            buildList { while (c.moveToNext()) add(EditablePoint(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4))) }
+        }
+
+    /**
+     * Deletes points. Trips they belonged to are dissolved so the trip detector rebuilds them from what's
+     * left (points keep their travel mode, so answers aren't asked again). Returns the edited days and the
+     * remote ids of shared routes that no longer exist.
+     */
+    fun deletePoints(ids: Collection<Long>): DeleteResult {
+        if (ids.isEmpty()) return DeleteResult(emptySet(), emptyList())
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        db.beginTransaction()
+        try {
+            for (chunk in ids.chunked(500)) {
+                val list = chunk.joinToString(",")
+                db.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM points WHERE id IN ($list)", null)
+                    .use { c -> while (c.moveToNext()) days += c.getString(0) }
+                val tripIds = db.rawQuery("SELECT DISTINCT trip_id FROM points WHERE id IN ($list) AND trip_id > 0", null)
+                    .use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
+                if (tripIds.isNotEmpty()) {
+                    val trips = tripIds.joinToString(",")
+                    db.rawQuery("SELECT remote_id FROM trips WHERE id IN ($trips) AND remote_id IS NOT NULL", null)
+                        .use { c -> while (c.moveToNext()) remoteIds += c.getString(0) }
+                    db.execSQL("DELETE FROM trips WHERE id IN ($trips)")
+                    db.execSQL("DELETE FROM trip_paths WHERE trip_id IN ($trips)")
+                    db.execSQL("DELETE FROM road_questions WHERE trip_id IN ($trips)")
+                    db.execSQL("UPDATE points SET trip_id = 0 WHERE trip_id IN ($trips)")
+                }
+                db.execSQL("DELETE FROM points WHERE id IN ($list)")
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
 
     // ---- Trips ----
 

@@ -50,6 +50,10 @@ class LocationTickerService : Service() {
     private var lastSavedAt = 0L
     private var lastDetectedAt = 0L
 
+    // Automatic interval: recent fixes, and since when they've stayed in one spot. Worker thread only.
+    private val recent = ArrayDeque<Location>()
+    private var stillSince = 0L
+
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             result.locations.forEach(::record)
@@ -90,6 +94,7 @@ class LocationTickerService : Service() {
 
         Prefs.setTracking(true)
         ActivityTracker.start(this)
+        ActivityTracker.onChange = { activity -> if (Prefs.autoInterval.value) handler.post { reconsider(activity, null) } }
         requestUpdates()
         return START_STICKY
     }
@@ -97,6 +102,7 @@ class LocationTickerService : Service() {
     override fun onDestroy() {
         fused.removeLocationUpdates(callback)
         ActivityTracker.stop(this)
+        ActivityTracker.onChange = null
         val app = applicationContext
         handler.post { TripDetector.process(app) }
         worker.quitSafely()
@@ -104,8 +110,14 @@ class LocationTickerService : Service() {
     }
 
     @SuppressLint("MissingPermission") // Checked in onStartCommand.
+    /** The interval to use now: the fixed setting, or in automatic mode the last choice (1 minute to start). */
+    @Volatile
+    private var autoSec = AutoInterval.UNKNOWN_SEC
+
     private fun requestUpdates() {
-        val interval = Prefs.intervalSec.value * 1000L
+        val seconds = if (Prefs.autoInterval.value) autoSec else Prefs.intervalSec.value
+        Prefs.setLiveIntervalSec(seconds)
+        val interval = seconds * 1000L
         val highAccuracy = Prefs.highAccuracy.value
         handler.post {
             intervalMs = interval
@@ -139,6 +151,8 @@ class LocationTickerService : Service() {
         )
         lastSavedAt = location.time
 
+        if (Prefs.autoInterval.value) reconsider(ActivityTracker.current, location)
+
         // Look for finished trips every couple of minutes rather than on every fix.
         if (location.time - lastDetectedAt > 2 * 60_000L) {
             lastDetectedAt = location.time
@@ -147,6 +161,30 @@ class LocationTickerService : Service() {
 
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, buildNotification(location))
+    }
+
+    /** Automatic mode: picks a new interval from activity, speed and stillness; re-requests if it changed. */
+    private fun reconsider(activity: Int, fix: Location?) {
+        if (fix != null) {
+            recent.addLast(fix)
+            while (recent.size > 6) recent.removeFirst()
+            val anchor = recent.first()
+            val allClose = recent.all { it.distanceTo(anchor) < 40f }
+            stillSince = if (allClose && recent.size >= 3) (if (stillSince == 0L) anchor.time else stillSince) else 0L
+        }
+        val last = recent.lastOrNull()
+        val prev = recent.getOrNull(recent.size - 2)
+        val speed = when {
+            last != null && last.hasSpeed() -> last.speed
+            last != null && prev != null && last.time > prev.time -> last.distanceTo(prev) / ((last.time - prev.time) / 1000f)
+            else -> null
+        }
+        val stillFor = if (stillSince > 0L && last != null) last.time - stillSince else 0L
+        val chosen = AutoInterval.choose(activity, speed, stillFor)
+        if (chosen != autoSec) {
+            autoSec = chosen
+            ContextCompat.getMainExecutor(this).execute { if (Prefs.tracking.value) requestUpdates() }
+        }
     }
 
     private fun buildNotification(last: Location?): Notification {
@@ -160,7 +198,7 @@ class LocationTickerService : Service() {
             Intent(this, LocationTickerService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        val every = "Every ${formatInterval(Prefs.intervalSec.value)}"
+        val every = (if (Prefs.autoInterval.value) "Auto · every " else "Every ") + formatInterval(Prefs.liveIntervalSec.value)
         val text = if (last == null) {
             "$every · waiting for first fix"
         } else {

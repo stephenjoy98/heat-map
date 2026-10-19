@@ -100,6 +100,17 @@ object Friends {
         val store = PointStore.get(context)
         val routes = user(uid).collection("routes")
 
+        // Routes of trips removed by editing.
+        val gone = Prefs.pendingRouteDeletes
+        if (gone.isNotEmpty()) {
+            gone.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(routes.document(it)) }
+                batch.commit().await()
+            }
+            Prefs.setPendingRouteDeletes(emptySet())
+        }
+
         if (!Prefs.shareRoutes.value) {
             val existing = routes.get().await().documents
             existing.chunked(400).forEach { chunk ->

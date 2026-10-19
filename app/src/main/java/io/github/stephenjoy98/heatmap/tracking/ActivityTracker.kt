@@ -25,6 +25,10 @@ object ActivityTracker {
     var current: Int = -1
         private set
 
+    /** Called (on the main thread) when the detected activity changes; used by automatic intervals. */
+    @Volatile
+    var onChange: ((Int) -> Unit)? = null
+
     private val tracked = listOf(
         DetectedActivity.IN_VEHICLE,
         DetectedActivity.ON_BICYCLE,
@@ -60,6 +64,7 @@ object ActivityTracker {
     }
 
     internal fun onResult(result: ActivityTransitionResult) {
+        val before = current
         for (event in result.transitionEvents) {
             if (event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER) {
                 current = event.activityType
@@ -67,6 +72,7 @@ object ActivityTracker {
                 current = -1
             }
         }
+        if (current != before) onChange?.invoke(current)
     }
 
     private fun pendingIntent(context: Context): PendingIntent {

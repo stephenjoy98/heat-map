@@ -201,7 +201,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
 }
 
 /** Centres and zooms the map so [box] fits in a roughly 340 × 240 dp view. */
-private fun frame(camera: MapCamera, box: GeoBox) {
+internal fun frame(camera: MapCamera, box: GeoBox) {
     val lonSpan = (box.east - box.west).coerceAtLeast(0.0005)
     val mercSpan = (TileMath.mercY(box.north) - TileMath.mercY(box.south)).coerceAtLeast(0.0005)
     val log2 = { v: Double -> ln(v) / ln(2.0) }

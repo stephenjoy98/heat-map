@@ -13,12 +13,19 @@ import android.util.LruCache
 import android.view.View
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.BackgroundLayer
+import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.HillshadeLayer
+import org.maplibre.android.style.layers.Layer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.sources.RasterDemSource
+import org.maplibre.android.style.sources.TileSet
+import org.maplibre.android.style.sources.VectorSource
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.PI
@@ -85,6 +92,53 @@ object VectorMaps {
             }
         }
     }
+
+    /**
+     * Adds terrain shading from the keyless AWS Terrain Tiles (Terrarium-encoded elevation), drawn under
+     * roads and labels so they stay readable.
+     */
+    fun addTerrain(style: Style, dark: Boolean) {
+        if (style.getSource(TERRAIN_SOURCE) != null) return
+        val tiles = TileSet("2.2.0", "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png").apply {
+            setEncoding("terrarium")
+            setMaxZoom(15f)
+        }
+        style.addSource(RasterDemSource(TERRAIN_SOURCE, tiles, 256))
+        val hillshade = HillshadeLayer("terrain-hillshade", TERRAIN_SOURCE).withProperties(
+            PropertyFactory.hillshadeExaggeration(if (dark) 0.45f else 0.6f),
+            PropertyFactory.hillshadeShadowColor(if (dark) "#000000" else "#5F6B5A"),
+            PropertyFactory.hillshadeHighlightColor(if (dark) "#2A2A2A" else "#FFFFFF"),
+            PropertyFactory.hillshadeAccentColor(if (dark) "#0A0A0A" else "#7D8A72"),
+        )
+        val below = firstLayerAbove(style) { id, layer ->
+            layer is SymbolLayer || listOf("building", "tunnel", "highway", "road", "bridge", "transportation").any { it in id }
+        }
+        if (below != null) style.addLayerBelow(hillshade, below) else style.addLayer(hillshade)
+    }
+
+    /** Extrudes OpenMapTiles building footprints by their height, Google Maps-style. Seen when the map is tilted. */
+    fun addBuildings(style: Style, dark: Boolean) {
+        if (style.getLayer(BUILDINGS_LAYER) != null) return
+        val flat = style.layers.firstOrNull { it is FillLayer && "building" in it.id.lowercase() } as? FillLayer
+        val sourceId = flat?.sourceId ?: style.sources.firstOrNull { it is VectorSource }?.id ?: return
+        val extrusion = FillExtrusionLayer(BUILDINGS_LAYER, sourceId).withSourceLayer("building").withProperties(
+            PropertyFactory.fillExtrusionColor(if (dark) building3dDark else building3dLight),
+            PropertyFactory.fillExtrusionHeight(Expression.coalesce(Expression.get("render_height"), Expression.literal(6))),
+            PropertyFactory.fillExtrusionBase(Expression.coalesce(Expression.get("render_min_height"), Expression.literal(0))),
+            PropertyFactory.fillExtrusionOpacity(0.9f),
+        )
+        extrusion.minZoom = 13f
+        val below = firstLayerAbove(style) { _, layer -> layer is SymbolLayer }
+        if (below != null) style.addLayerBelow(extrusion, below) else style.addLayer(extrusion)
+    }
+
+    private fun firstLayerAbove(style: Style, match: (id: String, layer: Layer) -> Boolean): String? =
+        style.layers.firstOrNull { match(it.id.lowercase(), it) }?.id
+
+    private const val TERRAIN_SOURCE = "terrain-dem"
+    private const val BUILDINGS_LAYER = "buildings-3d"
+    private val building3dLight = Color.parseColor("#DADCE0")
+    private val building3dDark = Color.parseColor("#262626")
 }
 
 /**
@@ -123,21 +177,31 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
     }
 
     /**
-     * Draws the tiles at [zoom] covering the given bounds. [place] writes a tile's four corners in screen
+     * Draws the tiles at [maxZoom] (or coarser, when that would take too many) covering the given bounds. [place] writes a tile's four corners in screen
      * pixels (top-left, top-right, bottom-right, bottom-left) so tiles follow a rotated map.
      */
     fun draw(
         canvas: Canvas,
-        zoom: Int,
+        maxZoom: Int,
         north: Double, south: Double, east: Double, west: Double,
         place: (north: Double, west: Double, south: Double, east: Double, out: FloatArray) -> Unit,
     ) {
-        val n = 1 shl zoom
-        val x0 = tileX(west, n)
-        val x1 = tileX(east, n)
-        val y0 = tileY(north, n)
-        val y1 = tileY(south, n)
-        if ((x1 - x0 + 1) * (y1 - y0 + 1) > 64) return
+        // A tilted map can show a lot of ground towards the horizon; use coarser tiles until it's manageable.
+        var zoom = maxZoom
+        var n: Int
+        var x0: Int
+        var x1: Int
+        var y0: Int
+        var y1: Int
+        while (true) {
+            n = 1 shl zoom
+            x0 = tileX(west, n)
+            x1 = tileX(east, n)
+            y0 = tileY(north, n)
+            y1 = tileY(south, n)
+            if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 64 || zoom == 0) break
+            zoom--
+        }
 
         for (x in x0..x1) for (y in y0..y1) {
             val key = (zoom.toLong() shl 48) or (x.toLong() shl 24) or y.toLong()
@@ -185,7 +249,7 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
 
 /**
  * A transparent view laid over a MapLibre map that draws heat (and other) tile layers plus a "latest
- * position" dot, following the camera, including rotation. Tilt is disabled so tiles stay flat.
+ * position" dot, following the camera, including rotation and tilt (tiles are drawn in perspective).
  */
 @SuppressLint("ViewConstructor")
 class TileOverlayView(context: Context) : View(context) {

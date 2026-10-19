@@ -13,11 +13,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -34,12 +37,14 @@ import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapType
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.TileOverlay
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberTileOverlayState
 import io.github.stephenjoy98.heatmap.BuildConfig
+import io.github.stephenjoy98.heatmap.data.MapLayerType
 import io.github.stephenjoy98.heatmap.data.MapProvider
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.map.GoogleTileAdapter
@@ -79,6 +84,15 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
     /** The map's current rotation in degrees clockwise from north, kept up to date by the engine. */
     var bearing by mutableFloatStateOf(0f)
         internal set
+
+    /** Changes whenever the camera moves, so overlays that use [toScreen] know to redraw. */
+    var cameraTick by mutableIntStateOf(0)
+        internal set
+
+    internal var projector: ((Double, Double) -> Offset?)? = null
+
+    /** Where a coordinate is on the map, in pixels from its top-left corner; null until the map is ready. */
+    fun toScreen(lat: Double, lon: Double): Offset? = projector?.invoke(lat, lon)
 
     fun zoomIn() {
         actions.tryEmit(Action.ZOOM_IN)
@@ -124,25 +138,36 @@ fun AppMap(
     refreshKey: Any? = null,
     latest: LatLng? = null,
     showMyLocation: Boolean = false,
+    onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
 ) {
     val dark = isDarkTheme()
+    val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
+    val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
+    val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
     if (useGoogleMaps()) {
-        GoogleAppMap(camera, layers, dark, refreshKey, showMyLocation, modifier)
+        GoogleAppMap(camera, layers, style, refreshKey, showMyLocation, onMapClick, modifier)
     } else {
-        VectorAppMap(camera, layers, dark, refreshKey, latest, modifier)
+        VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, modifier)
     }
 }
+
+/** How the base map looks: theme, terrain shading and 3D buildings (which also tilt the camera). */
+private data class MapLook(val dark: Boolean, val terrain: Boolean = false, val buildings: Boolean = false)
+
+private const val TILT_3D = 45f
 
 @SuppressLint("MissingPermission") // showMyLocation is only true with location permission.
 @Composable
 private fun GoogleAppMap(
     camera: MapCamera,
     layers: List<MapLayer>,
-    dark: Boolean,
+    look: MapLook,
     refreshKey: Any?,
     showMyLocation: Boolean,
+    onMapClick: ((Double, Double) -> Unit)?,
     modifier: Modifier,
 ) {
+    val dark = look.dark
     val state = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(camera.initialLat, camera.initialLon), camera.initialZoom)
     }
@@ -167,15 +192,36 @@ private fun GoogleAppMap(
         }
     }
     LaunchedEffect(camera, state) {
-        snapshotFlow { state.position.bearing }.collect { camera.bearing = it }
+        snapshotFlow { state.position }.collect {
+            camera.bearing = it.bearing
+            camera.cameraTick++
+        }
+    }
+    DisposableEffect(camera, state) {
+        camera.projector = { lat, lon ->
+            state.projection?.toScreenLocation(LatLng(lat, lon))?.let { Offset(it.x.toFloat(), it.y.toFloat()) }
+        }
+        onDispose { camera.projector = null }
+    }
+    // Tilt the camera so 3D buildings stand out, and flatten it again when they're turned off.
+    LaunchedEffect(look.buildings) {
+        val tilt = if (look.buildings) TILT_3D else 0f
+        if (state.position.tilt != tilt) {
+            runCatching {
+                state.animate(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(state.position).tilt(tilt).build()), 600)
+            }
+        }
     }
     GoogleMap(
         modifier = modifier,
         cameraPositionState = state,
         properties = MapProperties(
             mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light),
+            mapType = if (look.terrain) MapType.TERRAIN else MapType.NORMAL,
+            isBuildingEnabled = look.buildings,
             isMyLocationEnabled = showMyLocation,
         ),
+        onMapClick = { onMapClick?.invoke(it.latitude, it.longitude) },
         uiSettings = MapUiSettings(
             zoomControlsEnabled = false,
             myLocationButtonEnabled = false,
@@ -208,7 +254,7 @@ private fun GoogleAppMap(
 private class VectorMapHolder(context: Context) {
     val mapView = MapView(context).apply { onCreate(null) }
     var map: MapLibreMap? = null
-    var styleDark: Boolean? = null
+    var styleLook: Any? = null
     private val readyCallbacks = mutableListOf<(MapLibreMap) -> Unit>()
 
     init {
@@ -231,12 +277,17 @@ private class VectorMapHolder(context: Context) {
         map?.let(block) ?: readyCallbacks.add(block)
     }
 
-    /** Loads the vector style for the theme (recoloured for dark), then calls [onLoaded]. */
-    fun setTheme(dark: Boolean, onLoaded: (Style) -> Unit = {}) = withMap { m ->
-        if (styleDark == dark) return@withMap
-        styleDark = dark
+    /**
+     * Loads the vector style for [look] (recoloured for dark, with terrain shading and 3D buildings if
+     * asked for), then calls [onLoaded]. Does nothing if that look is already showing.
+     */
+    fun setLook(look: MapLook, onLoaded: (Style) -> Unit = {}) = withMap { m ->
+        if (styleLook == look) return@withMap
+        styleLook = look
         m.setStyle(Style.Builder().fromUri(VectorMaps.STYLE_URL)) { style ->
-            if (dark) VectorMaps.applyDark(style)
+            if (look.dark) VectorMaps.applyDark(style)
+            if (look.terrain) VectorMaps.addTerrain(style, look.dark)
+            if (look.buildings) VectorMaps.addBuildings(style, look.dark)
             onLoaded(style)
         }
     }
@@ -277,14 +328,16 @@ private fun Float.toVectorZoom(): Double = (this - 1f).toDouble().coerceAtLeast(
 private fun VectorAppMap(
     camera: MapCamera,
     layers: List<MapLayer>,
-    dark: Boolean,
+    look: MapLook,
     refreshKey: Any?,
     latest: LatLng?,
+    onMapClick: ((Double, Double) -> Unit)?,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
     val holder = rememberVectorMap()
     val overlay = remember { TileOverlayView(context) }
+    val clickHandler by rememberUpdatedState(onMapClick)
 
     DisposableEffect(Unit) {
         holder.withMap { m ->
@@ -294,13 +347,38 @@ private fun VectorAppMap(
                 )
             )
             overlay.attach(m)
-            m.addOnCameraMoveListener { camera.bearing = m.cameraPosition.bearing.toFloat() }
-            m.addOnCameraIdleListener { camera.bearing = m.cameraPosition.bearing.toFloat() }
+            m.addOnCameraMoveListener {
+                camera.bearing = m.cameraPosition.bearing.toFloat()
+                camera.cameraTick++
+            }
+            m.addOnCameraIdleListener {
+                camera.bearing = m.cameraPosition.bearing.toFloat()
+                camera.cameraTick++
+            }
+            // Returning false lets the map handle the tap as usual.
+            m.addOnMapClickListener { p ->
+                clickHandler?.invoke(p.latitude, p.longitude)
+                false
+            }
+            camera.projector = { lat, lon ->
+                m.projection.toScreenLocation(MLatLng(lat, lon)).let { Offset(it.x, it.y) }
+            }
         }
-        onDispose { overlay.release() }
+        onDispose {
+            camera.projector = null
+            overlay.release()
+        }
     }
 
-    LaunchedEffect(dark) { holder.setTheme(dark) }
+    LaunchedEffect(look) { holder.setLook(look) }
+
+    LaunchedEffect(look.buildings) {
+        holder.withMap { m ->
+            m.uiSettings.isTiltGesturesEnabled = look.buildings
+            val tilt = if (look.buildings) TILT_3D.toDouble() else 0.0
+            if (m.cameraPosition.tilt != tilt) m.animateCamera(org.maplibre.android.camera.CameraUpdateFactory.tiltTo(tilt), 600)
+        }
+    }
 
     SideEffect {
         overlay.setLayers(layers.map { TileOverlayView.LayerSpec(it.id, it.source, it.alpha, it.zIndex) })
@@ -383,8 +461,8 @@ fun TripPreviewLinesMap(lines: List<PreviewLine>, modifier: Modifier = Modifier)
     } else {
         val holder = rememberVectorMap()
         LaunchedEffect(lines, dark) {
-            holder.styleDark = null // Reload so the lines are added to a fresh style.
-            holder.setTheme(dark) { style ->
+            holder.styleLook = null // Reload so the lines are added to a fresh style.
+            holder.setLook(MapLook(dark)) { style ->
                 lines.forEachIndexed { i, l ->
                     val geometry = LineString.fromLngLats(l.points.map { Point.fromLngLat(it.longitude, it.latitude) })
                     style.addSource(GeoJsonSource("preview-$i", Feature.fromGeometry(geometry)))

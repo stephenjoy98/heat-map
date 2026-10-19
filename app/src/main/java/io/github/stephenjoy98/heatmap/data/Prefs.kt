@@ -9,6 +9,8 @@ enum class DisplayMode { ROUTES, POINTS }
 
 enum class MapTheme { SYSTEM, DARK, LIGHT }
 
+enum class MapLayerType { DEFAULT, TERRAIN }
+
 /** AUTO uses Google Maps when the build has an API key and OpenStreetMap otherwise. */
 enum class MapProvider { AUTO, GOOGLE, OSM }
 
@@ -25,6 +27,24 @@ object Prefs {
 
     private val _intervalSec = MutableStateFlow(60)
     val intervalSec: StateFlow<Int> = _intervalSec
+
+    /** Let the app choose the interval from movement and activity instead of a fixed tick. */
+    private val _autoInterval = MutableStateFlow(false)
+    val autoInterval: StateFlow<Boolean> = _autoInterval
+
+    /** The interval the recorder is using right now (differs from [intervalSec] in automatic mode). */
+    private val _liveIntervalSec = MutableStateFlow(60)
+    val liveIntervalSec: StateFlow<Int> = _liveIntervalSec
+
+    private val _mapLayer = MutableStateFlow(MapLayerType.DEFAULT)
+    val mapLayer: StateFlow<MapLayerType> = _mapLayer
+
+    private val _buildings3d = MutableStateFlow(false)
+    val buildings3d: StateFlow<Boolean> = _buildings3d
+
+    /** Days ("yyyy-MM-dd") whose points were edited and must be re-uploaded to the backup. */
+    private val _dirtyBackupDays = MutableStateFlow<Set<String>>(emptySet())
+    val dirtyBackupDays: StateFlow<Set<String>> = _dirtyBackupDays
 
     /** Whether the user wants recording on; used to resume after a reboot. */
     private val _tracking = MutableStateFlow(false)
@@ -96,6 +116,11 @@ object Prefs {
         _mapProvider.value = MapProvider.entries.byName(sp.getString("map_provider", null)) ?: MapProvider.AUTO
         _dynamicColor.value = sp.getBoolean("dynamic_color", true)
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
+        _autoInterval.value = sp.getBoolean("auto_interval", false)
+        _liveIntervalSec.value = _intervalSec.value
+        _mapLayer.value = MapLayerType.entries.byName(sp.getString("map_layer", null)) ?: MapLayerType.DEFAULT
+        _buildings3d.value = sp.getBoolean("buildings_3d", false)
+        _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
         _snapToRoads.value = sp.getBoolean("snap_roads", true)
     }
 
@@ -164,6 +189,44 @@ object Prefs {
     fun setDynamicColor(on: Boolean) {
         _dynamicColor.value = on
         sp.edit().putBoolean("dynamic_color", on).apply()
+    }
+
+    fun setAutoInterval(on: Boolean) {
+        _autoInterval.value = on
+        sp.edit().putBoolean("auto_interval", on).apply()
+    }
+
+    fun setLiveIntervalSec(seconds: Int) {
+        _liveIntervalSec.value = seconds
+    }
+
+    fun setMapLayer(layer: MapLayerType) {
+        _mapLayer.value = layer
+        sp.edit().putString("map_layer", layer.name).apply()
+    }
+
+    fun setBuildings3d(on: Boolean) {
+        _buildings3d.value = on
+        sp.edit().putBoolean("buildings_3d", on).apply()
+    }
+
+    fun addDirtyBackupDays(days: Collection<String>) {
+        val next = _dirtyBackupDays.value + days
+        _dirtyBackupDays.value = next
+        sp.edit().putStringSet("dirty_backup_days", next).apply()
+    }
+
+    fun clearDirtyBackupDays(days: Collection<String>) {
+        val next = _dirtyBackupDays.value - days.toSet()
+        _dirtyBackupDays.value = next
+        sp.edit().putStringSet("dirty_backup_days", next).apply()
+    }
+
+    /** Shared routes (Firestore ids) whose trips were deleted, to remove on the next sync. */
+    val pendingRouteDeletes: Set<String> get() = sp.getStringSet("pending_route_deletes", null)?.toSet() ?: emptySet()
+
+    fun setPendingRouteDeletes(ids: Set<String>) {
+        sp.edit().putStringSet("pending_route_deletes", ids).apply()
     }
 
     fun setSmoothRoutes(on: Boolean) {

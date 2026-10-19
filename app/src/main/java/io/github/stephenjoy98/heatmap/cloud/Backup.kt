@@ -26,8 +26,9 @@ object Backup {
         val started = System.currentTimeMillis()
         val zone = ZoneId.systemDefault()
 
-        // Re-upload whole days so each document is always complete.
-        val days = store.daysWithPointsAfter(Prefs.lastBackup.value)
+        // Re-upload whole days so each document is always complete, including days edited since.
+        val dirty = Prefs.dirtyBackupDays.value
+        val days = (store.daysWithPointsAfter(Prefs.lastBackup.value) + dirty).distinct().sorted()
         for (day in days) {
             val date = LocalDate.parse(day)
             val from = date.atStartOfDay(zone).toInstant().toEpochMilli()
@@ -38,9 +39,12 @@ object Backup {
             chunks.forEachIndexed { i, chunk ->
                 batch.set(col.document(if (i == 0) day else "${day}_$i"), encode(chunk))
             }
+            // Remove leftover parts from before an edit made the day smaller (or empty).
+            for (i in chunks.size until chunks.size + 3) batch.delete(col.document(if (i == 0) day else "${day}_$i"))
             batch.commit().await()
         }
         Prefs.setLastBackup(started)
+        Prefs.clearDirtyBackupDays(dirty)
         return days.size
     }
 

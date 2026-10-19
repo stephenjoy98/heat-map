@@ -1,6 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,11 +26,20 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Compass (tap for north-up) above a zoom in / zoom out pill, for any [AppMap]. */
+/**
+ * Map layers (when [onLayers] is given), a compass (tap for north-up) and a zoom in / zoom out pill,
+ * for any [AppMap].
+ */
 @Composable
-fun MapControls(camera: MapCamera, modifier: Modifier = Modifier) {
+fun MapControls(camera: MapCamera, modifier: Modifier = Modifier, onLayers: (() -> Unit)? = null) {
     val container = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (onLayers != null) {
+            Surface(onClick = onLayers, shape = CircleShape, color = container, shadowElevation = 3.dp, modifier = Modifier.size(48.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(LayersIcon, contentDescription = "Map layers") }
+            }
+            androidx.compose.foundation.layout.Spacer(Modifier.size(12.dp))
+        }
         Surface(
             onClick = { camera.northUp() },
             shape = CircleShape,

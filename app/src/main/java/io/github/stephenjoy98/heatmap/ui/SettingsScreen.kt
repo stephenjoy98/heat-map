@@ -105,6 +105,7 @@ fun SettingsScreen(
     val tracking by Prefs.tracking.collectAsStateWithLifecycle()
     val intervalSec by Prefs.intervalSec.collectAsStateWithLifecycle()
     val highAccuracy by Prefs.highAccuracy.collectAsStateWithLifecycle()
+    val autoInterval by Prefs.autoInterval.collectAsStateWithLifecycle()
     val mode by Prefs.displayMode.collectAsStateWithLifecycle()
     val mapTheme by Prefs.mapTheme.collectAsStateWithLifecycle()
     val mapProvider by Prefs.mapProvider.collectAsStateWithLifecycle()
@@ -187,15 +188,37 @@ fun SettingsScreen(
                 .padding(bottom = 24.dp),
         ) {
             Section("Recording") {
+                SettingRow(
+                    title = "Automatic interval",
+                    subtitle = "Chooses how often to record from your movement and activity",
+                ) {
+                    Switch(checked = autoInterval, onCheckedChange = {
+                        Prefs.setAutoInterval(it)
+                        applyToService()
+                    })
+                }
+                ItemDivider()
                 Column(Modifier.padding(16.dp)) {
-                    Text("Record a point every", style = MaterialTheme.typography.labelLarge)
-                    IntervalSlider(intervalSec, ::setInterval)
-                    CustomInterval(intervalSec, ::setInterval)
-                    Text(
-                        "Points less than 15 minutes apart are joined into routes; slower ticks show as dots.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (autoInterval) {
+                        Text("Automatic", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            "Every 15 s in a vehicle, 20 s cycling and 30 s walking, so routes follow the road; " +
+                                "every 2 minutes when still, and every 10 minutes after staying put for a while. " +
+                                "It switches as soon as activity recognition notices you moving, so allow " +
+                                "physical activity access below for the best results.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Text("Record a point every", style = MaterialTheme.typography.labelLarge)
+                        IntervalSlider(intervalSec, ::setInterval)
+                        CustomInterval(intervalSec, ::setInterval)
+                        Text(
+                            "Points less than 15 minutes apart are joined into routes; slower ticks show as dots.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 ItemDivider()
                 SettingRow(

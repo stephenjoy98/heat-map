@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -44,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -65,11 +68,16 @@ import io.github.stephenjoy98.heatmap.map.HeatRamps
 import io.github.stephenjoy98.heatmap.map.HeatTiles
 import io.github.stephenjoy98.heatmap.map.heatTilePx
 import io.github.stephenjoy98.heatmap.map.OwnTracks
+import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
+import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @Composable
 fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int, onOpenProfile: () -> Unit) {
@@ -93,9 +101,37 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val camera = rememberMapCamera()
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
     val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
-    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
-        listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var layersOpen by remember { mutableStateOf(false) }
+    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads, editing) {
+        // While editing, the heatmap fades back so the dots stand out.
+        val heat = HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)
+        listOf(MapLayer("heat", heat, alpha = if (editing) 0.35f else 1f))
     }
+
+    val edit = remember { DotEditState(LocalDate.now()) }
+    var editLoading by remember { mutableStateOf(false) }
+    var editReload by remember { mutableIntStateOf(0) }
+    var framedDay by remember { mutableStateOf<LocalDate?>(null) }
+    LaunchedEffect(editing, edit.day, editReload) {
+        if (!editing) {
+            framedDay = null
+            return@LaunchedEffect
+        }
+        editLoading = true
+        val zone = ZoneId.systemDefault()
+        val from = edit.day.atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = edit.day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val pts = withContext(Dispatchers.IO) { store.editablePoints(from, to) }
+        edit.load(pts)
+        editLoading = false
+        if (framedDay != edit.day) {
+            framedDay = edit.day
+            frameDots(camera, pts)
+        }
+    }
+    BackHandler(enabled = editing) { editing = false }
+    val tapRadiusPx = 32 * context.resources.displayMetrics.density
     LaunchedEffect(stats) {
         val latest = stats?.latest
         if (!centered && latest != null) {
@@ -122,7 +158,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             refreshKey = changes,
             latest = stats?.latest?.let { LatLng(it.lat, it.lon) },
             showMyLocation = hasLocation,
+            onMapClick = if (editing) {
+                { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
+            } else {
+                null
+            },
         )
+        if (editing) DotsOverlay(camera, edit, Modifier.fillMaxSize())
 
         Column(
             Modifier
@@ -142,32 +184,73 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     ProfileButton(onClick = onOpenProfile, modifier = Modifier.size(48.dp))
                 }
             }
-            Spacer(Modifier.size(8.dp))
-            ModeFilterRow(filter)
+            if (!editing) {
+                Spacer(Modifier.size(8.dp))
+                ModeFilterRow(filter)
+            }
         }
 
         MapControls(
             camera = camera,
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+            onLayers = { layersOpen = true },
         )
+        if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false })
 
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
             horizontalAlignment = Alignment.End,
         ) {
-            SmallFloatingActionButton(
-                onClick = {
-                    val latest = stats?.latest
-                    if (latest == null) {
-                        scope.launch { snackbar.showSnackbar("No points recorded yet") }
-                    } else {
-                        camera.animateTo(latest.lat, latest.lon, 16f)
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) { Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position") }
+            Row {
+                if (!editing) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            // Start on the day of the latest dot, where a stray one is most likely to be noticed.
+                            edit.day = stats?.latest?.let { Instant.ofEpochMilli(it.time).atZone(ZoneId.systemDefault()).toLocalDate() }
+                                ?: LocalDate.now()
+                            editing = true
+                        },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) { Icon(Icons.Filled.Edit, contentDescription = "Edit dots") }
+                    Spacer(Modifier.width(8.dp))
+                }
+                SmallFloatingActionButton(
+                    onClick = {
+                        val latest = stats?.latest
+                        if (latest == null) {
+                            scope.launch { snackbar.showSnackbar("No points recorded yet") }
+                        } else {
+                            camera.animateTo(latest.lat, latest.lon, 16f)
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) { Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position") }
+            }
             Spacer(Modifier.size(8.dp))
-            ControlPanel(
+            if (editing) {
+                EditPanel(
+                    state = edit,
+                    loading = editLoading,
+                    onDay = { edit.day = it },
+                    onFocus = { camera.animateTo(it.lat, it.lon, 17f) },
+                    onShow = { frameDots(camera, it) },
+                    onDelete = { doomed ->
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) { store.deletePoints(doomed.map { it.id }) }
+                            // Make sure backups and shared routes drop the deleted dots too.
+                            Prefs.addDirtyBackupDays(result.days)
+                            if (result.removedRemoteIds.isNotEmpty()) {
+                                Prefs.setPendingRouteDeletes(Prefs.pendingRouteDeletes + result.removedRemoteIds)
+                            }
+                            withContext(Dispatchers.IO) { TripDetector.process(context) }
+                            RoadSnapWorker.runNow(context)
+                            editReload++
+                            snackbar.showSnackbar(if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted")
+                        }
+                    },
+                    onClose = { editing = false },
+                )
+            } else ControlPanel(
                 tracking = tracking,
                 intervalSec = intervalSec,
                 onToggle = {
@@ -294,7 +377,12 @@ private fun ControlPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text("Every ${formatInterval(intervalSec)}", style = MaterialTheme.typography.titleLarge)
+                val auto by Prefs.autoInterval.collectAsStateWithLifecycle()
+                val live by Prefs.liveIntervalSec.collectAsStateWithLifecycle()
+                Text(
+                    if (auto) "Auto · ${if (tracking) "every ${formatInterval(live)}" else "adapts to you"}" else "Every ${formatInterval(intervalSec)}",
+                    style = MaterialTheme.typography.titleLarge,
+                )
             }
         }
     }

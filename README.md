@@ -26,9 +26,21 @@ up to your Google account, and lets you compare explored areas with friends.
   white. The light map uses light orange through deep crimson.
 - **Travel-mode filter**: chips for Walking, Cycling, Driving, Car share, Transit and Other.
 - Routes or raw-points view, and very large histories automatically fall back to a density grid.
+- **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type
+  (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) on
+  OpenStreetMap; Google's terrain map with a key), and **3D buildings** under Map details, which tilts
+  the map so buildings stand up.
+- **Edit dots**: tap the pencil to fix mapping errors. Pick a day, narrow it down with a **start–end
+  slider** (the dots in range are highlighted and joined in time order), or tap a single dot and step
+  through its neighbours, then delete. Trips touching deleted dots are rebuilt from what's left, and
+  backups and shared routes are updated on the next sync.
 
 ### Recording
 - Interval slider (15 s … 1 day) plus an exact value in seconds, minutes, hours or days.
+- **Automatic interval**: picks how often to record from how you're moving (activity recognition,
+  speed between recent fixes, and how long you've stayed put): every 15 s in a vehicle, 20 s cycling,
+  30 s on foot, 2 min when still and 10 min after 20 minutes in one place. It reacts straight away
+  when activity recognition is allowed; otherwise it adapts from GPS fixes alone.
 - Foreground service with a Stop action in its notification; resumes after reboot when allowed.
 
 ### How you travelled
