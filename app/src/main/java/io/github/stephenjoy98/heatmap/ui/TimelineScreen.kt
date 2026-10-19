@@ -225,6 +225,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     null
                 },
             )
+            ScaleBar(camera, Modifier.align(Alignment.BottomStart).padding(8.dp))
             if (editing) {
                 DotsOverlay(camera, edit, Modifier.fillMaxSize())
                 // Map type and 3D buildings, right where you're editing.

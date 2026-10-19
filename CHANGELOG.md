@@ -21,11 +21,16 @@ The app shows the entries since your last version as "What's new" after an updat
 - Map layers button while editing dots on the Timeline.
 - GPX exports include elevation.
 - Long-press any button to see what it does.
+- Tilt the map with two fingers to switch on 3D buildings and 3D routes.
+- A scale bar appears while you move or zoom the map (feet and miles in the US).
 
 ### Fixed
 - Tapping the map outside the GPS accuracy card closes it.
 
 ### Changed
+- Automatic recording is much finer: every second in a vehicle, 2 s cycling, 3 s walking, 5 s when
+  unsure, 15 s when still and every minute after staying put. Standing still is judged over the last
+  minute of fixes.
 - Backups now include elevation. Older backups and dots recorded before this version have none, so
   they stay flat in 3D.
 

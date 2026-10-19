@@ -41,6 +41,9 @@ up to your Google account, and lets you compare explored areas with friends.
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
   routes are drawn as a ribbon at their recorded height (relative to the lowest point in view,
   exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain. OpenStreetMap maps only.
+  Tilting the map with two fingers switches 3D on.
+- A **scale bar** shows while you pan or zoom, in round distances (metres and km, or feet and miles in
+  the US).
 - **GPS accuracy** (signal-bars button, like Fog of World): live accuracy in metres with a Good / Fair /
   Poor / Too weak badge, satellites in use and in view (by constellation: GPS, Galileo, GLONASS,
   BeiDou…), heading and speed, and the time of the fix. The **?** explains what accuracy
@@ -54,8 +57,8 @@ up to your Google account, and lets you compare explored areas with friends.
 ### Recording
 - Interval slider (15 s … 1 day) plus an exact value in seconds, minutes, hours or days.
 - **Automatic interval**: picks how often to record from how you're moving (activity recognition,
-  speed between recent fixes, and how long you've stayed put): every 15 s in a vehicle, 20 s cycling,
-  30 s on foot, 2 min when still and 10 min after 20 minutes in one place. It reacts straight away
+  speed between recent fixes, and how long you've stayed put): every 1 s in a vehicle, 2 s cycling,
+  3 s on foot, 5 s when unsure, 15 s when still and 1 min after 20 minutes in one place. It reacts straight away
   when activity recognition is allowed; otherwise it adapts from GPS fixes alone.
 - Foreground service with a Stop action in its notification; resumes after reboot when allowed.
 

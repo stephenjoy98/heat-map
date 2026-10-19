@@ -168,7 +168,10 @@ class LocationTickerService : Service() {
     private fun reconsider(activity: Int, fix: Location?) {
         if (fix != null) {
             recent.addLast(fix)
-            while (recent.size > 6) recent.removeFirst()
+            // Judge stillness over about the last minute, however often fixes come (every second when
+            // driving, every minute when long still), keeping at least three fixes.
+            while (recent.size > 3 && fix.time - recent.first().time > STILL_WINDOW_MS) recent.removeFirst()
+            while (recent.size > 120) recent.removeFirst()
             val anchor = recent.first()
             val allClose = recent.all { it.distanceTo(anchor) < 40f }
             stillSince = if (allClose && recent.size >= 3) (if (stillSince == 0L) anchor.time else stillSince) else 0L
@@ -219,6 +222,8 @@ class LocationTickerService : Service() {
     }
 
     companion object {
+        private const val STILL_WINDOW_MS = 60_000L
+
         /** Height above sea level where Android provides it (14+), otherwise GPS height; null if neither. */
         fun altitudeOf(location: Location): Double? = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && location.hasMslAltitude() -> location.mslAltitudeMeters

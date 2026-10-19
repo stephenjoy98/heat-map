@@ -200,8 +200,9 @@ fun SettingsScreen(
                     if (autoInterval) {
                         Text("Automatic", style = MaterialTheme.typography.labelLarge)
                         Text(
-                            "Every 15 s in a vehicle, 20 s cycling and 30 s walking, so routes follow the road; " +
-                                "every 2 minutes when still, and every 10 minutes after staying put for a while. " +
+                            "Every second in a vehicle, 2 s cycling and 3 s walking, so routes trace every turn; " +
+                                "every 15 seconds when still, and every minute after staying put for a while. " +
+                                "Fast recording uses more battery while you're on the move. " +
                                 "It switches as soon as activity recognition notices you moving, so allow " +
                                 "physical activity access below for the best results.",
                             style = MaterialTheme.typography.bodySmall,

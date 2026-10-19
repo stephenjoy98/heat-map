@@ -3,16 +3,17 @@ package io.github.stephenjoy98.heatmap.tracking
 import com.google.android.gms.location.DetectedActivity
 
 /**
- * Picks a recording interval from what the phone is doing: frequent while moving fast (so routes follow
- * the road), relaxed when walking, and sparse when sitting still to save battery.
+ * Picks a recording interval from what the phone is doing: every second while moving fast (so routes trace
+ * every turn of the road), a little less often on a bike or on foot, and sparse when sitting still to save
+ * battery.
  */
 object AutoInterval {
-    const val VEHICLE_SEC = 15
-    const val CYCLE_SEC = 20
-    const val WALK_SEC = 30
-    const val UNKNOWN_SEC = 60
-    const val STILL_SEC = 120
-    const val LONG_STILL_SEC = 600
+    const val VEHICLE_SEC = 1
+    const val CYCLE_SEC = 2
+    const val WALK_SEC = 3
+    const val UNKNOWN_SEC = 5
+    const val STILL_SEC = 15
+    const val LONG_STILL_SEC = 60
 
     private const val STILL_AFTER_MS = 3 * 60_000L
     private const val LONG_STILL_AFTER_MS = 20 * 60_000L

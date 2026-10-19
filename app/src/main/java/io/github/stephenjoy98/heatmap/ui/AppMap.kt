@@ -3,6 +3,8 @@ package io.github.stephenjoy98.heatmap.ui
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.graphics.PointF
+import android.view.View
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -24,6 +26,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
@@ -45,6 +48,7 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.maps.android.compose.CameraMoveStartedReason
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
@@ -61,6 +65,8 @@ import io.github.stephenjoy98.heatmap.map.GoogleTileAdapter
 import io.github.stephenjoy98.heatmap.map.MapStyles
 import io.github.stephenjoy98.heatmap.map.TileBitmapSource
 import kotlinx.coroutines.delay
+import kotlin.math.pow
+import kotlin.math.cos
 import io.github.stephenjoy98.heatmap.map.TileOverlayView
 import io.github.stephenjoy98.heatmap.map.VectorMaps
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -98,6 +104,14 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
 
     /** Changes whenever the camera moves, so overlays that use [toScreen] know to redraw. */
     var cameraTick by mutableIntStateOf(0)
+        internal set
+
+    /** Ground distance one screen pixel covers at the middle of the map, in metres (0 until known). */
+    var metersPerPixel by mutableFloatStateOf(0f)
+        internal set
+
+    /** True while the map is being moved or zoomed, by a gesture or an animation. */
+    var moving by mutableStateOf(false)
         internal set
 
     internal var projector: ((Double, Double) -> Offset?)? = null
@@ -171,6 +185,9 @@ private data class MapLook(val dark: Boolean, val terrain: Boolean = false, val 
 
 private const val TILT_3D = 45f
 
+// Tilting further than this by hand switches on 3D buildings.
+private const val AUTO_3D_TILT = 8f
+
 @SuppressLint("MissingPermission") // showMyLocation is only true with location permission.
 @Composable
 private fun GoogleAppMap(
@@ -183,6 +200,8 @@ private fun GoogleAppMap(
     modifier: Modifier,
 ) {
     val dark = look.dark
+    val density = LocalContext.current.resources.displayMetrics.density
+    var tiltedByGesture by remember { mutableStateOf(false) }
     val state = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(camera.initialLat, camera.initialLon), camera.initialZoom)
     }
@@ -210,6 +229,21 @@ private fun GoogleAppMap(
         snapshotFlow { state.position }.collect {
             camera.bearing = it.bearing
             camera.cameraTick++
+            // Google's zoom counts 256 dp tiles: metres per dp at this latitude, then per screen pixel.
+            val perDp = 156_543.03392 * cos(Math.toRadians(it.target.latitude)) / 2.0.pow(it.zoom.toDouble())
+            camera.metersPerPixel = (perDp / density).toFloat()
+        }
+    }
+    LaunchedEffect(camera, state) {
+        snapshotFlow { state.isMoving }.collect { camera.moving = it }
+    }
+    // Tilting the map with two fingers switches on 3D buildings.
+    LaunchedEffect(state) {
+        snapshotFlow { state.position.tilt to state.cameraMoveStartedReason }.collect { (tilt, reason) ->
+            if (reason == CameraMoveStartedReason.GESTURE && tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
+                tiltedByGesture = true
+                Prefs.setBuildings3d(true)
+            }
         }
     }
     DisposableEffect(camera, state) {
@@ -218,8 +252,13 @@ private fun GoogleAppMap(
         }
         onDispose { camera.projector = null }
     }
-    // Tilt the camera so 3D buildings stand out, and flatten it again when they're turned off.
+    // Tilt the camera so 3D buildings stand out, and flatten it again when they're turned off. If 3D was
+    // switched on by tilting, the angle the user chose is kept.
     LaunchedEffect(look.buildings) {
+        if (look.buildings && tiltedByGesture) {
+            tiltedByGesture = false
+            return@LaunchedEffect
+        }
         val tilt = if (look.buildings) TILT_3D else 0f
         if (state.position.tilt != tilt) {
             runCatching {
@@ -279,6 +318,10 @@ private class VectorMapHolder(context: Context) {
     var onClick: ((Double, Double) -> Unit)? = null
     var setUp = false
 
+    // Whether the current camera move is the user's own gesture, and whether 3D was just switched on by one.
+    var gesture = false
+    var tiltedByGesture = false
+
     /** Goes up each time a style finishes loading, so extra layers can be added back. */
     var styleVersion by mutableIntStateOf(0)
 
@@ -291,7 +334,8 @@ private class VectorMapHolder(context: Context) {
         mapView.getMapAsync { m ->
             map = m
             m.uiSettings.isRotateGesturesEnabled = true
-            m.uiSettings.isTiltGesturesEnabled = false
+            // Tilting is always allowed; tilting by hand switches on 3D buildings.
+            m.uiSettings.isTiltGesturesEnabled = true
             m.uiSettings.isCompassEnabled = false
             m.uiSettings.isLogoEnabled = false
             m.uiSettings.attributionGravity = Gravity.BOTTOM or Gravity.START
@@ -378,6 +422,16 @@ private fun rememberVectorMap(cacheKey: String? = null): VectorMapHolder {
     return holder
 }
 
+/** Metres covered by one screen pixel across the middle of the map. */
+private fun metersPerPixel(m: MapLibreMap, view: View): Float {
+    val w = view.width
+    if (w <= 0) return 0f
+    val y = view.height / 2f
+    val a = m.projection.fromScreenLocation(PointF(w / 2f - 50f, y))
+    val b = m.projection.fromScreenLocation(PointF(w / 2f + 50f, y))
+    return (a.distanceTo(b) / 100.0).toFloat()
+}
+
 // Google Maps zoom levels count 256 px tiles; MapLibre counts 512 px tiles, so it's one level lower.
 private fun Float.toVectorZoom(): Double = (this - 1f).toDouble().coerceAtLeast(0.0)
 
@@ -415,10 +469,25 @@ private fun VectorAppMap(
                     holder.camera?.let {
                         it.bearing = m.cameraPosition.bearing.toFloat()
                         it.cameraTick++
+                        it.metersPerPixel = metersPerPixel(m, holder.mapView)
                     }
                 }
-                m.addOnCameraMoveListener { report() }
-                m.addOnCameraIdleListener { report() }
+                m.addOnCameraMoveStartedListener { reason ->
+                    holder.gesture = reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE
+                    holder.camera?.moving = true
+                }
+                m.addOnCameraMoveListener {
+                    report()
+                    if (holder.gesture && m.cameraPosition.tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
+                        holder.tiltedByGesture = true
+                        Prefs.setBuildings3d(true)
+                    }
+                }
+                m.addOnCameraIdleListener {
+                    report()
+                    holder.gesture = false
+                    holder.camera?.moving = false
+                }
                 // Returning false lets the map handle the tap as usual.
                 m.addOnMapClickListener { p ->
                     holder.onClick?.invoke(p.latitude, p.longitude)
@@ -440,7 +509,11 @@ private fun VectorAppMap(
 
     LaunchedEffect(look.buildings) {
         holder.withMap { m ->
-            m.uiSettings.isTiltGesturesEnabled = look.buildings
+            // Switched on by tilting: keep the angle the user chose.
+            if (look.buildings && holder.tiltedByGesture) {
+                holder.tiltedByGesture = false
+                return@withMap
+            }
             val tilt = if (look.buildings) TILT_3D.toDouble() else 0.0
             if (m.cameraPosition.tilt != tilt) m.animateCamera(org.maplibre.android.camera.CameraUpdateFactory.tiltTo(tilt), 600)
         }

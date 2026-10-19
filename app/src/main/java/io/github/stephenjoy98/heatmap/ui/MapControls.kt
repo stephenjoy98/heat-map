@@ -1,6 +1,23 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import java.util.Locale
+import kotlin.math.floor
+import kotlin.math.log10
+import kotlin.math.pow
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -121,5 +138,62 @@ private fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
             south,
         )
         drawCircle(pivot, radius = waist * 0.45f, center = center)
+    }
+}
+
+/**
+ * A map scale like Google Maps': a bar of a round distance (e.g. 200 m or 1 km) that fades in while the map
+ * moves or zooms and fades out a couple of seconds after it settles. Feet and miles where those are usual.
+ */
+@Composable
+fun ScaleBar(camera: MapCamera, modifier: Modifier = Modifier) {
+    var show by remember { mutableStateOf(false) }
+    LaunchedEffect(camera.moving) {
+        if (camera.moving) {
+            show = true
+        } else {
+            delay(2_000)
+            show = false
+        }
+    }
+    val imperial = remember { Locale.getDefault().country in setOf("US", "LR", "MM") }
+    val maxPx = with(LocalDensity.current) { 96.dp.toPx() }
+    val density = LocalDensity.current.density
+    AnimatedVisibility(visible = show && camera.metersPerPixel > 0f, modifier = modifier, enter = fadeIn(), exit = fadeOut()) {
+        val (meters, label) = niceScale(camera.metersPerPixel * maxPx, imperial)
+        val barDp = (meters / camera.metersPerPixel / density).dp
+        val ink = MaterialTheme.colorScheme.onSurface
+        Surface(shape = RoundedCornerShape(8.dp), color = controlColor(), shadowElevation = 2.dp) {
+            Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Text(label, style = MaterialTheme.typography.labelSmall, color = ink)
+                Canvas(Modifier.width(barDp).height(6.dp)) {
+                    val stroke = 2.dp.toPx()
+                    drawLine(ink, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = stroke)
+                    drawLine(ink, Offset(stroke / 2, 0f), Offset(stroke / 2, size.height), strokeWidth = stroke)
+                    drawLine(ink, Offset(size.width - stroke / 2, 0f), Offset(size.width - stroke / 2, size.height), strokeWidth = stroke)
+                }
+            }
+        }
+    }
+}
+
+/** The largest round distance (1, 2 or 5 × a power of ten) up to [maxMeters], in metres, with its label. */
+internal fun niceScale(maxMeters: Float, imperial: Boolean): Pair<Float, String> {
+    fun roundDown(max: Double): Double {
+        val p = 10.0.pow(floor(log10(max)))
+        return listOf(5.0, 2.0, 1.0).map { it * p }.first { it <= max }
+    }
+    fun trim(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else "%.1f".format(Locale.US, v)
+    if (!imperial) {
+        val m = roundDown(maxMeters.toDouble())
+        return m.toFloat() to (if (m >= 1000) "${trim(m / 1000)} km" else "${trim(m)} m")
+    }
+    val maxFeet = maxMeters / 0.3048
+    return if (maxFeet < 1000) {
+        val ft = roundDown(maxFeet)
+        (ft * 0.3048).toFloat() to "${trim(ft)} ft"
+    } else {
+        val mi = roundDown(maxMeters / 1609.344)
+        (mi * 1609.344).toFloat() to "${trim(mi)} mi"
     }
 }
