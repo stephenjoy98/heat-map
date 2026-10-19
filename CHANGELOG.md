@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.14.1] - 2026-10-19
+
+### Changed
+- The compass stays in the top right corner, just under the profile button, even when the filters are
+  open.
+- Tilting the map back flat with two fingers switches 3D buildings off again.
+
 ## [2.14.0] - 2026-10-19
 
 ### Added

@@ -41,7 +41,7 @@ up to your Google account, and lets you compare explored areas with friends.
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
   routes are drawn as a ribbon at their recorded height (relative to the lowest point in view,
   exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain. OpenStreetMap maps only.
-  Tilting the map with two fingers switches 3D on.
+  Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off.
 - A **scale bar** shows while you pan or zoom, in round distances.
 - **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed
   and the map scale; it defaults to your region (imperial in the US, UK, Liberia and Myanmar).

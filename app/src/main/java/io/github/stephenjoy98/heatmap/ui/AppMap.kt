@@ -185,8 +185,9 @@ private data class MapLook(val dark: Boolean, val terrain: Boolean = false, val 
 
 private const val TILT_3D = 45f
 
-// Tilting further than this by hand switches on 3D buildings.
+// Tilting further than this by hand switches on 3D buildings, and back below the second switches them off.
 private const val AUTO_3D_TILT = 8f
+private const val AUTO_FLAT_TILT = 2f
 
 @SuppressLint("MissingPermission") // showMyLocation is only true with location permission.
 @Composable
@@ -237,12 +238,15 @@ private fun GoogleAppMap(
     LaunchedEffect(camera, state) {
         snapshotFlow { state.isMoving }.collect { camera.moving = it }
     }
-    // Tilting the map with two fingers switches on 3D buildings.
+    // Tilting the map with two fingers switches on 3D buildings; tilting it back flat switches them off.
     LaunchedEffect(state) {
         snapshotFlow { state.position.tilt to state.cameraMoveStartedReason }.collect { (tilt, reason) ->
-            if (reason == CameraMoveStartedReason.GESTURE && tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
+            if (reason != CameraMoveStartedReason.GESTURE) return@collect
+            if (tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
                 tiltedByGesture = true
                 Prefs.setBuildings3d(true)
+            } else if (tilt < AUTO_FLAT_TILT && Prefs.buildings3d.value) {
+                Prefs.setBuildings3d(false)
             }
         }
     }
@@ -478,9 +482,15 @@ private fun VectorAppMap(
                 }
                 m.addOnCameraMoveListener {
                     report()
-                    if (holder.gesture && m.cameraPosition.tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
-                        holder.tiltedByGesture = true
-                        Prefs.setBuildings3d(true)
+                    // Tilting by hand switches 3D buildings on; tilting back flat switches them off.
+                    if (holder.gesture) {
+                        val tilt = m.cameraPosition.tilt
+                        if (tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
+                            holder.tiltedByGesture = true
+                            Prefs.setBuildings3d(true)
+                        } else if (tilt < AUTO_FLAT_TILT && Prefs.buildings3d.value) {
+                            Prefs.setBuildings3d(false)
+                        }
                     }
                 }
                 m.addOnCameraIdleListener {
