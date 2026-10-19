@@ -203,20 +203,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     ModeFilterRow(filter)
                 }
             }
-            // Under the top row (and the chips, when they're out): the scale while the map moves.
+            // Under the top row, and under the chips when they're out so nothing overlaps: the scale while the
+            // map moves on the left, and the compass on the right, under the profile button.
             Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
                 ScaleBar(camera, Modifier.align(Alignment.CenterStart))
+                CompassButton(camera, Modifier.align(Alignment.CenterEnd))
             }
         }
-
-        // The compass stays put in the top right corner, just under the profile button.
-        CompassButton(
-            camera,
-            Modifier
-                .align(Alignment.TopEnd)
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 8.dp + 48.dp + 12.dp, end = 12.dp),
-        )
 
         if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false })
 

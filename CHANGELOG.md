@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.14.3] - 2026-10-19
+
+### Changed
+- The Default and Terrain pictures in the layers sheet have dark versions for the dark theme.
+
+### Fixed
+- The compass moves down below the travel-mode chips when they're open, instead of covering them.
+
 ## [2.14.2] - 2026-10-19
 
 ### Changed

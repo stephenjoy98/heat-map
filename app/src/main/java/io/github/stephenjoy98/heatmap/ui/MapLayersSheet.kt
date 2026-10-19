@@ -64,13 +64,16 @@ val LayersIcon: ImageVector by lazy {
 
 /**
  * Google Maps-style sheet: pick the map type, and turn map details such as 3D buildings on or off. The map
- * types are shown as pictures of a street map and a terrain map (see tools/make_layer_previews.py).
+ * types are shown as pictures of a street map and a terrain map, in light and dark versions (see
+ * tools/make_layer_previews.py).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapLayersSheet(onDismiss: () -> Unit) {
     val layer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
+    // Pictures follow the app's own light or dark theme.
+    val dark = isDarkTheme()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -83,10 +86,10 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LayerTile("Default", layer == MapLayerType.DEFAULT, { Prefs.setMapLayer(MapLayerType.DEFAULT) }, preview = {
-                    TilePicture(R.drawable.layer_default)
+                    TilePicture(if (dark) R.drawable.layer_default_dark else R.drawable.layer_default)
                 }) { drawDefaultArt(it) }
                 LayerTile("Terrain", layer == MapLayerType.TERRAIN, { Prefs.setMapLayer(MapLayerType.TERRAIN) }, preview = {
-                    TilePicture(R.drawable.layer_terrain)
+                    TilePicture(if (dark) R.drawable.layer_terrain_dark else R.drawable.layer_terrain)
                 }) { drawTerrainArt(it) }
             }
             Spacer(Modifier.height(20.dp))
