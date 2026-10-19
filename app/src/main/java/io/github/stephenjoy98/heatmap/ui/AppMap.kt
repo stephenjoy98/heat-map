@@ -2,7 +2,6 @@ package io.github.stephenjoy98.heatmap.ui
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.PointF
 import android.view.View
 import android.view.Gravity
@@ -29,7 +28,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,34 +40,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMapOptions
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.CameraMoveStartedReason
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.TileOverlay
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberTileOverlayState
-import io.github.stephenjoy98.heatmap.BuildConfig
+import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.data.MapLayerType
-import io.github.stephenjoy98.heatmap.data.MapProvider
 import io.github.stephenjoy98.heatmap.data.Prefs
-import io.github.stephenjoy98.heatmap.map.GoogleTileAdapter
-import io.github.stephenjoy98.heatmap.map.MapStyles
 import io.github.stephenjoy98.heatmap.map.TileBitmapSource
 import kotlinx.coroutines.delay
-import kotlin.math.pow
-import kotlin.math.cos
 import io.github.stephenjoy98.heatmap.map.TileOverlayView
 import io.github.stephenjoy98.heatmap.map.VectorMaps
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -147,13 +122,6 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
 @Composable
 fun rememberMapCamera(lat: Double = 20.0, lon: Double = 0.0, zoom: Float = 2f) = remember { MapCamera(lat, lon, zoom) }
 
-/** Google Maps when this build has an API key (and the user hasn't picked OpenStreetMap), otherwise OpenStreetMap. */
-@Composable
-fun useGoogleMaps(): Boolean {
-    val provider by Prefs.mapProvider.collectAsStateWithLifecycle()
-    return BuildConfig.HAS_MAPS_KEY && provider != MapProvider.OSM
-}
-
 /**
  * The app's map: a dark or light base map with heat (and other) tile layers on top.
  * [refreshKey] changes when the layers' data changes; tiles are re-rendered shortly after.
@@ -165,22 +133,17 @@ fun AppMap(
     modifier: Modifier = Modifier,
     refreshKey: Any? = null,
     latest: LatLng? = null,
-    showMyLocation: Boolean = false,
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
     cacheKey: String? = null,
     // Loads routes with heights for an area; with 3D buildings on, they're drawn as a 3D route. Runs off
-    // the main thread. OpenStreetMap maps only.
+    // the main thread.
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)? = null,
 ) {
     val dark = isDarkTheme()
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    if (useGoogleMaps()) {
-        GoogleAppMap(camera, layers, style, refreshKey, latest, onMapClick, modifier)
-    } else {
-        VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, route3d, modifier)
-    }
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, route3d, modifier)
 }
 
 /** How the base map looks: theme, terrain shading and 3D buildings (which also tilt the camera). */
@@ -191,130 +154,6 @@ private const val TILT_3D = 45f
 // Tilting further than this by hand switches on 3D buildings, and back below the second switches them off.
 private const val AUTO_3D_TILT = 8f
 private const val AUTO_FLAT_TILT = 2f
-
-@Composable
-private fun GoogleAppMap(
-    camera: MapCamera,
-    layers: List<MapLayer>,
-    look: MapLook,
-    refreshKey: Any?,
-    latest: LatLng?,
-    onMapClick: ((Double, Double) -> Unit)?,
-    modifier: Modifier,
-) {
-    val dark = look.dark
-    val density = LocalContext.current.resources.displayMetrics.density
-    var tiltedByGesture by remember { mutableStateOf(false) }
-    val state = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(camera.initialLat, camera.initialLon), camera.initialZoom)
-    }
-    LaunchedEffect(camera) {
-        camera.commands.collect { c ->
-            if (c.animate) {
-                runCatching { state.animate(CameraUpdateFactory.newLatLngZoom(LatLng(c.lat, c.lon), c.zoom), 600) }
-            } else {
-                state.position = CameraPosition.fromLatLngZoom(LatLng(c.lat, c.lon), c.zoom)
-            }
-        }
-    }
-    LaunchedEffect(camera) {
-        camera.actions.collect { a ->
-            val update = when (a) {
-                MapCamera.Action.ZOOM_IN -> CameraUpdateFactory.zoomIn()
-                MapCamera.Action.ZOOM_OUT -> CameraUpdateFactory.zoomOut()
-                MapCamera.Action.NORTH_UP ->
-                    CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(state.position).bearing(0f).tilt(0f).build())
-            }
-            runCatching { state.animate(update, 300) }
-        }
-    }
-    LaunchedEffect(camera, state) {
-        snapshotFlow { state.position }.collect {
-            camera.bearing = it.bearing
-            camera.cameraTick++
-            // Google's zoom counts 256 dp tiles: metres per dp at this latitude, then per screen pixel.
-            val perDp = 156_543.03392 * cos(Math.toRadians(it.target.latitude)) / 2.0.pow(it.zoom.toDouble())
-            camera.metersPerPixel = (perDp / density).toFloat()
-        }
-    }
-    LaunchedEffect(camera, state) {
-        snapshotFlow { state.isMoving }.collect { camera.moving = it }
-    }
-    // Tilting the map with two fingers switches on 3D buildings; tilting it back flat switches them off.
-    LaunchedEffect(state) {
-        snapshotFlow { state.position.tilt to state.cameraMoveStartedReason }.collect { (tilt, reason) ->
-            if (reason != CameraMoveStartedReason.GESTURE) return@collect
-            if (tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
-                tiltedByGesture = true
-                Prefs.setBuildings3d(true)
-            } else if (tilt < AUTO_FLAT_TILT && Prefs.buildings3d.value) {
-                Prefs.setBuildings3d(false)
-            }
-        }
-    }
-    DisposableEffect(camera, state) {
-        camera.projector = { lat, lon ->
-            state.projection?.toScreenLocation(LatLng(lat, lon))?.let { Offset(it.x.toFloat(), it.y.toFloat()) }
-        }
-        onDispose { camera.projector = null }
-    }
-    // Tilt the camera so 3D buildings stand out, and flatten it again when they're turned off. If 3D was
-    // switched on by tilting, the angle the user chose is kept.
-    LaunchedEffect(look.buildings) {
-        if (look.buildings && tiltedByGesture) {
-            tiltedByGesture = false
-            return@LaunchedEffect
-        }
-        val tilt = if (look.buildings) TILT_3D else 0f
-        if (state.position.tilt != tilt) {
-            runCatching {
-                state.animate(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(state.position).tilt(tilt).build()), 600)
-            }
-        }
-    }
-    GoogleMap(
-        modifier = modifier,
-        cameraPositionState = state,
-        properties = MapProperties(
-            mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light),
-            mapType = if (look.terrain) MapType.TERRAIN else MapType.NORMAL,
-            isBuildingEnabled = look.buildings,
-        ),
-        onMapClick = { onMapClick?.invoke(it.latitude, it.longitude) },
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            myLocationButtonEnabled = false,
-            mapToolbarEnabled = false,
-            compassEnabled = false,
-        ),
-    ) {
-        // Your latest position as the app's red marker; Google's own location dot is always blue.
-        latest?.let { position ->
-            val marker = remember { MarkerState(position) }
-            marker.position = position
-            val icon = remember(density) { BitmapDescriptorFactory.fromBitmap(locationMarker(density)) }
-            Marker(state = marker, icon = icon, anchor = Offset(0.5f, 0.5f), flat = true, zIndex = 10f)
-        }
-        for (layer in layers) {
-            // Recreate the overlay when its source changes (filter, display mode, theme).
-            key(layer.id, layer.source) {
-                val tileState = rememberTileOverlayState()
-                val provider = remember { GoogleTileAdapter(layer.source) }
-                LaunchedEffect(refreshKey) {
-                    delay(1500)
-                    tileState.clearTileCache()
-                }
-                TileOverlay(
-                    tileProvider = provider,
-                    state = tileState,
-                    fadeIn = false,
-                    transparency = 1f - layer.alpha,
-                    zIndex = layer.zIndex,
-                )
-            }
-        }
-    }
-}
 
 /** Owns a MapLibre MapView, follows the Compose lifecycle, and hands out the map once it's ready. */
 private class VectorMapHolder(context: Context) {
@@ -434,22 +273,6 @@ private fun rememberVectorMap(cacheKey: String? = null): VectorMapHolder {
     return holder
 }
 
-/** The location marker drawn on Google Maps: a red dot with a white ring and a soft red halo. */
-private fun locationMarker(density: Float): Bitmap {
-    val size = (28 * density).toInt()
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(bitmap)
-    val c = size / 2f
-    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-    paint.color = android.graphics.Color.argb(70, 229, 57, 53)
-    canvas.drawCircle(c, c, 14 * density, paint)
-    paint.color = android.graphics.Color.WHITE
-    canvas.drawCircle(c, c, 7 * density, paint)
-    paint.color = android.graphics.Color.rgb(229, 57, 53)
-    canvas.drawCircle(c, c, 5 * density, paint)
-    return bitmap
-}
-
 /** Metres covered by one screen pixel across the middle of the map. */
 private fun metersPerPixel(m: MapLibreMap, view: View): Float {
     val w = view.width
@@ -460,7 +283,8 @@ private fun metersPerPixel(m: MapLibreMap, view: View): Float {
     return (a.distanceTo(b) / 100.0).toFloat()
 }
 
-// Google Maps zoom levels count 256 px tiles; MapLibre counts 512 px tiles, so it's one level lower.
+// The app's zoom levels follow the usual web-map convention of 256 px tiles; MapLibre counts 512 px tiles,
+// so it's one level lower.
 private fun Float.toVectorZoom(): Double = (this - 1f).toDouble().coerceAtLeast(0.0)
 
 @OptIn(FlowPreview::class)
@@ -632,61 +456,41 @@ fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
 fun TripPreviewLinesMap(lines: List<PreviewLine>, modifier: Modifier = Modifier) {
     val dark = isDarkTheme()
     val all = remember(lines) { lines.flatMap { it.points } }
-    if (useGoogleMaps()) {
-        val camera = rememberCameraPositionState()
-        val density = LocalContext.current.resources.displayMetrics.density
-        GoogleMap(
-            modifier = modifier,
-            cameraPositionState = camera,
-            googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
-            properties = MapProperties(mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light)),
-            uiSettings = MapUiSettings(mapToolbarEnabled = false, zoomControlsEnabled = false),
-            onMapLoaded = {
-                if (all.size >= 2) {
-                    val bounds = LatLngBounds.builder().apply { all.forEach { include(it) } }.build()
-                    runCatching { camera.move(CameraUpdateFactory.newLatLngBounds(bounds, 48)) }
-                }
-            },
-        ) {
-            for (line in lines) Polyline(points = line.points, color = line.color, width = line.widthDp * density)
-        }
-    } else {
-        val holder = rememberVectorMap()
-        LaunchedEffect(lines, dark) {
-            holder.styleLook = null // Reload so the lines are added to a fresh style.
-            holder.setLook(MapLook(dark)) { style ->
-                lines.forEachIndexed { i, l ->
-                    val geometry = LineString.fromLngLats(l.points.map { Point.fromLngLat(it.longitude, it.latitude) })
-                    style.addSource(GeoJsonSource("preview-$i", Feature.fromGeometry(geometry)))
-                    style.addLayer(
-                        LineLayer("preview-line-$i", "preview-$i").withProperties(
-                            PropertyFactory.lineColor(l.color.toArgb()),
-                            PropertyFactory.lineWidth(l.widthDp),
-                            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
-                        )
+    val holder = rememberVectorMap()
+    LaunchedEffect(lines, dark) {
+        holder.styleLook = null // Reload so the lines are added to a fresh style.
+        holder.setLook(MapLook(dark)) { style ->
+            lines.forEachIndexed { i, l ->
+                val geometry = LineString.fromLngLats(l.points.map { Point.fromLngLat(it.longitude, it.latitude) })
+                style.addSource(GeoJsonSource("preview-$i", Feature.fromGeometry(geometry)))
+                style.addLayer(
+                    LineLayer("preview-line-$i", "preview-$i").withProperties(
+                        PropertyFactory.lineColor(l.color.toArgb()),
+                        PropertyFactory.lineWidth(l.widthDp),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                     )
-                }
-                holder.withMap { m ->
-                    m.uiSettings.setAllGesturesEnabled(false)
-                    m.uiSettings.isAttributionEnabled = false
-                    if (all.size >= 2) {
-                        val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
-                            .includes(all.map { MLatLng(it.latitude, it.longitude) })
-                            .build()
-                        holder.mapView.post {
-                            runCatching { m.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds, 48)) }
-                        }
+                )
+            }
+            holder.withMap { m ->
+                m.uiSettings.setAllGesturesEnabled(false)
+                m.uiSettings.isAttributionEnabled = false
+                if (all.size >= 2) {
+                    val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
+                        .includes(all.map { MLatLng(it.latitude, it.longitude) })
+                        .build()
+                    holder.mapView.post {
+                        runCatching { m.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds, 48)) }
                     }
                 }
             }
         }
-        AndroidView(
-            modifier = modifier,
-            factory = {
-                (holder.mapView.parent as? ViewGroup)?.removeView(holder.mapView)
-                holder.mapView
-            },
-        )
     }
+    AndroidView(
+        modifier = modifier,
+        factory = {
+            (holder.mapView.parent as? ViewGroup)?.removeView(holder.mapView)
+            holder.mapView
+        },
+    )
 }

@@ -30,8 +30,6 @@ jobs:
           fi
 
       - name: Build APKs
-        env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew --no-daemon assembleDebug assembleRelease
 
       - name: Read app version

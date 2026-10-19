@@ -3,11 +3,8 @@ package io.github.stephenjoy98.heatmap.map
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import com.google.android.gms.maps.model.Tile
-import com.google.android.gms.maps.model.TileProvider
 import io.github.stephenjoy98.heatmap.data.Cells
 import io.github.stephenjoy98.heatmap.data.DisplayMode
-import java.io.ByteArrayOutputStream
 import kotlin.math.max
 
 const val TILE_PX = 512
@@ -70,15 +67,3 @@ class CellTiles(
     }
 }
 
-/** Serves a [TileBitmapSource] to Google Maps as PNG tiles. */
-class GoogleTileAdapter(private val source: TileBitmapSource) : TileProvider {
-    override fun getTile(x: Int, y: Int, zoom: Int): Tile {
-        val bitmap = source.render(x, y, zoom) ?: return TileProvider.NO_TILE
-        val out = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-        val w = bitmap.width
-        val h = bitmap.height
-        bitmap.recycle()
-        return Tile(w, h, out.toByteArray())
-    }
-}

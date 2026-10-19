@@ -62,7 +62,6 @@ private val libraries = listOf(
     Credit("Jetpack Compose, Material 3 and AndroidX", "Apache License 2.0", "https://developer.android.com/jetpack/androidx"),
     Credit("Kotlin and kotlinx.coroutines", "Apache License 2.0", "https://github.com/Kotlin/kotlinx.coroutines"),
     Credit("MapLibre Native for Android", "BSD 2-Clause License", "https://github.com/maplibre/maplibre-native"),
-    Credit("Maps Compose", "Apache License 2.0", "https://github.com/googlemaps/android-maps-compose"),
     Credit("Firebase Android SDK", "Apache License 2.0", "https://github.com/firebase/firebase-android-sdk"),
     Credit("Health Connect client", "Apache License 2.0", "https://developer.android.com/health-and-fitness/guides/health-connect"),
     Credit("Coil", "Apache License 2.0", "https://github.com/coil-kt/coil"),

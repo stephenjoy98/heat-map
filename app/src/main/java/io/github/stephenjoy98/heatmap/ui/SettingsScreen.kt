@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.MapTheme
-import io.github.stephenjoy98.heatmap.data.MapProvider
 import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.BuildConfig
 import androidx.compose.material3.SegmentedButton
@@ -108,7 +107,6 @@ fun SettingsScreen(
     val mode by Prefs.displayMode.collectAsStateWithLifecycle()
     val mapTheme by Prefs.mapTheme.collectAsStateWithLifecycle()
     val units by Prefs.units.collectAsStateWithLifecycle()
-    val mapProvider by Prefs.mapProvider.collectAsStateWithLifecycle()
     val dynamicColor by Prefs.dynamicColor.collectAsStateWithLifecycle()
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
     val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
@@ -279,18 +277,6 @@ fun SettingsScreen(
                         enabled = expressiveSupported,
                         onCheckedChange = Prefs::setDynamicColor,
                     )
-                }
-                if (BuildConfig.HAS_MAPS_KEY) {
-                    ItemDivider()
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Map provider", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(8.dp))
-                        SegmentedChoice(
-                            options = listOf(MapProvider.AUTO to "Google Maps", MapProvider.OSM to "OpenStreetMap"),
-                            selected = if (mapProvider == MapProvider.OSM) MapProvider.OSM else MapProvider.AUTO,
-                            onSelect = Prefs::setMapProvider,
-                        )
-                    }
                 }
             }
 

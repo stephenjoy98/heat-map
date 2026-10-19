@@ -1,4 +1,3 @@
-import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -11,13 +10,6 @@ plugins {
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
-
-val localProps = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-val mapsApiKey: String = System.getenv("MAPS_API_KEY")?.takeIf { it.isNotBlank() }
-    ?: localProps.getProperty("MAPS_API_KEY", "")
 
 // Semantic Versioning (https://semver.org). The version lives in gradle.properties; versionCode is derived
 // from it (2.11.3 -> 21103) so it always increases with the version, as Android requires for updates.
@@ -55,8 +47,6 @@ android {
         versionCode = verMajor * 10_000 + verMinor * 100 + verPatch
         versionName = appVersion
 
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
-        buildConfigField("boolean", "HAS_MAPS_KEY", (mapsApiKey.isNotEmpty()).toString())
     }
 
     signingConfigs {
@@ -119,10 +109,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
-    // Location, activity recognition, maps
+    // Location and activity recognition
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    implementation("com.google.maps.android:maps-compose:6.12.0")
-    // Vector OpenStreetMap maps (OpenFreeMap tiles), used when the build has no Google Maps key
+    // Vector OpenStreetMap maps (OpenFreeMap tiles)
     implementation("org.maplibre.gl:android-sdk:11.13.5")
 
     // Steps

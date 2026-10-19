@@ -71,7 +71,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.maps.model.LatLng
+import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
@@ -147,7 +147,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             modifier = Modifier.fillMaxSize(),
             refreshKey = changes,
             latest = stats?.latest?.let { LatLng(it.lat, it.lon) },
-            showMyLocation = hasLocation,
             cacheKey = "map",
             route3d = route3d,
         )

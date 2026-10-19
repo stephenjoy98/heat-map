@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-19
+
+### Removed
+- Google Maps. The app uses OpenStreetMap maps only, which need no API key, and is smaller without the
+  Google Maps libraries. The map provider choice in Settings is gone.
+
 ## [2.14.4] - 2026-10-19
 
 ### Changed

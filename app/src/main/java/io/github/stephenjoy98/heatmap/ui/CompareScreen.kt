@@ -45,7 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.maps.model.LatLng
+import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.cloud.Friend
 import io.github.stephenjoy98.heatmap.cloud.Friends
 import io.github.stephenjoy98.heatmap.data.DisplayMode

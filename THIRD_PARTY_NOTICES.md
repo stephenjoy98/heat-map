@@ -15,7 +15,6 @@ The app shows the same list under **Profile menu → About**.
 | Jetpack Compose, Material 3, AndroidX (Core, Activity, Lifecycle, WorkManager, Credentials) | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
 | Health Connect client | Apache License 2.0 |
 | Kotlin standard library, kotlinx.coroutines | Apache License 2.0 |
-| [Maps Compose](https://github.com/googlemaps/android-maps-compose) | Apache License 2.0 |
 | [Firebase Android SDK](https://github.com/firebase/firebase-android-sdk) (Auth, Firestore, AI Logic) | Apache License 2.0 |
 | [MapLibre Native](https://github.com/maplibre/maplibre-native) | [BSD 2-Clause](https://github.com/maplibre/maplibre-native/blob/main/LICENSE.md) |
 | [Coil](https://github.com/coil-kt/coil) | Apache License 2.0 |
@@ -34,11 +33,10 @@ them in the APK.
 | [OpenFreeMap](https://openfreemap.org/) tiles, [OpenMapTiles](https://openmaptiles.org/) schema | "OpenFreeMap © OpenMapTiles". Credit shown on the map. |
 | [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Elevation from Mapzen, USGS, NASA SRTM, EU-DEM and others; see the [full attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). |
 | [Valhalla](https://github.com/valhalla/valhalla) map matching on the FOSSGIS server | Valhalla is MIT-licensed; the public server has a [fair-use policy](https://valhalla.openstreetmap.de/). Only coordinates are sent. |
-| Google Maps (only with your own API key) | [Google Maps Platform Terms](https://cloud.google.com/maps-platform/terms). |
 | [JoyPixels](https://www.joypixels.com/) emoji artwork | [JoyPixels Free License](https://www.joypixels.com/licenses), which requires attribution (shown in Settings and About). The artwork is **not** covered by this project's GPL licence. |
 
 ## Trademarks
 
-Claude and Anthropic are trademarks of Anthropic, PBC. Google, Android, Google Maps, Firebase and
+Claude and Anthropic are trademarks of Anthropic, PBC. Google, Android, Firebase and
 Health Connect are trademarks of Google LLC. Strava and Tesla are mentioned only for comparison. This
 project isn't affiliated with or endorsed by any of these companies.

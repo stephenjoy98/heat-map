@@ -3,7 +3,7 @@
 Your most travelled routes on a map.
 
 **Location Ticker** is an Android app that records your position on a fixed tick, anywhere from every
-15 seconds to once a day, and draws everything as a Strava-style heatmap on OpenStreetMap or Google Maps. It works out
+15 seconds to once a day, and draws everything as a Strava-style heatmap on OpenStreetMap. It works out
 how you travelled, gives you a Review page with AI insights, reads your steps from Health Connect, backs
 up to your Google account, and lets you compare explored areas with friends.
 
@@ -23,10 +23,9 @@ up to your Google account, and lets you compare explored areas with friends.
   the account button, which shows a badge when trips or roads are waiting for your answer.
 
 ### Map
-- **Works with no setup**: without a Google Maps API key the app uses sharp **vector maps** from
-  [OpenFreeMap](https://openfreemap.org/) (OpenStreetMap data, no key, no limits), drawn by MapLibre
-  at your screen's full resolution. With a key, Google Maps is used, and Settings lets you switch.
-- Two looks either way: a **dark** map in the near-black greys of Google's dark theme, so routes glow
+- **Works with no setup**: sharp **vector maps** from [OpenFreeMap](https://openfreemap.org/)
+  (OpenStreetMap data, no key, no limits), drawn by MapLibre at your screen's full resolution.
+- Two looks: a **dark** map in the near-black greys of Google's dark theme, so routes glow
   like Strava's heatmap, and a clean **light** white map in the spirit of Tesla's in-car map. Choose
   Light, Dark or System; the whole app follows.
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
@@ -36,11 +35,10 @@ up to your Google account, and lets you compare explored areas with friends.
   Driving, Car share, Transit and Other; a dot on the button shows when the map is filtered.
 - Routes or raw-points view, and very large histories automatically fall back to a density grid.
 - **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type
-  (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) on
-  OpenStreetMap; Google's terrain map with a key), and **3D buildings** under Map details, which tilts
+  (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)), and **3D buildings** under Map details, which tilts
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
   routes are drawn as a ribbon at their recorded height (relative to the lowest point in view,
-  exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain. OpenStreetMap maps only.
+  exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
   Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off.
 - A **scale bar** shows while you pan or zoom, in round distances.
 - **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed
@@ -142,15 +140,7 @@ steps, on-device AI and statistics. Sign-in, backup, friends and cloud AI need F
 
 ## Setup
 
-### 1. Google Maps API key (optional)
-Vector OpenStreetMap maps are used without one. To use Google Maps instead:
-1. In [Google Cloud console](https://console.cloud.google.com/), create a project (or reuse your
-   Firebase one), enable **Maps SDK for Android**, and create an API key.
-2. Restrict it to Android apps with package `io.github.stephenjoy98.heatmap` and the SHA-1 below.
-3. Add it as a GitHub Actions secret named **`MAPS_API_KEY`** (repo → Settings → Secrets and
-   variables → Actions). For local builds, put `MAPS_API_KEY=...` in `local.properties`.
-
-### 2. Firebase (sign-in, backup, friends, cloud AI)
+### 1. Firebase (sign-in, backup, friends, cloud AI)
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com/) and add an
    Android app with package **`io.github.stephenjoy98.heatmap`**.
 2. Add the signing key's SHA-1 (and SHA-256) fingerprints:
@@ -171,7 +161,7 @@ Vector OpenStreetMap maps are used without one. To use Google Maps instead:
 
 The next push (or *Run workflow* on the Actions tab) builds an APK with everything turned on.
 
-### 3. On the phone
+### 2. On the phone
 - Allow **location** (and *Allow all the time* in Settings if you want recording to resume after a
   reboot), **notifications**, and **physical activity** (much better travel-mode detection).
 - Connect **Health Connect** from the Review page or Settings to see steps.
@@ -195,7 +185,7 @@ Requires JDK 17 and the Android SDK (API 36).
 | Route smoothing | `map/Smoothing.kt` |
 | Storage (SQLite: points, trips, places cache, friends' routes) | `data/PointStore.kt` |
 | Heatmap rendering and map tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |
-| Map engines (Google Maps or MapLibre vector maps) behind one composable | `ui/AppMap.kt`, `map/VectorMapSupport.kt` |
+| The map (MapLibre vector maps with heat tiles, 3D routes and a location marker) | `ui/AppMap.kt`, `map/VectorMapSupport.kt` |
 | Map styles (dark / light) | `map/MapStyles.kt`, `map/VectorMapSupport.kt` |
 | Review stats, steps, insights (Nano / cloud / statistics) | `review/` |
 | Sign-in, backup, friends, daily sync | `cloud/` |

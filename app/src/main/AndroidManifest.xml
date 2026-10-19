@@ -29,10 +29,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LocationTicker">
 
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
-
         <!-- Lets Play services fetch the QR scanner UI ahead of first use. -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
