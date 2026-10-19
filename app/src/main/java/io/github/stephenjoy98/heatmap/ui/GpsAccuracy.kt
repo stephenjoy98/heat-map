@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Units
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -284,11 +285,11 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailInset: Dp = 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(84.dp)) {
                     Text("ACCURACY", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = muted)
                     Text(
-                        if (quality == FixQuality.NONE) "--" else fix!!.accuracy.roundToInt().toString(),
+                        if (quality == FixQuality.NONE) "--" else Units.lengthValue(fix!!.accuracy.toDouble()).toString(),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Text("METERS", style = MaterialTheme.typography.labelSmall, color = muted)
+                    Text(Units.shortUnitLabel, style = MaterialTheme.typography.labelSmall, color = muted)
                 }
                 VerticalDivider(Modifier.fillMaxHeight().padding(horizontal = 12.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -379,9 +380,9 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailInset: Dp = 
                     "Accuracy is the radius around the reported position within which your true location very " +
                         "probably is, so a smaller number means a more precise dot. More satellites in use usually " +
                         "means better accuracy; buildings, trees and being indoors block them.\n\n" +
-                        "Good is within 20 m, fair within 50 m. Location Ticker only records fixes within " +
-                        "${limit.roundToInt()} m" +
-                        (if (highAccuracy) "" else " (100 m with High accuracy on in Settings)") +
+                        "Perfect is within ${Units.length(10.0)}, good within ${Units.length(20.0)}, fair within " +
+                        "${Units.length(50.0)}. Location Ticker only records fixes within ${Units.length(limit.toDouble())}" +
+                        (if (highAccuracy) "" else " (${Units.length(100.0)} with High accuracy on in Settings)") +
                         "; anything less precise is skipped so it can't put stray dots on your map."
                 )
             },

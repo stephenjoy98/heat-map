@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Units
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -369,7 +370,7 @@ private fun QuestionCard(trip: Trip, onAnswer: suspend (TravelMode) -> Unit) {
         Column(Modifier.padding(14.dp)) {
             Text("$day · ${time.format(start)}–${time.format(Date(trip.endTime))}", style = MaterialTheme.typography.titleSmall)
             Text(
-                "${Insights.km(trip.distanceM / 1000)} · average ${trip.avgSpeedKmh.toInt()} km/h · best guess: ${trip.inferredMode.label}",
+                "${Insights.km(trip.distanceM / 1000)} · average ${Units.speed(trip.avgSpeedKmh)} · best guess: ${trip.inferredMode.label}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

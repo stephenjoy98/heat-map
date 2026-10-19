@@ -22,7 +22,9 @@ The app shows the entries since your last version as "What's new" after an updat
 - GPX exports include elevation.
 - Long-press any button to see what it does.
 - Tilt the map with two fingers to switch on 3D buildings and 3D routes.
-- A scale bar appears while you move or zoom the map (feet and miles in the US).
+- A scale bar appears while you move or zoom the map.
+- Units setting: metric (km, m) or imperial (miles, feet) for every distance, height, speed and the map
+  scale. It starts from your region's usual units.
 
 ### Fixed
 - Tapping the map outside the GPS accuracy card closes it.

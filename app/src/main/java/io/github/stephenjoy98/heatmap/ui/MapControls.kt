@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import io.github.stephenjoy98.heatmap.data.Units
 import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.log10
@@ -143,7 +144,7 @@ private fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
 
 /**
  * A map scale like Google Maps': a bar of a round distance (e.g. 200 m or 1 km) that fades in while the map
- * moves or zooms and fades out a couple of seconds after it settles. Feet and miles where those are usual.
+ * moves or zooms and fades out a couple of seconds after it settles, in the units chosen in Settings.
  */
 @Composable
 fun ScaleBar(camera: MapCamera, modifier: Modifier = Modifier) {
@@ -156,7 +157,7 @@ fun ScaleBar(camera: MapCamera, modifier: Modifier = Modifier) {
             show = false
         }
     }
-    val imperial = remember { Locale.getDefault().country in setOf("US", "LR", "MM") }
+    val imperial = Units.imperial
     val maxPx = with(LocalDensity.current) { 96.dp.toPx() }
     val density = LocalDensity.current.density
     AnimatedVisibility(visible = show && camera.metersPerPixel > 0f, modifier = modifier, enter = fadeIn(), exit = fadeOut()) {

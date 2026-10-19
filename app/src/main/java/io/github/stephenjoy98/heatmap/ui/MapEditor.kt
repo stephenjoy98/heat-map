@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Units
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -212,7 +213,7 @@ fun EditPanel(
                             Column(Modifier.weight(1f)) {
                                 Text("Dot ${state.selected!! + 1} of ${pts.size}", style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    "${time(sel.time)} · ±${sel.accuracy.roundToInt()} m",
+                                    "${time(sel.time)} · ±${Units.length(sel.accuracy.toDouble())}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

@@ -77,6 +77,7 @@ import androidx.compose.runtime.produceState
 import io.github.stephenjoy98.heatmap.data.GpxExporter
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.UnitSystem
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -106,6 +107,7 @@ fun SettingsScreen(
     val autoInterval by Prefs.autoInterval.collectAsStateWithLifecycle()
     val mode by Prefs.displayMode.collectAsStateWithLifecycle()
     val mapTheme by Prefs.mapTheme.collectAsStateWithLifecycle()
+    val units by Prefs.units.collectAsStateWithLifecycle()
     val mapProvider by Prefs.mapProvider.collectAsStateWithLifecycle()
     val dynamicColor by Prefs.dynamicColor.collectAsStateWithLifecycle()
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
@@ -251,6 +253,16 @@ fun SettingsScreen(
                         options = listOf(MapTheme.LIGHT to "Light", MapTheme.DARK to "Dark", MapTheme.SYSTEM to "System"),
                         selected = mapTheme,
                         onSelect = Prefs::setMapTheme,
+                    )
+                }
+                ItemDivider()
+                Column(Modifier.padding(16.dp)) {
+                    Text("Units", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    SegmentedChoice(
+                        options = listOf(UnitSystem.METRIC to "Metric (km, m)", UnitSystem.IMPERIAL to "Imperial (mi, ft)"),
+                        selected = units,
+                        onSelect = Prefs::setUnits,
                     )
                 }
                 ItemDivider()

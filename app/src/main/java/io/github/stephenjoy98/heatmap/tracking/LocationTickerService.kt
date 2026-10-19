@@ -28,6 +28,7 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.Units
 import io.github.stephenjoy98.heatmap.ui.MainActivity
 import io.github.stephenjoy98.heatmap.ui.formatInterval
 import java.text.DateFormat
@@ -207,7 +208,7 @@ class LocationTickerService : Service() {
             "$every · waiting for first fix"
         } else {
             val time = DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(last.time))
-            "$every · last fix $time (±${last.accuracy.toInt()} m)"
+            "$every · last fix $time (±${Units.length(last.accuracy.toDouble())})"
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_ticker)

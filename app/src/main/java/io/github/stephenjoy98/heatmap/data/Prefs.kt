@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import io.github.stephenjoy98.heatmap.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 
 enum class DisplayMode { ROUTES, POINTS }
@@ -60,6 +61,9 @@ object Prefs {
     private val _mapTheme = MutableStateFlow(MapTheme.DARK)
     val mapTheme: StateFlow<MapTheme> = _mapTheme
 
+    private val _units = MutableStateFlow(UnitSystem.METRIC)
+    val units: StateFlow<UnitSystem> = _units
+
     /** Travel modes shown on the map. [TravelMode.UNKNOWN] covers points not yet assigned a mode. */
     private val _modeFilter = MutableStateFlow(TravelMode.entries.toSet())
     val modeFilter: StateFlow<Set<TravelMode>> = _modeFilter
@@ -105,6 +109,8 @@ object Prefs {
         _highAccuracy.value = sp.getBoolean("high_accuracy", true)
         _displayMode.value = DisplayMode.entries.byName(sp.getString("display_mode", null)) ?: DisplayMode.ROUTES
         _mapTheme.value = MapTheme.entries.byName(sp.getString("map_theme", null)) ?: MapTheme.DARK
+        _units.value = UnitSystem.entries.byName(sp.getString("units", null)) ?: Units.defaultFor(Locale.getDefault())
+        Units.system = _units.value
         _modeFilter.value = sp.getStringSet("mode_filter", null)
             ?.mapNotNull { it.toIntOrNull()?.let(TravelMode::fromId) }?.toSet()
             ?: TravelMode.entries.toSet()
@@ -144,6 +150,12 @@ object Prefs {
     fun setDisplayMode(mode: DisplayMode) {
         _displayMode.value = mode
         sp.edit().putString("display_mode", mode.name).apply()
+    }
+
+    fun setUnits(units: UnitSystem) {
+        _units.value = units
+        Units.system = units
+        sp.edit().putString("units", units.name).apply()
     }
 
     fun setMapTheme(theme: MapTheme) {

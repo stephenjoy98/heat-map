@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Units
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -247,7 +248,7 @@ private fun HeroCard(s: ProfileStats) {
                 HorizontalDivider(Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 StatRow(
                     listOf(
-                        compact(s.totalKm) to "KM TRAVELLED",
+                        compact(Units.fromKm(s.totalKm)) to "${Units.longUnit.uppercase()} TRAVELLED",
                         compact(s.trips.toDouble()) to "TRIPS",
                         compact(s.areas.toDouble()) to "AREAS",
                     )
@@ -395,18 +396,19 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "${compact(s.exploredKm)} km",
+                            "${compact(Units.fromKm(s.exploredKm))} ${Units.longUnit}",
                             color = fg,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                         )
-                        Text("KM EXPLORED", color = MaterialTheme.colorScheme.onSurfaceVariant, style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp))
+                        Text("${Units.longUnit.uppercase()} EXPLORED", color = MaterialTheme.colorScheme.onSurfaceVariant, style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp))
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "Km explored counts new ground only, so repeat trips don't add to it; km travelled above includes them. " +
+                "${Units.longUnit.replaceFirstChar { it.uppercase() }} explored counts new ground only, so repeat trips don't add to it; " +
+                    "${Units.longUnit} travelled above includes them. " +
                     "Tap a number to see the list.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,

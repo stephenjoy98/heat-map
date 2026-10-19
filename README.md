@@ -42,8 +42,9 @@ up to your Google account, and lets you compare explored areas with friends.
   routes are drawn as a ribbon at their recorded height (relative to the lowest point in view,
   exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain. OpenStreetMap maps only.
   Tilting the map with two fingers switches 3D on.
-- A **scale bar** shows while you pan or zoom, in round distances (metres and km, or feet and miles in
-  the US).
+- A **scale bar** shows while you pan or zoom, in round distances.
+- **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed
+  and the map scale; it defaults to your region (imperial in the US, UK, Liberia and Myanmar).
 - **GPS accuracy** (signal-bars button, like Fog of World): live accuracy in metres with a Good / Fair /
   Poor / Too weak badge, satellites in use and in view (by constellation: GPS, Galileo, GLONASS,
   BeiDou…), heading and speed, and the time of the fix. The **?** explains what accuracy

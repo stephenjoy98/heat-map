@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.review
 
+import io.github.stephenjoy98.heatmap.data.Units
 import android.content.Context
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
@@ -114,7 +115,7 @@ object Insights {
 
     private fun buildPrompt(data: ReviewData, question: String?): String = buildString {
         appendLine("You are a friendly assistant inside a personal location-history app.")
-        appendLine("Use only these facts about the user's travel. Don't invent places or numbers. Use kilometres.")
+        appendLine("Use only these facts about the user's travel. Don't invent places or numbers. Use ${Units.longUnitName}.")
         appendLine()
         append(facts(data))
         appendLine()
@@ -125,7 +126,8 @@ object Insights {
         }
     }
 
-    internal fun km(v: Double) = if (v >= 100) "${v.roundToInt()} km" else String.format(Locale.US, "%.1f km", v)
+    /** A distance in kilometres, shown in the chosen units (km or miles). */
+    internal fun km(v: Double) = Units.distance(v)
 
     internal fun periodText(p: ReviewPeriod) = when (p) {
         ReviewPeriod.WEEK -> "the last 7 days"
@@ -205,7 +207,7 @@ object StatsInsights {
                 else "You visited ${d.cities.size}: " + d.cities.joinToString { it.city } + "."
             "countr" in q -> if (d.countries.isEmpty()) "No countries identified yet." else "Countries: ${d.countries.joinToString()}."
             "new" in q || "explor" in q -> "${d.newAreas} new map squares out of ${d.areasVisited} visited."
-            "far" in q || "km" in q || "distance" in q || "kilomet" in q -> "You covered ${Insights.km(d.totalKm)} over ${d.trips} trips."
+            "far" in q || "km" in q || "mile" in q || "distance" in q || "kilomet" in q -> "You covered ${Insights.km(d.totalKm)} over ${d.trips} trips."
             else -> null
         }
     }
