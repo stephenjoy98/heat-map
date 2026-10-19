@@ -12,8 +12,10 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 - Owner: **@stephenjoy98** (GitHub), based in Canada. Licence: **GPL-3.0-or-later** (LICENSE + NOTICE with a
   section 7 exception for linking Google Play services, Firebase, ML Kit and Google Identity).
-- Repo: `stephenjoy98/heat-map`. Work branch: **`claude/location-ticker-android-wk7rgy`**; draft **PR #1**.
-  Push only to that branch. Commit messages end with the Co-Authored-By / Claude-Session trailers given in
+- Repo: `stephenjoy98/heat-map`. **`main` is the default branch and where work goes now**: the user asked
+  (2026-10-19) for everything to be on `main` and for future work to use it. PR #1 (from
+  `claude/location-ticker-android-wk7rgy`, everything up to 2.16.1) was merged into `main`. If a session is
+  assigned a different work branch, branch from the latest `main` and open a PR into `main`. Commit messages end with the Co-Authored-By / Claude-Session trailers given in
   the session's system reminder. Don't put model names in commits or code.
 - Package: `io.github.stephenjoy98.heatmap`. Single `app` module.
 - Toolchain: Kotlin 2.2.21, AGP 8.13.0, Gradle 8.14.3, compileSdk 36, targetSdk 35, minSdk 26, Compose BOM
@@ -28,7 +30,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 ## How to work in this environment
 
 - **No Android SDK locally.** CI (`.github/workflows/android.yml`, builds assembleDebug + assembleRelease
-  and uploads `location-ticker-<version>-apk`) is the only compiler. Pushes are the test. Watch PR #1 check
+  and uploads `location-ticker-<version>-apk`) is the only compiler. Pushes are the test. Watch the PR's check
   events; use the GitHub MCP tools (`actions_list`, `actions_get`, `get_job_logs`) — unauthenticated
   api.github.com calls get rate-limited.
 - Network: Maven Central and npm are reachable; **dl.google.com / maven.google.com, gnu.org, OSM tiles,
