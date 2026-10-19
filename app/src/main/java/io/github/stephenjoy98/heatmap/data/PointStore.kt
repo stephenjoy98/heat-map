@@ -759,6 +759,17 @@ class PointStore private constructor(context: Context) :
         ).use { c -> if (c.moveToFirst()) intArrayOf(c.getInt(0), c.getInt(1), c.getInt(2), c.getInt(3)) else IntArray(4) }
 
     /**
+     * Distance over ground covered for the first time, in metres, for fixes in the range. Reads the whole
+     * history (earlier fixes mark ground as already visited), so call it off the main thread.
+     */
+    fun exploredMeters(from: Long, to: Long): Double {
+        val explored = ExploredDistance(from, to)
+        readableDatabase.rawQuery("SELECT time, lat, lon, interval_ms FROM points WHERE time < $to ORDER BY time", null)
+            .use { c -> while (c.moveToNext()) explored.add(c.getLong(0), c.getDouble(1), c.getDouble(2), c.getInt(3)) }
+        return explored.meters
+    }
+
+    /**
      * Total time the recording covers in the range: each point stands for its interval, capped at the gap
      * to the next point (so pauses and missed ticks don't count).
      */

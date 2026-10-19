@@ -28,6 +28,8 @@ class ProfileStats(
     /** Total time covered by the recording, in milliseconds. */
     val capturedMs: Long,
     val kmByMode: Map<TravelMode, Double>,
+    /** Distance over ground covered for the first time; repeat trips over the same streets don't add to it. */
+    val exploredKm: Double,
     val trips: Int,
     val areas: Long,
     val cities: List<CityEntry>,
@@ -41,6 +43,7 @@ class ProfileStats(
     val longestTrip: Trip?,
     val stamps: List<Stamp>,
 ) {
+    /** Everything travelled, including the same routes again and again. */
     val totalKm: Double get() = kmByMode.values.sum()
 
     /** Rough CO₂ from vehicle trips: ~170 g/km by car (driving or car share), ~50 g/km by bus or train. */
@@ -74,6 +77,7 @@ object ProfileRepository {
             dots = store.pointCount(from, to),
             capturedMs = store.capturedMillis(from, to),
             kmByMode = period.kmByMode,
+            exploredKm = store.exploredMeters(from, to) / 1000.0,
             trips = store.tripCount(from, to),
             areas = store.cellsVisited(from, to),
             cities = period.cities,

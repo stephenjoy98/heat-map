@@ -374,8 +374,29 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
                     }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            Surface(shape = RoundedCornerShape(20.dp), color = fg.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    JoyEmoji("🧭", 26)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "${compact(s.exploredKm)} km",
+                            color = fg,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text("KM EXPLORED", color = fg.copy(alpha = 0.75f), style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp))
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
-            Text("Tap a number to see the list", color = fg.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Km explored counts new ground only, so repeat trips don't add to it; km travelled above includes them. " +
+                    "Tap a number to see the list.",
+                color = fg.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall,
+            )
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                 Button(

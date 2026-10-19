@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-19
+
+### Added
+- Km explored on your profile, under Locations explored: the distance over ground you've covered for the
+  first time. Travelling the same streets again doesn't add to it, and GPS drift while standing still
+  can't inflate it. Km travelled still counts every trip.
+
 ## [2.11.0] - 2026-10-19
 
 ### Added

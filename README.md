@@ -83,7 +83,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Profile** is a "travel passport": name, joining date and friend ID; your **home base** (the city
   where you spend the most days); **dots captured** with kilometres, trips and areas; **time captured**
   as a total (e.g. 1 day 15 hours, each dot counting for its interval); your most visited city;
-  **locations explored** (countries, cities and continents, each tappable for the full list with flags);
+  **locations explored** (**km explored**, which counts only ground you're covering for the first time
+  on a ~60 m grid, unlike km travelled; and countries, cities and continents, each tappable for the full list with flags);
   and an estimated **carbon footprint**.
 - Emoji throughout the app use [JoyPixels](https://www.joypixels.com) artwork (free licence, attribution in
   Settings), loaded from the JoyPixels CDN and cached, with the system emoji as a fallback.
