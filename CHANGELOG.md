@@ -30,6 +30,7 @@ The app shows the entries since your last version as "What's new" after an updat
 - Tapping the map outside the GPS accuracy card closes it.
 
 ### Changed
+- The compass is always shown again.
 - Automatic recording is much finer: every second in a vehicle, 2 s cycling, 3 s walking, 5 s when
   unsure, 15 s when still and every minute after staying put. Standing still is judged over the last
   minute of fixes.
@@ -39,7 +40,6 @@ The app shows the entries since your last version as "What's new" after an updat
 ## [2.13.1] - 2026-10-19
 
 ### Changed
-- The compass only appears while the map is turned away from north.
 - Map type tiles in the layers sheet show real previews of the OpenStreetMap styles around you.
 - Light theme: white cards and buttons on a light grey page, with stronger secondary text, for better
   contrast.

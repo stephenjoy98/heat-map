@@ -204,18 +204,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 }
             }
             // Under the top row (and the chips, when they're out): the scale while the map moves, on the left,
-            // and the compass under the profile button, shown only while the map is turned away from north.
-            val turned = ((camera.bearing % 360f) + 360f) % 360f
+            // and the compass under the profile button.
             Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
                 ScaleBar(camera, Modifier.align(Alignment.CenterStart))
-                AnimatedVisibility(
-                    visible = minOf(turned, 360f - turned) > 1f,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    enter = scaleIn(spatialSpring()) + fadeIn(),
-                    exit = scaleOut() + fadeOut(),
-                ) {
-                    CompassButton(camera)
-                }
+                CompassButton(camera, Modifier.align(Alignment.CenterEnd))
             }
         }
 
