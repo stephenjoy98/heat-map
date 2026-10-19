@@ -21,10 +21,8 @@ class ProfileStats(
     val years: List<Int>,
     val joined: Long?,
     val dots: Long,
-    val hours: Int,
-    val days: Int,
-    val months: Int,
-    val yearsCaptured: Int,
+    /** Total time covered by the recording, in milliseconds. */
+    val capturedMs: Long,
     val kmByMode: Map<TravelMode, Double>,
     val trips: Int,
     val areas: Long,
@@ -62,8 +60,7 @@ object ProfileRepository {
         }
         val period = summarize(context, store, from, to)
         val allTime = if (year == null) period else summarize(context, store, 0L, Long.MAX_VALUE)
-        val coverage = store.coverage(from, to)
-        val allCoverage = if (year == null) coverage else store.coverage(0L, Long.MAX_VALUE)
+        val allCoverage = store.coverage(0L, Long.MAX_VALUE)
         val firstPoint = store.firstPointTime()
 
         return ProfileStats(
@@ -71,10 +68,7 @@ object ProfileRepository {
             years = store.yearsWithData(),
             joined = listOfNotNull(firstPoint, accountCreated).minOrNull(),
             dots = store.pointCount(from, to),
-            hours = coverage[0],
-            days = coverage[1],
-            months = coverage[2],
-            yearsCaptured = coverage[3],
+            capturedMs = store.capturedMillis(from, to),
             kmByMode = period.kmByMode,
             trips = store.tripCount(from, to),
             areas = store.cellsVisited(from, to),

@@ -88,14 +88,7 @@ private val capsLabel = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Semi
 
 /** Your travel passport: who you are, how much you've captured and where it's taken you. */
 @Composable
-fun ProfileScreen(
-    resumeTick: Int,
-    onBack: () -> Unit,
-    onFriends: () -> Unit,
-    onBackup: () -> Unit,
-    onSettings: () -> Unit,
-    onExplore: () -> Unit,
-) {
+fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
@@ -108,10 +101,11 @@ fun ProfileScreen(
         value = withContext(Dispatchers.IO) { ProfileRepository.load(context, year, created) }
     }
 
+    // A Surface sets the content colour, so every text gets proper contrast with the background.
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
@@ -147,16 +141,12 @@ fun ProfileScreen(
             YearChips(s.years, year) { year = it }
             HeroCard(s)
             TimeCapturedCard(s)
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MostVisitedTile(s, Modifier.weight(1.15f).fillMaxHeight())
-                LongestTripTile(s, Modifier.weight(1f).fillMaxHeight())
-            }
+            MostVisitedTile(s, Modifier)
             PlacesCard(s, onExplore)
             CarbonCard(s)
-            StampsSection(s.stamps)
+            // Stamps are hidden for now; more will be added to this section later.
         }
-
-        AccountCard(onFriends, onBackup, onSettings)
+    }
     }
 }
 
@@ -263,24 +253,46 @@ private fun StatRow(items: List<Pair<String, String>>) {
     }
 }
 
+/** Splits a duration into years (365 days), months (30 days), days, hours and minutes. */
+private fun breakdown(ms: Long): LongArray {
+    var minutes = ms / 60_000
+    val years = minutes / (365L * 24 * 60); minutes -= years * 365L * 24 * 60
+    val months = minutes / (30L * 24 * 60); minutes -= months * 30L * 24 * 60
+    val days = minutes / (24 * 60); minutes -= days * 24 * 60
+    val hours = minutes / 60; minutes -= hours * 60
+    return longArrayOf(years, months, days, hours, minutes)
+}
+
+/** "1 day 15 hours": the two largest non-zero units. */
+private fun formatCaptured(ms: Long): String {
+    val parts = breakdown(ms)
+    val names = listOf("year" to "years", "month" to "months", "day" to "days", "hour" to "hours", "minute" to "minutes")
+    val shown = parts.indices.filter { parts[it] > 0 }.take(2)
+    if (shown.isEmpty()) return "0 minutes"
+    return shown.joinToString(" ") { i -> "${parts[i]} ${if (parts[i] == 1L) names[i].first else names[i].second}" }
+}
+
 @Composable
 private fun TimeCapturedCard(s: ProfileStats) {
+    val parts = breakdown(s.capturedMs)
     Card {
         Column(Modifier.padding(24.dp)) {
             Text("TIME CAPTURED", style = capsLabel)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(formatCaptured(s.capturedMs), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                listOf(s.hours to "HOURS", s.days to "DAYS", s.months to "MONTHS", s.yearsCaptured to "YEARS").forEachIndexed { i, (v, label) ->
+                listOf(parts[0] to "YEARS", parts[1] to "MONTHS", parts[2] to "DAYS", parts[3] to "HOURS").forEachIndexed { i, (v, label) ->
                     if (i > 0) VerticalDivider(Modifier.padding(horizontal = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(compact(v.toDouble()), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(v.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(label, style = capsLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "Hours, days, months and years with at least one dot.",
+                "The time your recording covers: each dot counts for its interval, so pauses aren't included.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -294,7 +306,6 @@ private fun MostVisitedTile(s: ProfileStats, modifier: Modifier) {
         Column(Modifier.padding(20.dp)) {
             Text("MOST VISITED", style = capsLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(s.topCity ?: "—", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2)
-            Spacer(Modifier.weight(1f))
             Spacer(Modifier.height(12.dp))
             if (s.topCityDays > 0) {
                 Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.onSurface) {
@@ -311,28 +322,6 @@ private fun MostVisitedTile(s: ProfileStats, modifier: Modifier) {
 }
 
 @Composable
-private fun LongestTripTile(s: ProfileStats, modifier: Modifier) {
-    val trip = s.longestTrip
-    Card(modifier, color = MaterialTheme.colorScheme.primaryContainer) {
-        Column(Modifier.padding(20.dp)) {
-            Text("LONGEST TRIP", style = capsLabel, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(
-                trip?.let { Insights.km(it.distanceM / 1000) } ?: "—",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                trip?.let { "${it.mode.label} · ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it.startTime))}" } ?: "No trips yet",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
 private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
     val bg = MaterialTheme.colorScheme.inverseSurface
     val fg = MaterialTheme.colorScheme.inverseOnSurface
@@ -340,15 +329,15 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
         Column(Modifier.padding(20.dp)) {
             Surface(shape = RoundedCornerShape(50), color = fg) {
                 Text(
-                    "${s.countries.size} ${if (s.countries.size == 1) "country" else "countries"}",
+                    "LOCATIONS EXPLORED",
                     color = bg,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = capsLabel,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth()) {
-                listOf(s.cities to "CITIES", s.states to "STATES", s.countries.size to "COUNTRIES", s.continents.size to "CONTINENTS").forEach { (v, label) ->
+                listOf(s.countries.size to "COUNTRIES", s.cities to "CITIES", s.continents.size to "CONTINENTS").forEach { (v, label) ->
                     Column(Modifier.weight(1f)) {
                         Text(v.toString(), color = fg, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(label, color = fg.copy(alpha = 0.7f), style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp), maxLines = 1)
@@ -457,40 +446,6 @@ private fun StampsSection(stamps: List<Stamp>) {
                         LinearProgressIndicator(progress = { stamp.progress }, modifier = Modifier.fillMaxWidth())
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountCard(onFriends: () -> Unit, onBackup: () -> Unit, onSettings: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val user by Account.user.collectAsStateWithLifecycle()
-    val configured = remember { FirebaseGate.isConfigured(context) }
-    var signingIn by remember { mutableStateOf(false) }
-    Text("ACCOUNT", style = capsLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
-    Card {
-        Column(Modifier.padding(vertical = 8.dp)) {
-            if (user == null && configured) {
-                Button(
-                    enabled = !signingIn,
-                    onClick = {
-                        val activity = context.findActivity() ?: return@Button
-                        signingIn = true
-                        scope.launch {
-                            runCatching { Account.signIn(activity) }.onSuccess { SyncWorker.runNow(context) }
-                            signingIn = false
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                ) { Text(if (signingIn) "Signing in…" else "Sign in with Google") }
-            }
-            MenuRow(Icons.Filled.Share, "Friends", "Add friends and compare routes and explored areas", onFriends)
-            MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history", onBackup)
-            MenuRow(Icons.Filled.Settings, "Settings", null, onSettings)
-            if (user != null) {
-                MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign out", null) { scope.launch { Account.signOut(context) } }
             }
         }
     }

@@ -113,5 +113,8 @@ dependencies {
 
     // Friend QR codes
     implementation("com.google.zxing:core:3.5.3")
+
+    // Profile pictures
+    implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }

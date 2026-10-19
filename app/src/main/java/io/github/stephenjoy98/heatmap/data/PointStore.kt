@@ -627,6 +627,28 @@ class PointStore private constructor(context: Context) :
             null,
         ).use { c -> if (c.moveToFirst()) intArrayOf(c.getInt(0), c.getInt(1), c.getInt(2), c.getInt(3)) else IntArray(4) }
 
+    /**
+     * Total time the recording covers in the range: each point stands for its interval, capped at the gap
+     * to the next point (so pauses and missed ticks don't count).
+     */
+    fun capturedMillis(from: Long, to: Long): Long {
+        var total = 0L
+        readableDatabase.rawQuery(
+            "SELECT time, interval_ms FROM points WHERE time >= $from AND time < $to ORDER BY time", null
+        ).use { c ->
+            var prevTime = -1L
+            var prevInterval = 0L
+            while (c.moveToNext()) {
+                val t = c.getLong(0)
+                if (prevTime >= 0) total += minOf(t - prevTime, prevInterval)
+                prevTime = t
+                prevInterval = c.getLong(1)
+            }
+            if (prevTime >= 0) total += prevInterval
+        }
+        return total
+    }
+
     /** Years (local time) that have recorded points, newest first. */
     fun yearsWithData(): List<Int> =
         readableDatabase.rawQuery(
