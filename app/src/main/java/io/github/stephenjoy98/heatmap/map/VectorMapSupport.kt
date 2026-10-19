@@ -100,7 +100,7 @@ object VectorMaps {
     fun addTerrain(style: Style, dark: Boolean) {
         if (style.getSource(TERRAIN_SOURCE) != null) return
         val tiles = TileSet("2.2.0", "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png").apply {
-            setEncoding("terrarium")
+            encoding = "terrarium"
             setMaxZoom(15f)
         }
         style.addSource(RasterDemSource(TERRAIN_SOURCE, tiles, 256))
