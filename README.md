@@ -189,6 +189,27 @@ The renderer strokes each route at 12% alpha onto an offscreen 512 px tile. Over
 `1 - (1 - a)^n`, so the alpha channel measures how often you've been somewhere, saturating after about
 20 trips. That value is then looked up in the theme's colour ramp.
 
+## Versioning and changelog
+
+Versions follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
+
+- **MAJOR**: changes that break existing data, backups or sharing with older versions of the app.
+- **MINOR**: new features that keep working with existing data.
+- **PATCH**: bug fixes only.
+
+The version is set in one place, `appVersion` in [`gradle.properties`](gradle.properties). The build
+derives Android's `versionCode` from it (`2.11.3` → `21103`, so it always goes up) and uses it as the
+`versionName`. [`CHANGELOG.md`](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/)
+and is bundled into the app. After an update, the app shows **What's new** with every release since the
+version the user last saw, and the full changelog is under **About → Changelog**.
+
+To release:
+
+1. Note changes under `## [Unreleased]` in `CHANGELOG.md` as you go, written for users.
+2. Pick the next version by the rules above, and rename that heading to `## [x.y.z] - YYYY-MM-DD`.
+3. Set `appVersion=x.y.z` in `gradle.properties`. The build fails if the changelog has no entry for it.
+4. Optionally tag the commit `vx.y.z`.
+
 ## Licence
 
 Location Ticker is open source under the [MIT License](LICENSE). It uses third-party libraries, map

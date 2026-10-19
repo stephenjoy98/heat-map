@@ -2,6 +2,7 @@ package io.github.stephenjoy98.heatmap.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.stephenjoy98.heatmap.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -169,6 +170,15 @@ object Prefs {
     fun setOnboarded() {
         _onboarded.value = true
         sp.edit().putBoolean("onboarded", true).apply()
+        // A fresh install has nothing new to show yet.
+        if (lastSeenVersion == null) setLastSeenVersion(BuildConfig.VERSION_NAME)
+    }
+
+    /** The app version whose "What's new" the user last saw; null on a fresh install or when updating from before 2.11.0. */
+    val lastSeenVersion: String? get() = sp.getString("last_seen_version", null)
+
+    fun setLastSeenVersion(version: String) {
+        sp.edit().putString("last_seen_version", version).apply()
     }
 
     fun setShareRoutes(on: Boolean) {

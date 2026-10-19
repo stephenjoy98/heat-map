@@ -38,9 +38,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.stephenjoy98.heatmap.BuildConfig
 import io.github.stephenjoy98.heatmap.cloud.Account
 import io.github.stephenjoy98.heatmap.cloud.Friend
 import io.github.stephenjoy98.heatmap.cloud.SyncWorker
+import io.github.stephenjoy98.heatmap.data.Changelog
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
@@ -112,6 +114,11 @@ private fun AppScaffold(
     var menuOpen by remember { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var aboutOpen by rememberSaveable { mutableStateOf(false) }
+    var changelogOpen by rememberSaveable { mutableStateOf(false) }
+    // After an update, the changes since the version the user last saw.
+    var whatsNew by remember {
+        mutableStateOf(Changelog.whatsNew(Changelog.load(context), Prefs.lastSeenVersion, BuildConfig.VERSION_NAME))
+    }
     val friendsRequested by openFriends.collectAsStateWithLifecycle()
     var resumeTick by remember { mutableIntStateOf(0) }
     val pendingInvite by invite.collectAsStateWithLifecycle()
@@ -152,6 +159,20 @@ private fun AppScaffold(
         if (user != null) SyncWorker.runNow(context)
     }
 
+    LaunchedEffect(Unit) {
+        if (whatsNew.isEmpty()) Prefs.setLastSeenVersion(BuildConfig.VERSION_NAME)
+    }
+    if (whatsNew.isNotEmpty()) {
+        WhatsNewDialog(
+            releases = whatsNew,
+            onDismiss = {
+                Prefs.setLastSeenVersion(BuildConfig.VERSION_NAME)
+                whatsNew = emptyList()
+            },
+            onFullChangelog = { changelogOpen = true },
+        )
+    }
+
     val openProfile = { menuOpen = true }
     if (menuOpen) {
         AccountMenu(
@@ -169,8 +190,13 @@ private fun AppScaffold(
         return
     }
 
+    if (changelogOpen) {
+        ChangelogScreen(onBack = { changelogOpen = false })
+        return
+    }
+
     if (aboutOpen) {
-        AboutScreen(onBack = { aboutOpen = false })
+        AboutScreen(onBack = { aboutOpen = false }, onChangelog = { changelogOpen = true })
         return
     }
 

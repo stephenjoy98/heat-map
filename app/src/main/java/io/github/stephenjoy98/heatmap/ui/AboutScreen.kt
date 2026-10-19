@@ -86,7 +86,7 @@ private val dataSources = listOf(
 /** Who made the app, its open-source licence, and the licences of everything it builds on. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
     BackHandler(onBack = onBack)
     val uri = LocalUriHandler.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -126,6 +126,8 @@ fun AboutScreen(onBack: () -> Unit) {
 
             Card {
                 Column {
+                    LinkRow("Changelog", "What's new in each version") { onChangelog() }
+                    HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     LinkRow("GitHub", "@$GITHUB_USER") { uri.openUri(GITHUB_PROFILE) }
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     LinkRow("Source code", REPO_URL.removePrefix("https://")) { uri.openUri(REPO_URL) }

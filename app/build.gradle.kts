@@ -19,6 +19,31 @@ val localProps = Properties().apply {
 val mapsApiKey: String = System.getenv("MAPS_API_KEY")?.takeIf { it.isNotBlank() }
     ?: localProps.getProperty("MAPS_API_KEY", "")
 
+// Semantic Versioning (https://semver.org). The version lives in gradle.properties; versionCode is derived
+// from it (2.11.3 -> 21103) so it always increases with the version, as Android requires for updates.
+val appVersion: String = providers.gradleProperty("appVersion").get()
+val semver = Regex("""(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""").matchEntire(appVersion)
+    ?: error("appVersion '$appVersion' must be MAJOR.MINOR.PATCH, see https://semver.org")
+val (verMajor, verMinor, verPatch) = semver.destructured.toList().map { it.toInt() }
+require(verMinor < 100 && verPatch < 100) { "appVersion minor and patch must stay below 100 to fit versionCode" }
+
+// Bundles CHANGELOG.md into the app (shown as "What's new" after an update), refusing to build if it has
+// no entry for the current version.
+val changelogDir = layout.buildDirectory.dir("generated/changelog")
+val bundleChangelog by tasks.registering(Copy::class) {
+    val changelog = rootProject.file("CHANGELOG.md")
+    val version = appVersion
+    inputs.property("appVersion", version)
+    from(changelog)
+    into(changelogDir)
+    doFirst {
+        check(changelog.readText().contains("## [$version]")) {
+            "CHANGELOG.md has no \"## [$version]\" entry. Add one before building version $version."
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(bundleChangelog) }
+
 android {
     namespace = "io.github.stephenjoy98.heatmap"
     compileSdk = 36
@@ -27,8 +52,8 @@ android {
         applicationId = "io.github.stephenjoy98.heatmap"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = verMajor * 10_000 + verMinor * 100 + verPatch
+        versionName = appVersion
 
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("boolean", "HAS_MAPS_KEY", (mapsApiKey.isNotEmpty()).toString())
@@ -54,6 +79,10 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("dev")
         }
+    }
+
+    sourceSets {
+        getByName("main") { assets.srcDir(changelogDir.get().asFile) }
     }
 
     compileOptions {

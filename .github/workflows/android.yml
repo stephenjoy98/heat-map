@@ -34,9 +34,13 @@ jobs:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: ./gradlew --no-daemon assembleDebug assembleRelease
 
+      - name: Read app version
+        id: version
+        run: echo "name=$(grep '^appVersion=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: location-ticker-apk
+          name: location-ticker-${{ steps.version.outputs.name }}-apk
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
