@@ -32,7 +32,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
   up. On the dark map roads used once are dark red and your most travelled ones burn orange, yellow and
   white. The light map uses light orange through deep crimson.
-- **Travel-mode filter**: chips for Walking, Cycling, Driving, Car share, Transit and Other.
+- **Travel-mode filter**: the filter button (top left) slides out chips for All, Walking, Cycling,
+  Driving, Car share, Transit and Other; a dot on the button shows when the map is filtered.
 - Routes or raw-points view, and very large histories automatically fall back to a density grid.
 - **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type
   (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) on

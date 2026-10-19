@@ -7,10 +7,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +48,11 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -100,6 +107,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
     val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
     var layersOpen by remember { mutableStateOf(false) }
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var accuracyOpen by rememberSaveable { mutableStateOf(false) }
     // Live GPS pauses while a page covers the map.
     val covered = LocalCovered.current
@@ -145,6 +153,12 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                FilterButton(
+                    open = filtersOpen,
+                    active = filter.size != TravelMode.entries.size,
+                    onClick = { filtersOpen = !filtersOpen },
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
                 StatsBar(stats, Modifier.align(Alignment.Center))
                 Surface(
                     shape = CircleShape,
@@ -155,8 +169,19 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     ProfileButton(onClick = onOpenProfile, modifier = Modifier.size(48.dp))
                 }
             }
-            Spacer(Modifier.size(8.dp))
-            ModeFilterRow(filter)
+            // The travel-mode chips slide out from the filter button, and tuck back into it.
+            AnimatedVisibility(
+                visible = filtersOpen,
+                enter = expandVertically(spatialSpring(), expandFrom = Alignment.Top) +
+                    scaleIn(spatialSpring(), initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 0f)) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) +
+                    scaleOut(targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 0f)) + fadeOut(),
+            ) {
+                Column {
+                    Spacer(Modifier.size(8.dp))
+                    ModeFilterRow(filter)
+                }
+            }
         }
 
         MapControls(
@@ -212,6 +237,34 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     }
                 },
             )
+        }
+    }
+}
+
+/** Material's "filter_list" icon; the core icon set doesn't include it. */
+private val FilterIcon: ImageVector by lazy {
+    ImageVector.Builder("Filter", 24.dp, 24.dp, 24f, 24f).apply {
+        addPath(
+            pathData = addPathNodes("M10,18h4v-2h-4v2zM3,6v2h18L21,6L3,6zM6,13h12v-2L6,11v2z"),
+            fill = SolidColor(Color.Black),
+        )
+    }.build()
+}
+
+/** Shows or hides the travel-mode chips. A dot marks that the map is filtered, even with the chips hidden. */
+@Composable
+private fun FilterButton(open: Boolean, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = if (open) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+        shadowElevation = 3.dp,
+        modifier = modifier.size(48.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            BadgedBox(badge = { if (active) Badge(containerColor = MaterialTheme.colorScheme.primary) }) {
+                Icon(FilterIcon, contentDescription = if (open) "Hide travel mode filters" else "Filter by travel mode")
+            }
         }
     }
 }

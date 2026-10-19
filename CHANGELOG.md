@@ -22,6 +22,8 @@ The app shows the entries since your last version as "What's new" after an updat
   the app.
 - The account menu, place lists and the GPS accuracy card grow out of the button you tapped.
 - A badge on the account button when trips or roads are waiting for your answer.
+- Filter button at the top left of the map: travel-mode chips slide out when you need them, and a dot
+  shows when the map is filtered.
 
 ### Changed
 - Edit dots has moved to the Timeline tab.
