@@ -72,6 +72,12 @@ import io.github.stephenjoy98.heatmap.profile.ProfileStats
 import io.github.stephenjoy98.heatmap.profile.Stamp
 import io.github.stephenjoy98.heatmap.profile.StampIcon
 import io.github.stephenjoy98.heatmap.review.Insights
+import io.github.stephenjoy98.heatmap.review.Places
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -321,10 +327,20 @@ private fun MostVisitedTile(s: ProfileStats, modifier: Modifier) {
     }
 }
 
+private enum class PlaceKind(val title: String) { COUNTRIES("Countries"), CITIES("Cities"), CONTINENTS("Continents") }
+
+private fun continentEmoji(continent: String) = when (continent) {
+    "North America", "South America" -> "🌎"
+    "Asia", "Oceania" -> "🌏"
+    "Antarctica" -> "🐧"
+    else -> "🌍"
+}
+
 @Composable
 private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
     val bg = MaterialTheme.colorScheme.inverseSurface
     val fg = MaterialTheme.colorScheme.inverseOnSurface
+    var showing by remember { mutableStateOf<PlaceKind?>(null) }
     Card(color = bg) {
         Column(Modifier.padding(20.dp)) {
             Surface(shape = RoundedCornerShape(50), color = fg) {
@@ -335,24 +351,32 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth()) {
-                listOf(s.countries.size to "COUNTRIES", s.cities to "CITIES", s.continents.size to "CONTINENTS").forEach { (v, label) ->
-                    Column(Modifier.weight(1f)) {
-                        Text(v.toString(), color = fg, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text(label, color = fg.copy(alpha = 0.7f), style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp), maxLines = 1)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    Triple(PlaceKind.COUNTRIES, s.countries.size, s.countries.firstOrNull()?.let { JoyPixels.flag(it.code) } ?: "🏳️"),
+                    Triple(PlaceKind.CITIES, s.cities.size, "🏙️"),
+                    Triple(PlaceKind.CONTINENTS, s.continents.size, s.continents.firstOrNull()?.let(::continentEmoji) ?: "🌍"),
+                ).forEach { (kind, count, emoji) ->
+                    Surface(
+                        onClick = { showing = kind },
+                        enabled = count > 0,
+                        shape = RoundedCornerShape(20.dp),
+                        color = fg.copy(alpha = 0.08f),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            JoyEmoji(emoji, 26)
+                            Spacer(Modifier.height(6.dp))
+                            Text(count.toString(), color = fg, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                            Text(kind.title.uppercase(), color = fg.copy(alpha = 0.75f), style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp), maxLines = 1)
+                        }
                     }
                 }
             }
-            if (s.countries.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    (s.continents.joinToString(" · ") + "\n" + s.countries.take(12).joinToString(", ")).trim(),
-                    color = fg.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(10.dp))
+            Text("Tap a number to see the list", color = fg.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                 Button(
                     onClick = onExplore,
@@ -364,6 +388,48 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
             }
         }
     }
+
+    showing?.let { kind -> PlacesDialog(kind, s) { showing = null } }
+}
+
+/** A popup listing every country, city or continent visited in the selected period. */
+@Composable
+private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, onDismiss: () -> Unit) {
+    val rows: List<Triple<String, String, String?>> = when (kind) {
+        PlaceKind.COUNTRIES -> s.countries.map { Triple(JoyPixels.flag(it.code), it.name, Places.continentOf(it.code)) }
+        PlaceKind.CITIES -> s.cities.map { c ->
+            Triple(
+                c.countryCode?.let(JoyPixels::flag) ?: "🏙️",
+                c.name,
+                listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}").joinToString(" · "),
+            )
+        }
+        PlaceKind.CONTINENTS -> s.continents.map { continent ->
+            val n = s.countries.count { Places.continentOf(it.code) == continent }
+            Triple(continentEmoji(continent), continent, "$n ${if (n == 1) "country" else "countries"}")
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${kind.title} · ${rows.size}") },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(rows) { (emoji, name, detail) ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        JoyEmoji(emoji, 28)
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text(name, style = MaterialTheme.typography.bodyLarge)
+                            detail?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
 }
 
 @Composable
@@ -436,7 +502,7 @@ private fun StampsSection(stamps: List<Stamp>) {
                         Box(
                             Modifier.size(48.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
                             contentAlignment = Alignment.Center,
-                        ) { Text(stamp.icon.emoji(), fontSize = 22.sp) }
+                        ) { JoyEmoji(stamp.icon.emoji(), 26) }
                         Spacer(Modifier.height(14.dp))
                         Text(stamp.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(stamp.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)

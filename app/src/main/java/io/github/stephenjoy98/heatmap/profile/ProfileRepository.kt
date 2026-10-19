@@ -16,6 +16,10 @@ class Stamp(val name: String, val description: String, val icon: StampIcon, val 
 
 enum class StampIcon { DOTS, DISTANCE, WALK, CYCLE, CITY, GLOBE, CONTINENT, AREA, CALENDAR }
 
+class CityEntry(val name: String, val country: String?, val countryCode: String?, val days: Int)
+
+class CountryEntry(val code: String, val name: String)
+
 class ProfileStats(
     val year: Int?,
     val years: List<Int>,
@@ -26,9 +30,9 @@ class ProfileStats(
     val kmByMode: Map<TravelMode, Double>,
     val trips: Int,
     val areas: Long,
-    val cities: Int,
+    val cities: List<CityEntry>,
     val states: Int,
-    val countries: List<String>,
+    val countries: List<CountryEntry>,
     val continents: List<String>,
     val homeCity: String?,
     val homeCountry: String?,
@@ -72,7 +76,7 @@ object ProfileRepository {
             kmByMode = period.kmByMode,
             trips = store.tripCount(from, to),
             areas = store.cellsVisited(from, to),
-            cities = period.cities.size,
+            cities = period.cities,
             states = period.states.size,
             countries = period.countries,
             continents = period.continents,
@@ -87,9 +91,9 @@ object ProfileRepository {
 
     private class Summary(
         val kmByMode: Map<TravelMode, Double>,
-        val cities: Set<String>,
+        val cities: List<CityEntry>,
         val states: Set<String>,
-        val countries: List<String>,
+        val countries: List<CountryEntry>,
         val continents: List<String>,
         val topCity: String?,
         val topCountry: String?,
@@ -100,6 +104,7 @@ object ProfileRepository {
         val places = Places.resolve(context, store, store.coarseAreas(from, to, 500))
         val cityDays = HashMap<String, Int>()
         val cityCountry = HashMap<String, String?>()
+        val cityCode = HashMap<String, String?>()
         val states = HashSet<String>()
         val countries = LinkedHashMap<String, String>() // code -> name
         for ((area, place) in places) {
@@ -107,6 +112,7 @@ object ProfileRepository {
                 // Days in a city: the most days seen in any one of its areas (areas overlap the same days).
                 cityDays[it] = maxOf(cityDays[it] ?: 0, area.days)
                 cityCountry[it] = place.country
+                cityCode[it] = place.countryCode
             }
             if (place.state != null) states += "${place.countryCode}/${place.state}"
             val code = place.countryCode
@@ -115,9 +121,10 @@ object ProfileRepository {
         val top = cityDays.maxByOrNull { it.value }
         return Summary(
             kmByMode = store.distanceByMode(from, to).mapValues { it.value / 1000.0 },
-            cities = cityDays.keys,
+            cities = cityDays.entries.sortedByDescending { it.value }
+                .map { CityEntry(it.key, cityCountry[it.key], cityCode[it.key], it.value) },
             states = states,
-            countries = countries.values.toList(),
+            countries = countries.entries.map { CountryEntry(it.key, it.value) }.sortedBy { it.name },
             continents = countries.keys.mapNotNull(Places::continentOf).distinct(),
             topCity = top?.key,
             topCountry = top?.key?.let { cityCountry[it] },

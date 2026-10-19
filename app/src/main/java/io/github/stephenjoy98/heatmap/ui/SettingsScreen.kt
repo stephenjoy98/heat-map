@@ -365,7 +365,7 @@ fun SettingsScreen(
             }
 
             Text(
-                "Location Ticker ${BuildConfig.VERSION_NAME}",
+                "Location Ticker ${BuildConfig.VERSION_NAME}\nEmoji artwork provided by JoyPixels",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
