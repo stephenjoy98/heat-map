@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.MapTheme
 import io.github.stephenjoy98.heatmap.data.MapProvider
+import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.BuildConfig
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -93,6 +94,8 @@ fun SettingsSheet(
     val mapTheme by Prefs.mapTheme.collectAsStateWithLifecycle()
     val mapProvider by Prefs.mapProvider.collectAsStateWithLifecycle()
     val dynamicColor by Prefs.dynamicColor.collectAsStateWithLifecycle()
+    val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
+    val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
     val aiEngine by Prefs.aiEngine.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     var showAiChoice by remember { mutableStateOf(false) }
@@ -212,6 +215,24 @@ fun SettingsSheet(
                 ) {
                     Switch(checked = dynamicColor, onCheckedChange = Prefs::setDynamicColor)
                 }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            SettingRow(
+                title = "Smooth routes",
+                subtitle = "Draw curves instead of straight hops between recorded points",
+            ) {
+                Switch(checked = smoothRoutes, onCheckedChange = Prefs::setSmoothRoutes)
+            }
+            SettingRow(
+                title = "Snap routes to roads",
+                subtitle = "Matches finished trips to OpenStreetMap roads and asks when unsure. " +
+                    "Trip coordinates (never times) are sent to the free Valhalla service run by FOSSGIS.",
+            ) {
+                Switch(checked = snapToRoads, onCheckedChange = {
+                    Prefs.setSnapToRoads(it)
+                    if (it) RoadSnapWorker.runNow(context)
+                })
             }
 
             Divider()

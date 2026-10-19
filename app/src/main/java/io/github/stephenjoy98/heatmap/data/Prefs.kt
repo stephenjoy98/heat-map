@@ -66,6 +66,14 @@ object Prefs {
     private val _dynamicColor = MutableStateFlow(true)
     val dynamicColor: StateFlow<Boolean> = _dynamicColor
 
+    /** Draw unsnapped routes as smooth curves rather than straight hops between fixes. */
+    private val _smoothRoutes = MutableStateFlow(true)
+    val smoothRoutes: StateFlow<Boolean> = _smoothRoutes
+
+    /** Match finished trips to OpenStreetMap roads (sends trip coordinates, without times, to Valhalla). */
+    private val _snapToRoads = MutableStateFlow(true)
+    val snapToRoads: StateFlow<Boolean> = _snapToRoads
+
     private val _lastBackup = MutableStateFlow(0L)
     val lastBackup: StateFlow<Long> = _lastBackup
 
@@ -87,6 +95,8 @@ object Prefs {
         _lastBackup.value = sp.getLong("last_backup", 0L)
         _mapProvider.value = MapProvider.entries.byName(sp.getString("map_provider", null)) ?: MapProvider.AUTO
         _dynamicColor.value = sp.getBoolean("dynamic_color", true)
+        _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
+        _snapToRoads.value = sp.getBoolean("snap_roads", true)
     }
 
     fun setIntervalSec(seconds: Int) {
@@ -154,6 +164,16 @@ object Prefs {
     fun setDynamicColor(on: Boolean) {
         _dynamicColor.value = on
         sp.edit().putBoolean("dynamic_color", on).apply()
+    }
+
+    fun setSmoothRoutes(on: Boolean) {
+        _smoothRoutes.value = on
+        sp.edit().putBoolean("smooth_routes", on).apply()
+    }
+
+    fun setSnapToRoads(on: Boolean) {
+        _snapToRoads.value = on
+        sp.edit().putBoolean("snap_roads", on).apply()
     }
 
     fun setLastBackup(time: Long) {

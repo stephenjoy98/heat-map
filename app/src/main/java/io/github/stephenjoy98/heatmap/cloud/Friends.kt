@@ -114,7 +114,7 @@ object Friends {
                 if (trips.isEmpty()) break
                 val batch = db.batch()
                 val ids = trips.map { trip ->
-                    val path = store.tripPath(trip.id)
+                    val path = store.tripDisplayPath(trip.id)
                     val n = path.size / 2
                     // Cap very long trips at ~1500 points to keep documents small.
                     val step = maxOf(1, n / 1500)

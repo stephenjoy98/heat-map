@@ -92,7 +92,9 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     var showSettings by remember { mutableStateOf(false) }
     var centered by rememberSaveable { mutableStateOf(false) }
     val camera = rememberMapCamera()
-    val layers = remember(filter, mode, dark) {
+    val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
+    val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
+    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
         listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
     }
     LaunchedEffect(stats) {

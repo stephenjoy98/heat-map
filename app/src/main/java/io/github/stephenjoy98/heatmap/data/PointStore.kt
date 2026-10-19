@@ -81,8 +81,39 @@ class Place(val city: String?, val country: String?)
 
 class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
+class TripPathRow(val status: Int, val basePoly: String?, val poly: String?)
+
+/** One way a stretch of a trip could have gone: a road (named if known) or the recording itself. */
+class RoadOption(val label: String, val poly: String, val recorded: Boolean = false) {
+    companion object {
+        fun encodeList(options: List<RoadOption>): String = org.json.JSONArray().apply {
+            options.forEach { put(org.json.JSONObject().put("label", it.label).put("poly", it.poly).put("recorded", it.recorded)) }
+        }.toString()
+
+        fun decodeList(json: String): List<RoadOption> = runCatching {
+            val arr = org.json.JSONArray(json)
+            List(arr.length()) { i ->
+                val o = arr.getJSONObject(i)
+                RoadOption(o.getString("label"), o.getString("poly"), o.optBoolean("recorded"))
+            }
+        }.getOrDefault(emptyList())
+    }
+}
+
+class NewRoadQuestion(val baseFrom: Int, val baseTo: Int, val options: List<RoadOption>)
+
+/** A doubtful stretch between points [baseFrom]..[baseTo] of the trip's matched shape. [chosen] is -1 until answered. */
+class RoadQuestion(
+    val id: Long,
+    val tripId: Long,
+    val baseFrom: Int,
+    val baseTo: Int,
+    val options: List<RoadOption>,
+    val chosen: Int,
+)
+
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 2) {
+    SQLiteOpenHelper(context, "points.db", null, 3) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -153,6 +184,30 @@ class PointStore private constructor(context: Context) :
                 )"""
             )
         }
+        if (oldVersion < 3) {
+            // Road-snapped shape of each trip: the matched base shape, and the final shape after the user's answers.
+            db.execSQL(
+                """CREATE TABLE trip_paths (
+                    trip_id INTEGER PRIMARY KEY,
+                    status INTEGER NOT NULL,
+                    base_poly TEXT,
+                    poly TEXT,
+                    min_lat REAL, max_lat REAL, min_lon REAL, max_lon REAL
+                )"""
+            )
+            // "Which road did you take?" questions for stretches where the trace strays from the matched road.
+            db.execSQL(
+                """CREATE TABLE road_questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trip_id INTEGER NOT NULL,
+                    base_from INTEGER NOT NULL,
+                    base_to INTEGER NOT NULL,
+                    options TEXT NOT NULL,
+                    chosen INTEGER NOT NULL DEFAULT -1
+                )"""
+            )
+            db.execSQL("CREATE INDEX road_questions_trip ON road_questions(trip_id)")
+        }
     }
 
     private fun changed() = _changes.update { it + 1 }
@@ -198,6 +253,8 @@ class PointStore private constructor(context: Context) :
         val db = writableDatabase
         db.delete("points", null, null)
         db.delete("trips", null, null)
+        db.delete("trip_paths", null, null)
+        db.delete("road_questions", null, null)
         changed()
     }
 
@@ -215,9 +272,13 @@ class PointStore private constructor(context: Context) :
     fun countIn(box: GeoBox, modes: Set<TravelMode>): Int =
         long("SELECT COUNT(*) FROM points WHERE ${where(box)}${modeClause(modes)}").toInt()
 
-    fun tracksIn(box: GeoBox, modes: Set<TravelMode>): TrackData =
+    /** Points in time order; with [skipSnapped], leaves out trips that have a road-snapped shape. */
+    fun tracksIn(box: GeoBox, modes: Set<TravelMode>, skipSnapped: Boolean = false): TrackData =
         readableDatabase.rawQuery(
-            "SELECT time, lat, lon, interval_ms FROM points WHERE ${where(box)}${modeClause(modes)} ORDER BY time", null
+            "SELECT time, lat, lon, interval_ms FROM points WHERE ${where(box)}${modeClause(modes)}" +
+                (if (skipSnapped) " AND trip_id NOT IN (SELECT trip_id FROM trip_paths WHERE poly IS NOT NULL)" else "") +
+                " ORDER BY time",
+            null,
         ).use { c ->
             val n = c.count
             val time = LongArray(n)
@@ -342,6 +403,9 @@ class PointStore private constructor(context: Context) :
         try {
             db.execSQL("UPDATE trips SET mode = ${mode.id}, needs_review = 0, uploaded = 0 WHERE id = $tripId")
             db.execSQL("UPDATE points SET mode = ${mode.id} WHERE trip_id = $tripId")
+            // Re-match to roads with the right kind of network (footpaths, cycle routes, roads or bus routes).
+            db.execSQL("DELETE FROM trip_paths WHERE trip_id = $tripId")
+            db.execSQL("DELETE FROM road_questions WHERE trip_id = $tripId")
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -449,6 +513,95 @@ class PointStore private constructor(context: Context) :
 
     fun tripCount(from: Long, to: Long): Int =
         long("SELECT COUNT(*) FROM trips WHERE start_time >= $from AND start_time < $to").toInt()
+
+    // ---- Road snapping ----
+
+    /** Trips that haven't been matched to roads yet, oldest first. */
+    fun tripsWithoutPath(limit: Int = 20): List<Trip> =
+        trips("WHERE id NOT IN (SELECT trip_id FROM trip_paths) ORDER BY start_time LIMIT $limit")
+
+    fun trip(id: Long): Trip? = trips("WHERE id = $id").firstOrNull()
+
+    fun tripPathRow(tripId: Long): TripPathRow? =
+        readableDatabase.rawQuery("SELECT status, base_poly, poly FROM trip_paths WHERE trip_id = $tripId", null).use { c ->
+            if (c.moveToFirst()) TripPathRow(c.getInt(0), c.getStringOrNull(1), c.getStringOrNull(2)) else null
+        }
+
+    /**
+     * Saves a trip's road-snapped shape. [poly] is what gets drawn (null keeps the smoothed recording);
+     * [basePoly] is the matched shape that answers to road questions are spliced into.
+     */
+    fun saveTripPath(tripId: Long, status: Int, basePoly: String?, poly: String?) {
+        val values = ContentValues().apply {
+            put("trip_id", tripId)
+            put("status", status)
+            put("base_poly", basePoly)
+            put("poly", poly)
+            if (poly != null) {
+                val pts = Polyline.decode(poly)
+                var minLat = 90.0
+                var maxLat = -90.0
+                var minLon = 180.0
+                var maxLon = -180.0
+                for (i in pts.indices step 2) {
+                    minLat = minOf(minLat, pts[i]); maxLat = maxOf(maxLat, pts[i])
+                    minLon = minOf(minLon, pts[i + 1]); maxLon = maxOf(maxLon, pts[i + 1])
+                }
+                put("min_lat", minLat); put("max_lat", maxLat); put("min_lon", minLon); put("max_lon", maxLon)
+            }
+        }
+        val db = writableDatabase
+        db.insertWithOnConflict("trip_paths", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        // Friends get the improved shape on the next sync.
+        db.execSQL("UPDATE trips SET uploaded = 0 WHERE id = $tripId")
+        changed()
+    }
+
+    /** Road-snapped trip shapes overlapping [box], for travel modes being shown. */
+    fun snappedPathsIn(box: GeoBox, modes: Set<TravelMode>): List<String> {
+        val modeFilter = if (modes.size >= TravelMode.entries.size) "" else
+            " AND t.mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
+        return readableDatabase.rawQuery(
+            """SELECT p.poly FROM trip_paths p JOIN trips t ON t.id = p.trip_id
+               WHERE p.poly IS NOT NULL AND p.min_lat <= ${box.north} AND p.max_lat >= ${box.south}
+               AND p.min_lon <= ${box.east} AND p.max_lon >= ${box.west}$modeFilter""",
+            null,
+        ).use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
+    }
+
+    /** The shape to show or share for a trip: road-snapped if available, otherwise the recorded points. */
+    fun tripDisplayPath(tripId: Long): DoubleArray =
+        tripPathRow(tripId)?.poly?.let { Polyline.decode(it) } ?: tripPath(tripId)
+
+    fun addRoadQuestions(tripId: Long, questions: List<NewRoadQuestion>) {
+        val db = writableDatabase
+        for (q in questions) {
+            db.insert("road_questions", null, ContentValues().apply {
+                put("trip_id", tripId)
+                put("base_from", q.baseFrom)
+                put("base_to", q.baseTo)
+                put("options", RoadOption.encodeList(q.options))
+            })
+        }
+        changed()
+    }
+
+    fun openRoadQuestions(): List<RoadQuestion> = roadQuestions("WHERE chosen = -1 ORDER BY trip_id DESC, id")
+
+    fun roadQuestionsForTrip(tripId: Long): List<RoadQuestion> = roadQuestions("WHERE trip_id = $tripId ORDER BY base_from")
+
+    private fun roadQuestions(clause: String): List<RoadQuestion> =
+        readableDatabase.rawQuery("SELECT id, trip_id, base_from, base_to, options, chosen FROM road_questions $clause", null).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(RoadQuestion(c.getLong(0), c.getLong(1), c.getInt(2), c.getInt(3), RoadOption.decodeList(c.getString(4)), c.getInt(5)))
+                }
+            }
+        }
+
+    fun answerRoadQuestion(id: Long, choice: Int) {
+        writableDatabase.execSQL("UPDATE road_questions SET chosen = $choice WHERE id = $id")
+    }
 
     // ---- Areas ----
 

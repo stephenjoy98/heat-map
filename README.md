@@ -39,6 +39,18 @@ up to your Google account, and lets you compare explored areas with friends.
   trip and a notification. Your answer is remembered: the next trip between the same two places is
   classified automatically.
 
+### Smooth, road-snapped routes
+- **Smoothing**: routes that aren't snapped are drawn as curves (a 3-point moving average plus Chaikin
+  corner cutting) instead of straight hops between fixes.
+- **Snapping to roads**: finished trips are map-matched to OpenStreetMap with the free public
+  [Valhalla](https://valhalla1.openstreetmap.de) service run by FOSSGIS, using the network for the trip's
+  mode (footpaths, cycle routes, roads or bus routes). Only coordinates are sent, never times.
+- **Asking which road**: where the recording strays more than ~40 m from the matched road for a few fixes,
+  the Review tab asks "Which road did you take?" with a mini map of the options: the best match,
+  alternative roads between the same points (labelled by street name), and the line as recorded.
+- Trips that stray almost everywhere (trail walks, trains) keep their smoothed recording. Changing a trip's
+  travel mode re-matches it. Both features can be switched off in Settings.
+
 ### Review tab
 - Week / Month / Year / All time: distance (total and per mode), **new areas explored** (~220 m
   squares you'd never visited before), **cities and countries** visited (reverse-geocoded on the
@@ -125,6 +137,8 @@ Requires JDK 17 and the Android SDK (API 36).
 | --- | --- |
 | Recording service, activity tagging | `tracking/LocationTickerService.kt`, `tracking/ActivityTracker.kt` |
 | Trip splitting and travel-mode decisions | `tracking/TripDetector.kt` |
+| Road snapping, doubtful-stretch questions | `roads/RoadSnapper.kt`, `roads/Valhalla.kt` |
+| Route smoothing | `map/Smoothing.kt` |
 | Storage (SQLite: points, trips, places cache, friends' routes) | `data/PointStore.kt` |
 | Heatmap rendering and map tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |
 | Map engines (Google Maps or MapLibre vector maps) behind one composable | `ui/AppMap.kt`, `map/VectorMapSupport.kt` |

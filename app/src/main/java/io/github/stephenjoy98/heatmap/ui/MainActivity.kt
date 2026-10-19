@@ -43,6 +43,7 @@ import io.github.stephenjoy98.heatmap.cloud.Friend
 import io.github.stephenjoy98.heatmap.cloud.SyncWorker
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,7 +107,7 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
     val user by Account.user.collectAsStateWithLifecycle()
     val changes by store.changes.collectAsStateWithLifecycle()
     val questions by produceState(0, changes, resumeTick) {
-        value = withContext(Dispatchers.IO) { store.tripsNeedingReview().size }
+        value = withContext(Dispatchers.IO) { store.tripsNeedingReview().size + store.openRoadQuestions().size }
     }
 
     LaunchedEffect(wantedTab) {
@@ -128,6 +129,7 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
     // Catch up on trip detection and sync whenever the app comes to the front.
     LaunchedEffect(resumeTick) {
         withContext(Dispatchers.IO) { TripDetector.process(context) }
+        RoadSnapWorker.runNow(context)
         if (user != null) SyncWorker.runNow(context)
     }
 

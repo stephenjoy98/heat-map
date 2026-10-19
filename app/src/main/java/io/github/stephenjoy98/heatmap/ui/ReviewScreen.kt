@@ -65,7 +65,11 @@ import com.google.android.gms.maps.model.LatLng
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.TravelMode
+import io.github.stephenjoy98.heatmap.data.Polyline
+import io.github.stephenjoy98.heatmap.data.RoadQuestion
 import io.github.stephenjoy98.heatmap.data.Trip
+import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
+import io.github.stephenjoy98.heatmap.roads.RoadSnapper
 import io.github.stephenjoy98.heatmap.review.HealthSteps
 import io.github.stephenjoy98.heatmap.review.InsightResult
 import io.github.stephenjoy98.heatmap.review.Insights
@@ -88,6 +92,9 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int) {
     val changes by store.changes.collectAsStateWithLifecycle()
     val data by produceState<ReviewData?>(null, period, changes, refresh, resumeTick) {
         value = withContext(Dispatchers.IO) { ReviewRepository.load(context, period) }
+    }
+    val roadQuestions by produceState(emptyList<Pair<RoadQuestion, Trip?>>(), changes, refresh, resumeTick) {
+        value = withContext(Dispatchers.IO) { store.openRoadQuestions().take(10).map { it to store.trip(it.tripId) } }
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -370,6 +377,47 @@ private fun QuestionCard(trip: Trip, onAnswer: suspend (TravelMode) -> Unit) {
                         } else {
                             AssistChipDefaults.assistChipColors()
                         },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val optionColors = listOf(Color(0xFFFF7A1A), Color(0xFF3D9BFF), Color(0xFF66BB6A), Color(0xFFAB47BC))
+private val recordedColor = Color(0xFF9E9E9E)
+
+@Composable
+private fun RoadQuestionCard(question: RoadQuestion, trip: Trip?, onAnswer: suspend (Int) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val colors = remember(question.id) {
+        var road = 0
+        question.options.map { if (it.recorded) recordedColor else optionColors[road++ % optionColors.size] }
+    }
+    val lines = remember(question.id) {
+        question.options.mapIndexed { i, o ->
+            val pts = Polyline.decode(o.poly)
+            PreviewLine(List(pts.size / 2) { LatLng(pts[it * 2], pts[it * 2 + 1]) }, colors[i], if (o.recorded) 2.5f else 4.5f)
+        }.sortedByDescending { it.widthDp } // Recorded line on top, thin.
+    }
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            trip?.let {
+                val start = Date(it.startTime)
+                Text(
+                    "${DateFormat.getDateInstance(DateFormat.MEDIUM).format(start)} · ${DateFormat.getTimeInstance(DateFormat.SHORT).format(start)} · ${it.mode.label}",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            TripPreviewLinesMap(lines, Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(12.dp)))
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                question.options.forEachIndexed { i, option ->
+                    AssistChip(
+                        onClick = { scope.launch { withContext(Dispatchers.IO) { onAnswer(i) } } },
+                        label = { Text(option.label) },
+                        leadingIcon = { Box(Modifier.size(10.dp).background(colors[i], CircleShape)) },
                     )
                 }
             }

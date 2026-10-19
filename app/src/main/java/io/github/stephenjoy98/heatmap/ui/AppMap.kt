@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -292,45 +293,62 @@ private fun VectorAppMap(
     )
 }
 
+/** One line on a [TripPreviewMap]. */
+class PreviewLine(val points: List<LatLng>, val color: Color, val widthDp: Float = 4f)
+
 /** A small, non-interactive map showing one trip. */
 @Composable
 fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
-    val dark = isDarkTheme()
     val lineColor = MaterialTheme.colorScheme.primary
+    TripPreviewLinesMap(remember(path, lineColor) { listOf(PreviewLine(path, lineColor)) }, modifier)
+}
+
+/** A small, non-interactive map showing one or more lines (e.g. the candidate roads for a stretch). */
+@Composable
+fun TripPreviewLinesMap(lines: List<PreviewLine>, modifier: Modifier = Modifier) {
+    val dark = isDarkTheme()
+    val all = remember(lines) { lines.flatMap { it.points } }
     if (useGoogleMaps()) {
         val camera = rememberCameraPositionState()
-        val bounds = remember(path) { LatLngBounds.builder().apply { path.forEach { include(it) } }.build() }
+        val density = LocalContext.current.resources.displayMetrics.density
         GoogleMap(
             modifier = modifier,
             cameraPositionState = camera,
             googleMapOptionsFactory = { GoogleMapOptions().liteMode(true) },
             properties = MapProperties(mapStyleOptions = MapStyleOptions(if (dark) MapStyles.dark else MapStyles.light)),
             uiSettings = MapUiSettings(mapToolbarEnabled = false, zoomControlsEnabled = false),
-            onMapLoaded = { runCatching { camera.move(CameraUpdateFactory.newLatLngBounds(bounds, 48)) } },
+            onMapLoaded = {
+                if (all.size >= 2) {
+                    val bounds = LatLngBounds.builder().apply { all.forEach { include(it) } }.build()
+                    runCatching { camera.move(CameraUpdateFactory.newLatLngBounds(bounds, 48)) }
+                }
+            },
         ) {
-            Polyline(points = path, color = lineColor, width = 10f)
+            for (line in lines) Polyline(points = line.points, color = line.color, width = line.widthDp * density)
         }
     } else {
         val holder = rememberVectorMap()
-        LaunchedEffect(path, dark) {
-            holder.styleDark = null // Reload so the trip line is added to the fresh style.
+        LaunchedEffect(lines, dark) {
+            holder.styleDark = null // Reload so the lines are added to a fresh style.
             holder.setTheme(dark) { style ->
-                val line = LineString.fromLngLats(path.map { Point.fromLngLat(it.longitude, it.latitude) })
-                style.addSource(GeoJsonSource("trip", Feature.fromGeometry(line)))
-                style.addLayer(
-                    LineLayer("trip-line", "trip").withProperties(
-                        PropertyFactory.lineColor(lineColor.toArgb()),
-                        PropertyFactory.lineWidth(4f),
-                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                lines.forEachIndexed { i, l ->
+                    val geometry = LineString.fromLngLats(l.points.map { Point.fromLngLat(it.longitude, it.latitude) })
+                    style.addSource(GeoJsonSource("preview-$i", Feature.fromGeometry(geometry)))
+                    style.addLayer(
+                        LineLayer("preview-line-$i", "preview-$i").withProperties(
+                            PropertyFactory.lineColor(l.color.toArgb()),
+                            PropertyFactory.lineWidth(l.widthDp),
+                            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                        )
                     )
-                )
+                }
                 holder.withMap { m ->
                     m.uiSettings.setAllGesturesEnabled(false)
                     m.uiSettings.isAttributionEnabled = false
-                    if (path.size >= 2) {
+                    if (all.size >= 2) {
                         val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
-                            .includes(path.map { MLatLng(it.latitude, it.longitude) })
+                            .includes(all.map { MLatLng(it.latitude, it.longitude) })
                             .build()
                         holder.mapView.post {
                             runCatching { m.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds, 48)) }

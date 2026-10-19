@@ -12,6 +12,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.google.firebase.auth.FirebaseAuth
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.roads.RoadSnapper
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import java.util.concurrent.TimeUnit
 
@@ -23,6 +24,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         }
         return try {
             TripDetector.process(applicationContext)
+            runCatching { RoadSnapper.processPending(applicationContext) }
             if (Prefs.autoBackup.value) Backup.backUp(applicationContext)
             Friends.syncMine(applicationContext)
             Result.success()

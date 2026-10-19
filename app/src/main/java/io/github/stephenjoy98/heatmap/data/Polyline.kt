@@ -19,8 +19,9 @@ object Polyline {
         return sb.toString()
     }
 
-    /** Returns interleaved [lat0, lon0, lat1, lon1, ...]. */
-    fun decode(encoded: String): DoubleArray {
+    /** Returns interleaved [lat0, lon0, lat1, lon1, ...]. Valhalla uses [precision] 6. */
+    fun decode(encoded: String, precision: Int = 5): DoubleArray {
+        val factor = if (precision == 6) 1e6 else 1e5
         val out = ArrayList<Double>(encoded.length / 2)
         var index = 0
         var lat = 0L
@@ -46,8 +47,8 @@ object Polyline {
             } while (b >= 0x20 && index < encoded.length)
             lon += if (result and 1L != 0L) (result shr 1).inv() else result shr 1
 
-            out += lat / 1e5
-            out += lon / 1e5
+            out += lat / factor
+            out += lon / factor
         }
         return out.toDoubleArray()
     }
