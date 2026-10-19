@@ -165,6 +165,7 @@ fun CompareScreen(friend: Friend, onBack: () -> Unit) {
 
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 AppMap(camera = camera, layers = layers, modifier = Modifier.fillMaxSize(), refreshKey = comparison)
+                MapControls(camera, Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
                 if (comparison == null) {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
                 }

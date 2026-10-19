@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -27,7 +26,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -35,7 +40,15 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -77,16 +90,18 @@ private enum class IntervalUnit(val label: String, val seconds: Int) {
     SEC("sec", 1), MIN("min", 60), HOUR("h", 3600), DAY("day", 86_400)
 }
 
+/** Full-screen settings, grouped into sections the way Android's own Settings app is. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsSheet(
+fun SettingsScreen(
     store: PointStore,
-    snackbar: SnackbarHostState,
     resumeTick: Int,
-    onDismiss: () -> Unit,
+    onBack: () -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
     val tracking by Prefs.tracking.collectAsStateWithLifecycle()
     val intervalSec by Prefs.intervalSec.collectAsStateWithLifecycle()
     val highAccuracy by Prefs.highAccuracy.collectAsStateWithLifecycle()
@@ -128,7 +143,7 @@ fun SettingsSheet(
 
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* State is re-read below on the next recomposition. */ }
+    ) { /* State is re-read on the next resume. */ }
 
     val activityLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -149,140 +164,163 @@ fun SettingsSheet(
         context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Settings") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+    ) { inner ->
         Column(
             Modifier
+                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp)
+                .padding(inner)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
         ) {
-            SectionTitle("Recording interval")
-            IntervalSlider(intervalSec, ::setInterval)
-            CustomInterval(intervalSec, ::setInterval)
-            Text(
-                "Points less than 15 minutes apart are joined into routes; slower ticks show as dots.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Divider()
-            SettingRow(
-                title = "High accuracy (GPS)",
-                subtitle = if (highAccuracy) "Precise points, more battery" else "Wi-Fi/cell positioning, less battery",
-            ) {
-                Switch(checked = highAccuracy, onCheckedChange = {
-                    Prefs.setHighAccuracy(it)
-                    applyToService()
-                })
-            }
-
-            Divider()
-            SectionTitle("Map")
-            Text("Theme", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(6.dp))
-            SegmentedChoice(
-                options = listOf(MapTheme.DARK to "Dark", MapTheme.LIGHT to "Light", MapTheme.SYSTEM to "System"),
-                selected = mapTheme,
-                onSelect = Prefs::setMapTheme,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text("Show", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(6.dp))
-            SegmentedChoice(
-                options = listOf(DisplayMode.ROUTES to "Routes", DisplayMode.POINTS to "Points"),
-                selected = mode,
-                onSelect = Prefs::setDisplayMode,
-            )
-            if (BuildConfig.HAS_MAPS_KEY) {
-                Spacer(Modifier.height(12.dp))
-                Text("Map", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(6.dp))
-                SegmentedChoice(
-                    options = listOf(MapProvider.AUTO to "Google Maps", MapProvider.OSM to "OpenStreetMap"),
-                    selected = if (mapProvider == MapProvider.OSM) MapProvider.OSM else MapProvider.AUTO,
-                    onSelect = Prefs::setMapProvider,
-                )
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Spacer(Modifier.height(8.dp))
-                SettingRow(
-                    title = "Wallpaper colours",
-                    subtitle = "Material You: match the app's colours to your wallpaper",
-                ) {
-                    Switch(checked = dynamicColor, onCheckedChange = Prefs::setDynamicColor)
+            Section("Recording") {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Record a point every", style = MaterialTheme.typography.labelLarge)
+                    IntervalSlider(intervalSec, ::setInterval)
+                    CustomInterval(intervalSec, ::setInterval)
+                    Text(
+                        "Points less than 15 minutes apart are joined into routes; slower ticks show as dots.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            SettingRow(
-                title = "Smooth routes",
-                subtitle = "Draw curves instead of straight hops between recorded points",
-            ) {
-                Switch(checked = smoothRoutes, onCheckedChange = Prefs::setSmoothRoutes)
-            }
-            SettingRow(
-                title = "Snap routes to roads",
-                subtitle = "Matches finished trips to OpenStreetMap roads and asks when unsure. " +
-                    "Trip coordinates (never times) are sent to the free Valhalla service run by FOSSGIS.",
-            ) {
-                Switch(checked = snapToRoads, onCheckedChange = {
-                    Prefs.setSnapToRoads(it)
-                    if (it) RoadSnapWorker.runNow(context)
-                })
-            }
-
-            Divider()
-            SectionTitle("Insights and activity")
-            SettingRow(title = "Review insights", subtitle = engineLabel(aiEngine)) {
-                OutlinedButton(onClick = { showAiChoice = true }) { Text("Change") }
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ItemDivider()
                 SettingRow(
-                    title = "Detect how you travel",
-                    subtitle = if (hasActivity) "Using motion sensors to tell walking, cycling and vehicles apart"
-                    else "Allow physical activity access for better walking, cycling and vehicle detection",
+                    title = "High accuracy (GPS)",
+                    subtitle = if (highAccuracy) "Precise points, more battery" else "Wi-Fi/cell positioning, less battery",
                 ) {
-                    if (!hasActivity) {
-                        OutlinedButton(onClick = { activityLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) }) { Text("Allow") }
+                    Switch(checked = highAccuracy, onCheckedChange = {
+                        Prefs.setHighAccuracy(it)
+                        applyToService()
+                    })
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ItemDivider()
+                    SettingRow(
+                        title = "Detect how you travel",
+                        subtitle = if (hasActivity) "Using motion sensors to tell walking, cycling and vehicles apart"
+                        else "Allow physical activity access for better walking, cycling and vehicle detection",
+                    ) {
+                        if (!hasActivity) {
+                            OutlinedButton(onClick = { activityLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) }) { Text("Allow") }
+                        }
                     }
                 }
             }
-            SettingRow(
-                title = "Steps from Health Connect",
-                subtitle = when {
-                    healthAvailability == HealthSteps.Availability.UNSUPPORTED -> "Health Connect isn't available on this phone"
-                    healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> "Install or update Health Connect to show steps"
-                    healthGranted -> "Connected"
-                    else -> "Show your daily steps on the Review tab"
-                },
-            ) {
-                when {
-                    healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> OutlinedButton(onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata"))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }
-                    }) { Text("Get") }
-                    healthAvailability == HealthSteps.Availability.AVAILABLE && !healthGranted ->
-                        OutlinedButton(onClick = { healthLauncher.launch(HealthSteps.permissions) }) { Text("Connect") }
-                    else -> Unit
+
+            Section("Appearance") {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Theme", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    SegmentedChoice(
+                        options = listOf(MapTheme.DARK to "Dark", MapTheme.LIGHT to "Light", MapTheme.SYSTEM to "System"),
+                        selected = mapTheme,
+                        onSelect = Prefs::setMapTheme,
+                    )
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    ItemDivider()
+                    SettingRow(
+                        title = "Wallpaper colours",
+                        subtitle = "Material You: match the app's colours to your wallpaper",
+                    ) {
+                        Switch(checked = dynamicColor, onCheckedChange = Prefs::setDynamicColor)
+                    }
+                }
+                if (BuildConfig.HAS_MAPS_KEY) {
+                    ItemDivider()
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Map provider", style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(8.dp))
+                        SegmentedChoice(
+                            options = listOf(MapProvider.AUTO to "Google Maps", MapProvider.OSM to "OpenStreetMap"),
+                            selected = if (mapProvider == MapProvider.OSM) MapProvider.OSM else MapProvider.AUTO,
+                            onSelect = Prefs::setMapProvider,
+                        )
+                    }
                 }
             }
 
-            if (!hasBackground || !ignoresBattery) {
-                Divider()
-                SectionTitle("Keep recording reliably")
-                if (!hasBackground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    SettingRow(
-                        title = "Allow location all the time",
-                        subtitle = "Lets recording resume by itself after a reboot",
-                    ) {
+            Section("Map & routes") {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Show", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    SegmentedChoice(
+                        options = listOf(DisplayMode.ROUTES to "Routes", DisplayMode.POINTS to "Points"),
+                        selected = mode,
+                        onSelect = Prefs::setDisplayMode,
+                    )
+                }
+                ItemDivider()
+                SettingRow(
+                    title = "Smooth routes",
+                    subtitle = "Draw curves instead of straight hops between recorded points",
+                ) {
+                    Switch(checked = smoothRoutes, onCheckedChange = Prefs::setSmoothRoutes)
+                }
+                ItemDivider()
+                SettingRow(
+                    title = "Snap routes to roads",
+                    subtitle = "Matches finished trips to OpenStreetMap roads and asks when unsure. " +
+                        "Trip coordinates (never times) are sent to the free Valhalla service run by FOSSGIS.",
+                ) {
+                    Switch(checked = snapToRoads, onCheckedChange = {
+                        Prefs.setSnapToRoads(it)
+                        if (it) RoadSnapWorker.runNow(context)
+                    })
+                }
+            }
+
+            Section("Insights & health") {
+                SettingRow(title = "Review insights", subtitle = engineLabel(aiEngine)) {
+                    OutlinedButton(onClick = { showAiChoice = true }) { Text("Change") }
+                }
+                ItemDivider()
+                SettingRow(
+                    title = "Steps from Health Connect",
+                    subtitle = when {
+                        healthAvailability == HealthSteps.Availability.UNSUPPORTED -> "Health Connect isn't available on this phone"
+                        healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> "Install or update Health Connect to show steps"
+                        healthGranted -> "Connected"
+                        else -> "Show your daily steps on the Review tab"
+                    },
+                ) {
+                    when {
+                        healthAvailability == HealthSteps.Availability.NEEDS_INSTALL -> OutlinedButton(onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata"))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        }) { Text("Get") }
+                        healthAvailability == HealthSteps.Availability.AVAILABLE && !healthGranted ->
+                            OutlinedButton(onClick = { healthLauncher.launch(HealthSteps.permissions) }) { Text("Connect") }
+                        else -> Unit
+                    }
+                }
+            }
+
+            Section("Reliability") {
+                SettingRow(
+                    title = "Allow location all the time",
+                    subtitle = if (hasBackground) "Allowed: recording resumes by itself after a reboot"
+                    else "Lets recording resume by itself after a reboot",
+                ) {
+                    if (!hasBackground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         OutlinedButton(onClick = {
                             if (LocationTickerService.hasLocationPermission(context)) {
                                 backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
@@ -292,11 +330,13 @@ fun SettingsSheet(
                         }) { Text("Allow") }
                     }
                 }
-                if (!ignoresBattery) {
-                    SettingRow(
-                        title = "Ignore battery optimization",
-                        subtitle = "Stops the system from pausing long-interval recording",
-                    ) {
+                ItemDivider()
+                SettingRow(
+                    title = "Ignore battery optimization",
+                    subtitle = if (ignoresBattery) "Allowed: long-interval recording won't be paused"
+                    else "Stops the system from pausing long-interval recording",
+                ) {
+                    if (!ignoresBattery) {
                         OutlinedButton(onClick = {
                             @SuppressLint("BatteryLife")
                             val intent = Intent(
@@ -309,16 +349,28 @@ fun SettingsSheet(
                 }
             }
 
-            Divider()
-            SectionTitle("Data")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { exportLauncher.launch("location-ticker-${LocalDate.now()}.gpx") }) {
-                    Text("Export GPX")
-                }
-                TextButton(onClick = { confirmClear = true }) {
-                    Text("Delete all points", color = MaterialTheme.colorScheme.error)
-                }
+            Section("Data") {
+                ActionRow(
+                    title = "Export GPX",
+                    subtitle = "Save your whole history as a GPX file",
+                    onClick = { exportLauncher.launch("location-ticker-${LocalDate.now()}.gpx") },
+                )
+                ItemDivider()
+                ActionRow(
+                    title = "Delete all points",
+                    subtitle = "Remove your location history from this phone",
+                    color = MaterialTheme.colorScheme.error,
+                    onClick = { confirmClear = true },
+                )
             }
+
+            Text(
+                "Location Ticker ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                textAlign = TextAlign.Center,
+            )
         }
     }
 
@@ -342,6 +394,42 @@ fun SettingsSheet(
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/** A titled group of settings on a rounded card. */
+@Composable
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+    )
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column { content() }
+    }
+}
+
+@Composable
+private fun ItemDivider() {
+    HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+}
+
+@Composable
+private fun ActionRow(title: String, subtitle: String, onClick: () -> Unit, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = color)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -428,18 +516,8 @@ private fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onS
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 8.dp),
-    )
-}
-
-@Composable
 private fun SettingRow(title: String, subtitle: String, action: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -447,11 +525,6 @@ private fun SettingRow(title: String, subtitle: String, action: @Composable () -
         Spacer(Modifier.width(12.dp))
         action()
     }
-}
-
-@Composable
-private fun Divider() {
-    HorizontalDivider(Modifier.padding(vertical = 16.dp))
 }
 
 private fun nearestPreset(seconds: Int): Int =

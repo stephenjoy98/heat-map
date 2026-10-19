@@ -5,8 +5,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
@@ -109,7 +109,9 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
     private val executor: ExecutorService = Executors.newFixedThreadPool(2)
     private val main = Handler(Looper.getMainLooper())
     private var generation = 0
-    private val rect = RectF()
+    private val corners = FloatArray(8)
+    private val src = FloatArray(8)
+    private val matrix = Matrix()
 
     fun setAlpha(alpha: Float) {
         paint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
@@ -120,12 +122,15 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
         pending.clear()
     }
 
-    /** Draws the tiles at [zoom] covering the given bounds; [place] maps a tile's corners to screen pixels. */
+    /**
+     * Draws the tiles at [zoom] covering the given bounds. [place] writes a tile's four corners in screen
+     * pixels (top-left, top-right, bottom-right, bottom-left) so tiles follow a rotated map.
+     */
     fun draw(
         canvas: Canvas,
         zoom: Int,
         north: Double, south: Double, east: Double, west: Double,
-        place: (north: Double, west: Double, south: Double, east: Double, out: RectF) -> Unit,
+        place: (north: Double, west: Double, south: Double, east: Double, out: FloatArray) -> Unit,
     ) {
         val n = 1 shl zoom
         val x0 = tileX(west, n)
@@ -141,8 +146,12 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
             val bitmap = entry?.bitmap ?: continue
             if (bitmap.isRecycled) continue
             val box = TileMath.box(x, y, zoom)
-            place(box.north, box.west, box.south, box.east, rect)
-            canvas.drawBitmap(bitmap, null, rect, paint)
+            place(box.north, box.west, box.south, box.east, corners)
+            val w = bitmap.width.toFloat()
+            val h = bitmap.height.toFloat()
+            src[2] = w; src[4] = w; src[5] = h; src[7] = h
+            matrix.setPolyToPoly(src, 0, corners, 0, 4)
+            canvas.drawBitmap(bitmap, matrix, paint)
         }
     }
 
@@ -176,7 +185,7 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
 
 /**
  * A transparent view laid over a MapLibre map that draws heat (and other) tile layers plus a "latest
- * position" dot, following the camera. The map's rotation and tilt are disabled so tiles stay rectangles.
+ * position" dot, following the camera, including rotation. Tilt is disabled so tiles stay flat.
  */
 @SuppressLint("ViewConstructor")
 class TileOverlayView(context: Context) : View(context) {
@@ -239,10 +248,15 @@ class TileOverlayView(context: Context) : View(context) {
         val bounds = projection.visibleRegion.latLngBounds
         // MapLibre zoom is in 512 px tiles; tile zoom z+1 puts one heat tile on ~256 dp of screen.
         val zoom = floor(map.cameraPosition.zoom + 1).toInt().coerceIn(0, 21)
-        val place = { north: Double, west: Double, south: Double, east: Double, out: RectF ->
+        val place = { north: Double, west: Double, south: Double, east: Double, out: FloatArray ->
             val tl = projection.toScreenLocation(LatLng(north, west))
+            val tr = projection.toScreenLocation(LatLng(north, east))
             val br = projection.toScreenLocation(LatLng(south, east))
-            out.set(tl.x, tl.y, br.x, br.y)
+            val bl = projection.toScreenLocation(LatLng(south, west))
+            out[0] = tl.x; out[1] = tl.y
+            out[2] = tr.x; out[3] = tr.y
+            out[4] = br.x; out[5] = br.y
+            out[6] = bl.x; out[7] = bl.y
         }
         for ((_, renderer) in renderers.values.sortedBy { it.first }) {
             renderer.draw(canvas, zoom, bounds.latitudeNorth, bounds.latitudeSouth, bounds.longitudeEast, bounds.longitudeWest, place)

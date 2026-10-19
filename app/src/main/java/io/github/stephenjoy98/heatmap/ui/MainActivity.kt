@@ -101,6 +101,7 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableIntStateOf(MainActivity.TAB_MAP) }
     var comparing by remember { mutableStateOf<Friend?>(null) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var resumeTick by remember { mutableIntStateOf(0) }
     val pendingInvite by invite.collectAsStateWithLifecycle()
     val wantedTab by requestedTab.collectAsStateWithLifecycle()
@@ -131,6 +132,11 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
         withContext(Dispatchers.IO) { TripDetector.process(context) }
         RoadSnapWorker.runNow(context)
         if (user != null) SyncWorker.runNow(context)
+    }
+
+    if (settingsOpen) {
+        SettingsScreen(store = store, resumeTick = resumeTick, onBack = { settingsOpen = false })
+        return
     }
 
     comparing?.let { friend ->
@@ -178,7 +184,7 @@ private fun AppScaffold(invite: MutableStateFlow<String?>, requestedTab: Mutable
                 onInviteHandled = { invite.value = null },
                 onCompare = { comparing = it },
             )
-            else -> MapScreen(padding, snackbar, resumeTick)
+            else -> MapScreen(padding, snackbar, resumeTick, onOpenSettings = { settingsOpen = true })
         }
     }
 }

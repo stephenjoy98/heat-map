@@ -72,7 +72,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int) {
+fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
     val scope = rememberCoroutineScope()
@@ -89,7 +89,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     }
     val hasLocation = remember(resumeTick, tracking) { LocationTickerService.hasLocationPermission(context) }
 
-    var showSettings by remember { mutableStateOf(false) }
     var centered by rememberSaveable { mutableStateOf(false) }
     val camera = rememberMapCamera()
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
@@ -135,13 +134,18 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 StatsBar(stats, Modifier.align(Alignment.Center))
                 FilledTonalIconButton(
-                    onClick = { showSettings = true },
+                    onClick = onOpenSettings,
                     modifier = Modifier.align(Alignment.CenterEnd).size(48.dp),
                 ) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
             }
             Spacer(Modifier.size(8.dp))
             ModeFilterRow(filter)
         }
+
+        MapControls(
+            camera = camera,
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+        )
 
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
@@ -172,10 +176,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 },
             )
         }
-    }
-
-    if (showSettings) {
-        SettingsSheet(store = store, snackbar = snackbar, resumeTick = resumeTick, onDismiss = { showSettings = false })
     }
 }
 

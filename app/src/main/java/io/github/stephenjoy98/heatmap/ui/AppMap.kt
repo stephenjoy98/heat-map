@@ -12,6 +12,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -65,8 +68,30 @@ class MapLayer(val id: String, val source: TileBitmapSource, val alpha: Float = 
 class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom: Float) {
     internal class Command(val lat: Double, val lon: Double, val zoom: Float, val animate: Boolean)
 
-    // Replays the latest command so a map created afterwards still starts in the right place.
+    internal enum class Action { ZOOM_IN, ZOOM_OUT, NORTH_UP }
+
+    // Replays the latest move so a map created afterwards still starts in the right place.
     internal val commands = MutableSharedFlow<Command>(replay = 1, extraBufferCapacity = 4)
+
+    // One-off button actions; never replayed.
+    internal val actions = MutableSharedFlow<Action>(extraBufferCapacity = 8)
+
+    /** The map's current rotation in degrees clockwise from north, kept up to date by the engine. */
+    var bearing by mutableFloatStateOf(0f)
+        internal set
+
+    fun zoomIn() {
+        actions.tryEmit(Action.ZOOM_IN)
+    }
+
+    fun zoomOut() {
+        actions.tryEmit(Action.ZOOM_OUT)
+    }
+
+    /** Turns the map back so north is up. */
+    fun northUp() {
+        actions.tryEmit(Action.NORTH_UP)
+    }
 
     fun moveTo(lat: Double, lon: Double, zoom: Float) {
         commands.tryEmit(Command(lat, lon, zoom, animate = false))
@@ -130,6 +155,20 @@ private fun GoogleAppMap(
             }
         }
     }
+    LaunchedEffect(camera) {
+        camera.actions.collect { a ->
+            val update = when (a) {
+                MapCamera.Action.ZOOM_IN -> CameraUpdateFactory.zoomIn()
+                MapCamera.Action.ZOOM_OUT -> CameraUpdateFactory.zoomOut()
+                MapCamera.Action.NORTH_UP ->
+                    CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(state.position).bearing(0f).tilt(0f).build())
+            }
+            runCatching { state.animate(update, 300) }
+        }
+    }
+    LaunchedEffect(camera, state) {
+        snapshotFlow { state.position.bearing }.collect { camera.bearing = it }
+    }
     GoogleMap(
         modifier = modifier,
         cameraPositionState = state,
@@ -175,7 +214,7 @@ private class VectorMapHolder(context: Context) {
     init {
         mapView.getMapAsync { m ->
             map = m
-            m.uiSettings.isRotateGesturesEnabled = false
+            m.uiSettings.isRotateGesturesEnabled = true
             m.uiSettings.isTiltGesturesEnabled = false
             m.uiSettings.isCompassEnabled = false
             m.uiSettings.isLogoEnabled = false
@@ -255,6 +294,8 @@ private fun VectorAppMap(
                 )
             )
             overlay.attach(m)
+            m.addOnCameraMoveListener { camera.bearing = m.cameraPosition.bearing.toFloat() }
+            m.addOnCameraIdleListener { camera.bearing = m.cameraPosition.bearing.toFloat() }
         }
         onDispose { overlay.release() }
     }
@@ -276,6 +317,19 @@ private fun VectorAppMap(
             holder.withMap { m ->
                 val update = org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(MLatLng(c.lat, c.lon), c.zoom.toVectorZoom())
                 if (c.animate) m.animateCamera(update, 600) else m.moveCamera(update)
+            }
+        }
+    }
+
+    LaunchedEffect(camera) {
+        camera.actions.collect { a ->
+            holder.withMap { m ->
+                val update = when (a) {
+                    MapCamera.Action.ZOOM_IN -> org.maplibre.android.camera.CameraUpdateFactory.zoomBy(1.0)
+                    MapCamera.Action.ZOOM_OUT -> org.maplibre.android.camera.CameraUpdateFactory.zoomBy(-1.0)
+                    MapCamera.Action.NORTH_UP -> org.maplibre.android.camera.CameraUpdateFactory.bearingTo(0.0)
+                }
+                m.animateCamera(update, 300)
             }
         }
     }
