@@ -122,7 +122,7 @@ up to your Google account, and lets you compare explored areas with friends.
 
 ### Friends and backup (needs Firebase)
 - **Sign in with Google** (Credential Manager + Firebase Auth).
-- **Backup** of the full history to your private Firestore area, automatically (every 6 or 12 hours, daily or weekly) and on demand, with **Restore**
+- **Backup** of the full history to your private Firestore area, automatically (whenever you open the app, plus every 6 or 12 hours, daily or weekly) and on demand, with **Restore**
   that merges into the current phone's history.
 - **Friends** via an 8-character **ID**, a **QR code**, or a shared invite link
   (`locationticker://friend/ABCD2345`). Scan with the built-in Google code scanner.

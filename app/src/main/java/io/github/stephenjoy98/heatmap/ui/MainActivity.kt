@@ -163,7 +163,7 @@ private fun AppScaffold(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Catch up on trip detection and sync whenever the app comes to the front.
+    // Catch up on trip detection, sync and back up whenever the app comes to the front.
     LaunchedEffect(resumeTick) {
         withContext(Dispatchers.IO) {
             TripDetector.process(context)
@@ -171,7 +171,7 @@ private fun AppScaffold(
             store.updateExplored()
         }
         RoadSnapWorker.runNow(context)
-        if (user != null) SyncWorker.runNow(context)
+        if (user != null) SyncWorker.runNow(context, appOpen = true)
     }
 
     LaunchedEffect(Unit) {

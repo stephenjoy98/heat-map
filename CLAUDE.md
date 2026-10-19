@@ -46,7 +46,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.16.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.16.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -89,7 +89,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   expressive = Monet dynamic colour + shapes/type/springs; light schemes get white cards on grey page).
 - `cloud/`: Firebase optional (only if `app/google-services.json` exists; CI writes it from the
   `GOOGLE_SERVICES_JSON` secret). `Backup` (per-day docs incl. `al` altitude list with NaN for none),
-  `SyncWorker` (periodic at Prefs.backupEveryHours 6/12/24/168, UPDATE policy; backup only when due),
+  `SyncWorker` (periodic at Prefs.backupEveryHours 6/12/24/168, UPDATE policy; backup when due, and on every app open via `runNow(appOpen = true)` unless one ran <5 min ago),
   `Friends`, `Account`.
 - `review/` (Insights data, Places, Health Connect steps), `profile/`, `timeline/`, `roads/` (Valhalla map
   matching + "which road?" questions).

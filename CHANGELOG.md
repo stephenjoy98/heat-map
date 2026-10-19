@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-10-19
+
+### Changed
+- Opening the app starts a backup straight away (when automatic backup is on). The backup frequency sets
+  how often it also backs up in the background.
+
 ## [2.16.0] - 2026-10-19
 
 ### Added

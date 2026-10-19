@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.roads.RoadSnapper
@@ -17,8 +18,9 @@ import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import java.util.concurrent.TimeUnit
 
 /**
- * Backup on the schedule chosen under Backup (every 6 or 12 hours, daily or weekly), plus sharing of routes
- * and stats with friends, which also runs whenever the app opens.
+ * Backup and sharing of routes and stats with friends. Runs whenever the app opens, which starts a backup
+ * straight away, and in the background on the schedule chosen under Backup (every 6 or 12 hours, daily or
+ * weekly), which backs up once it's due.
  */
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -28,8 +30,13 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         return try {
             TripDetector.process(applicationContext)
             runCatching { RoadSnapper.processPending(applicationContext) }
-            // App-open syncs come more often than the schedule; only back up once it's due.
-            val dueAfter = Prefs.backupEveryHours.value * 3_600_000L * 9 / 10
+            // Opening the app backs up at once (unless one just ran, when hopping between apps); the
+            // schedule waits until it's due. Backups only send the days changed since the last one.
+            val dueAfter = if (inputData.getBoolean(KEY_APP_OPEN, false)) {
+                APP_OPEN_GAP_MS
+            } else {
+                Prefs.backupEveryHours.value * 3_600_000L * 9 / 10
+            }
             if (Prefs.autoBackup.value && System.currentTimeMillis() - Prefs.lastBackup.value >= dueAfter) {
                 Backup.backUp(applicationContext)
             }
@@ -41,6 +48,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 
     companion object {
+        private const val KEY_APP_OPEN = "app_open"
+        private const val APP_OPEN_GAP_MS = 5 * 60_000L
         private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
         /** (Re)schedules the periodic sync at the chosen backup frequency; call again after changing it. */
@@ -50,8 +59,12 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             WorkManager.getInstance(context).enqueueUniquePeriodicWork("sync", ExistingPeriodicWorkPolicy.UPDATE, request)
         }
 
-        fun runNow(context: Context) {
-            val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(constraints).build()
+        /** Syncs as soon as there's a connection; [appOpen] also starts a backup (when automatic backup is on). */
+        fun runNow(context: Context, appOpen: Boolean = false) {
+            val request = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(constraints)
+                .setInputData(workDataOf(KEY_APP_OPEN to appOpen))
+                .build()
             WorkManager.getInstance(context).enqueueUniqueWork("sync-now", ExistingWorkPolicy.REPLACE, request)
         }
     }
