@@ -268,7 +268,7 @@ private fun PlaceEditor(
                 ) {
                     AppMap(camera = camera, layers = emptyList(), modifier = Modifier.fillMaxSize())
                     // The place is always at the middle of the map: a circle of its size and a pin.
-                    val ring = MaterialTheme.colorScheme.primary
+                    val ring = MapAccent
                     Canvas(Modifier.fillMaxSize()) {
                         camera.cameraTick // Redraw as the map moves or zooms.
                         val mpp = camera.metersPerPixel

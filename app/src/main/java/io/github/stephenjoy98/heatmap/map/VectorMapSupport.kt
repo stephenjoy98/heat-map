@@ -153,10 +153,9 @@ object VectorMaps {
 
     /**
      * Shows routes in 3D: a translucent curtain from the ground up to each hop's height, topped by a solid
-     * ribbon in the app's accent [color], so the route visibly climbs and descends among the 3D buildings.
-     * Replaces any previous route.
+     * ribbon, so the route visibly climbs and descends among the 3D buildings. Replaces any previous route.
      */
-    fun showRoute3d(style: Style, segments: List<Route3d.Segment>, color: Int) {
+    fun showRoute3d(style: Style, segments: List<Route3d.Segment>) {
         if (!style.isFullyLoaded) return
         val features = segments.map { seg ->
             val c = seg.corners
@@ -176,18 +175,17 @@ object VectorMaps {
         val source = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)
         if (source != null) {
             source.setGeoJson(data)
-            for (id in listOf(ROUTE_CURTAIN, ROUTE_RIBBON)) style.getLayer(id)?.setProperties(PropertyFactory.fillExtrusionColor(color))
             return
         }
         style.addSource(GeoJsonSource(ROUTE_SOURCE, data))
         val curtain = FillExtrusionLayer(ROUTE_CURTAIN, ROUTE_SOURCE).withProperties(
-            PropertyFactory.fillExtrusionColor(color),
+            PropertyFactory.fillExtrusionColor(routeColor),
             PropertyFactory.fillExtrusionBase(0f),
             PropertyFactory.fillExtrusionHeight(Expression.get("c")),
             PropertyFactory.fillExtrusionOpacity(0.2f),
         )
         val ribbon = FillExtrusionLayer(ROUTE_RIBBON, ROUTE_SOURCE).withProperties(
-            PropertyFactory.fillExtrusionColor(color),
+            PropertyFactory.fillExtrusionColor(routeColor),
             PropertyFactory.fillExtrusionBase(Expression.get("h")),
             PropertyFactory.fillExtrusionHeight(Expression.get("t")),
             PropertyFactory.fillExtrusionOpacity(0.95f),
@@ -211,6 +209,7 @@ object VectorMaps {
     private const val ROUTE_RIBBON = "route-3d-ribbon"
     private const val RIBBON_M = 1.5
     private const val CURTAIN_GAP_M = 0.4
+    private val routeColor = Color.parseColor("#FF7A1A")
 
     private fun firstLayerAbove(style: Style, match: (id: String, layer: Layer) -> Boolean): String? =
         style.layers.firstOrNull { match(it.id.lowercase(), it) }?.id

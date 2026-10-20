@@ -93,7 +93,7 @@ class DotEditState(day: LocalDate) {
  */
 @Composable
 fun DotsOverlay(camera: MapCamera, state: DotEditState, modifier: Modifier = Modifier) {
-    val inRange = if (state.showingDeleted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    val inRange = if (state.showingDeleted) MaterialTheme.colorScheme.error else MapAccent
     val outside = MaterialTheme.colorScheme.outline
     val ring = MaterialTheme.colorScheme.surface
     val pick = Color(0xFFE53935)

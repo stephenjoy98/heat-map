@@ -31,6 +31,9 @@ val HeatOrange = Color(0xFFFF7A1A)
 val RecordRed = Color(0xFFE53935)
 val FriendBlue = Color(0xFF3D9BFF)
 
+/** Lines, dots and rings drawn on maps: the map's own orange, kept apart from the app's Material theme. */
+val MapAccent = HeatOrange
+
 // Google-style dark: near-black background, slightly lifted surfaces, and a neutral near-white accent (like
 // Android's own dark apps) rather than a coloured one.
 private val darkColors = darkColorScheme(

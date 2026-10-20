@@ -17,19 +17,14 @@ import io.github.stephenjoy98.heatmap.data.TravelMode
  * Heights come from a [HeightGrid] over everything recorded nearby, so a street you've travelled many times is
  * drawn at one agreed height rather than a different one each time. Places with two clearly different levels
  * become questions on the Timeline; once answered "different levels", each pass keeps its own height there.
- *
- * The heights returned are above the ground ([GroundHeights]), like the map's 3D buildings, so an elevated
- * train is drawn a few storeys up beside them and a 15th-floor flat about halfway up its tower. Where the
- * ground height can't be had (offline), they're above a low point of everything recorded instead. A street
- * covered by several routes at the same height is returned once. Call off the main thread.
+ * Call off the main thread.
  */
 object Route3dTracks {
     private const val MAX_NEW_QUESTIONS = 5
 
-    // [rank]: snapped to roads 0, smoothed 1, as recorded 2; cleaner lines win where routes overlap.
-    private class Line(val pass: Long, val dots: List<ElevationPoint>, val lat: DoubleArray?, val lon: DoubleArray?, val rank: Int)
+    private class Line(val pass: Long, val dots: List<ElevationPoint>, val lat: DoubleArray?, val lon: DoubleArray?)
 
-    fun load(store: PointStore, ground: GroundHeights, box: GeoBox, modes: Set<TravelMode>): List<List<ElevationPoint>> {
+    fun load(store: PointStore, box: GeoBox, modes: Set<TravelMode>): List<List<ElevationPoint>> {
         val smooth = Prefs.smoothRoutes.value
         val lines = ArrayList<Line>()
         val drawnTrips = HashSet<Long>()
@@ -40,14 +35,14 @@ object Route3dTracks {
                 val pts = Polyline.decode(poly)
                 val n = pts.size / 2
                 if (n < 2) continue
-                lines += Line(run.pass, store.tripElevations(run.tripId), DoubleArray(n) { pts[it * 2] }, DoubleArray(n) { pts[it * 2 + 1] }, 0)
+                lines += Line(run.pass, store.tripElevations(run.tripId), DoubleArray(n) { pts[it * 2] }, DoubleArray(n) { pts[it * 2 + 1] })
             } else if (smooth && run.dots.size >= 3) {
                 val lat = DoubleArray(run.dots.size) { run.dots[it].lat }
                 val lon = DoubleArray(run.dots.size) { run.dots[it].lon }
                 val (la, lo) = Smoothing.smooth(lat, lon, 0, run.dots.size)
-                lines += Line(run.pass, run.dots, la, lo, 1)
+                lines += Line(run.pass, run.dots, la, lo)
             } else {
-                lines += Line(run.pass, run.dots, null, null, 2)
+                lines += Line(run.pass, run.dots, null, null)
             }
         }
         if (lines.isEmpty()) return emptyList()
@@ -58,13 +53,9 @@ object Route3dTracks {
         val grid = HeightGrid.build(store.heightSamples(area).asSequence(), store.levelDecisions())
         store.addLevelQuestions(grid.candidates.take(MAX_NEW_QUESTIONS))
 
-        val groundAt = ground.session()
-        val fallback by lazy { store.altitudeBaseline() }
-        val tracks = lines.sortedBy { it.rank }.map { line ->
+        return lines.map { line ->
             val dots = line.dots.map { ElevationPoint(it.lat, it.lon, grid.height(it.lat, it.lon, line.pass, it.altitude)) }
-            val drawn = if (line.lat != null && line.lon != null) Route3d.drape(line.lat, line.lon, dots) else dots
-            Route3d.densify(drawn.map { ElevationPoint(it.lat, it.lon, it.altitude - (groundAt(it.lat, it.lon) ?: fallback)) })
+            if (line.lat != null && line.lon != null) Route3d.drape(line.lat, line.lon, dots) else dots
         }
-        return Route3d.withoutOverlaps(tracks)
     }
 }

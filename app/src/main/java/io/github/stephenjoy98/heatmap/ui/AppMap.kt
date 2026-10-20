@@ -326,8 +326,6 @@ private fun VectorAppMap(
 ) {
     val holder = rememberVectorMap(cacheKey)
     val loadRoute3d by rememberUpdatedState(route3d)
-    // 3D routes in the app's accent colour.
-    val routeColor = MaterialTheme.colorScheme.primary.toArgb()
     val overlay = holder.overlay
     SideEffect { holder.onClick = onMapClick }
 
@@ -416,7 +414,7 @@ private fun VectorAppMap(
 
     // 3D route: while 3D buildings are on, load the routes in view whenever the camera settles (or the style
     // reloads, or new dots arrive) and draw them at their recorded heights.
-    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey, routeColor) {
+    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey) {
         if (!look.buildings || route3d == null) {
             holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
             return@LaunchedEffect
@@ -432,10 +430,10 @@ private fun VectorAppMap(
                 val box = GeoBox(b.latitudeNorth + padLat, b.latitudeSouth - padLat, b.longitudeEast + padLon, b.longitudeWest - padLon)
                 val load = loadRoute3d ?: return@collectLatest
                 val segments = withContext(Dispatchers.IO) {
-                    // Heights come back above the ground, like the 3D buildings'.
-                    Route3d.build(load(box), 0.0)
+                    // One fixed baseline, so heights don't change as the map moves.
+                    Route3d.build(load(box), PointStore.get(holder.mapView.context).altitudeBaseline())
                 }
-                m.style?.let { VectorMaps.showRoute3d(it, segments, routeColor) }
+                m.style?.let { VectorMaps.showRoute3d(it, segments) }
             }
     }
 
@@ -480,7 +478,7 @@ class PreviewLine(val points: List<LatLng>, val color: Color, val widthDp: Float
 /** A small, non-interactive map showing one trip. */
 @Composable
 fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
-    val lineColor = MaterialTheme.colorScheme.primary
+    val lineColor = MapAccent
     TripPreviewLinesMap(remember(path, lineColor) { listOf(PreviewLine(path, lineColor)) }, modifier)
 }
 

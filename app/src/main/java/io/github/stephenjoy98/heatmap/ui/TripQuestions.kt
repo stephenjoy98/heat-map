@@ -160,7 +160,7 @@ private fun TripQuestionCard(
             List(p.size / 2) { LatLng(p[it * 2], p[it * 2 + 1]) }
         }
     }
-    val lineColor = MaterialTheme.colorScheme.primary
+    val lineColor = MapAccent
     val lines = remember(path, lineColor) { listOf(PreviewLine(path, lineColor, 5f)) }
     val start = Date(trip.startTime)
     val time = DateFormat.getTimeInstance(DateFormat.SHORT)
@@ -268,7 +268,7 @@ private fun LevelQuestionCard(
 ) {
     val places by Prefs.savedPlaces.collectAsStateWithLifecycle()
     val place = places.filter { it.distanceTo(q.lat, q.lon) <= it.radiusM + 100 }.minByOrNull { it.distanceTo(q.lat, q.lon) }
-    val outline = MaterialTheme.colorScheme.primary
+    val outline = MapAccent
     // The map square in question, outlined.
     val lines = remember(q.area, outline) {
         val row = Cells.rowOf(q.area)

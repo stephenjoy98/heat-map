@@ -50,7 +50,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.29.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.29.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -97,10 +97,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   `Prefs.currentMode` (set from `RecordingSheet`, opened by tapping the record tile) tags new dots' `mode`;
   cleared when tracking stops; TripDetector follows a majority of tagged dots.
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
-  `Route3d` (3D route geometry: continuous mitred ribbon, median + 120 m distance smoothing, 3D-simplified, split at
-  U-turns, pieces inset 6 cm so walls never touch (flicker); `densify` + `withoutOverlaps` draw a street once; since 2.28.0
-  heights are above the ground (`map/GroundHeights`: Terrarium z13 tiles cached in cacheDir/ground, ≤16 downloads per
-  load; fallback `PointStore.altitudeBaseline()`), true scale like the 3D buildings;
+  `Route3d` (3D route geometry: continuous mitred ribbon, median + 120 m distance smoothing, heights above a
+  fixed `PointStore.altitudeBaseline()` (5th percentile, cached 10 min), exaggerated 1.5×. 2.28.0 tried heights above
+  the ground (Terrarium DEM) at true scale plus overlap removal; the user found it "barely looks 3D" and it was
+  reverted in 2.29.1 — don't redo that without asking;
   `drape` lays dot heights along a display line; loader `map/Route3dTracks` uses snapped polys / smoothed
   lines like the 2D map; curtain stops 0.4 m under the ribbon to avoid z-fighting). Since 2.24.0 heights come
   from `data/HeightGrid` (~55×36 m patches; per-pass medians, pass = trip or day for stays; patch height =
@@ -184,7 +184,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   chips hidden behind the filter button, Review named **Insights**, **Google Material icons, never emoji** (since 2.29.0;
   `MaterialIcon(R.drawable.ic_*)` in ui/MaterialIcon.kt; add icons as vector drawables generated from the npm package
   `@material-design-icons/svg` outlined SVGs — material-icons-extended isn't used, it would bloat the unminified APK),
-  neutral near-white accent in the default dark theme (no orange; 3D ribbon uses `colorScheme.primary`), text a size up
+  neutral near-white accent in the default dark theme (no orange in the UI) but **map elements are never
+  Material-themed**: 3D ribbon `#FF7A1A`, preview lines/rings/edit dots use `MapAccent` (Theme.kt), text a size up
   from Material defaults with no letter spacing (`baseTypography` in Theme.kt, user compares with Gmail/Claude apps), units setting respected everywhere (`Units`), long-press tooltips on icon buttons.
 - When something can't be done exactly (e.g. no system dialog for revoking permissions), do the closest
   sensible thing and say so plainly in the reply.

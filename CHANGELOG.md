@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.29.1] - 2026-10-20
+
+### Changed
+- 3D routes are back to how they were in 2.27: taller and easier to see, measured from the lowest place
+  you've recorded and stretched 1.5×, and orange again. Lines, dots and rings drawn on maps keep the map's
+  own orange whatever the app's theme.
+
 ## [2.29.0] - 2026-10-20
 
 ### Added

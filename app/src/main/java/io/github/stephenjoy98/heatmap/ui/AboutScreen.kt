@@ -74,7 +74,7 @@ private val FEATURES = listOf(
     R.drawable.ic_edit to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
     R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",
     R.drawable.ic_help_outline to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",
-    R.drawable.ic_terrain to "Smooth 3D routes at their true height above the ground, to scale with the 3D buildings",
+    R.drawable.ic_terrain to "Smooth 3D routes at one agreed height per place, following the same line as the map",
     R.drawable.ic_public to "Your profile: places explored, distance explored and time captured",
     R.drawable.ic_location_city to "Distance in each city, and the new areas you've explored and where",
     R.drawable.ic_settings to "Settings as a page per section, or all in one list",

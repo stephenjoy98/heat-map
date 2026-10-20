@@ -38,9 +38,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type
   (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)), and **3D buildings** under Map details, which tilts
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
-  routes are drawn as a ribbon at their true height above the ground (the ground's height comes from the
-  same AWS Terrain Tiles, cached on the phone), at the same scale as the 3D buildings, smoothed over
-  neighbouring dots, over a translucent curtain. A street travelled many times is drawn once.
+  routes are drawn as an orange ribbon at their recorded height (above a fixed low point of everything
+  recorded, exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
   Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off.
 - A **scale bar** shows while you pan or zoom, in round distances.
 - **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed
