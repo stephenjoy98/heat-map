@@ -52,6 +52,25 @@ import java.util.WeakHashMap
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.unit.dp
+import org.maplibre.android.style.layers.CircleLayer
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -451,9 +470,18 @@ fun TripPreviewMap(path: List<LatLng>, modifier: Modifier = Modifier) {
     TripPreviewLinesMap(remember(path, lineColor) { listOf(PreviewLine(path, lineColor)) }, modifier)
 }
 
-/** A small, non-interactive map showing one or more lines (e.g. the candidate roads for a stretch). */
+/**
+ * A small map showing one or more lines (e.g. the candidate roads for a stretch). [interactive] lets it be
+ * panned and pinch-zoomed, with zoom and fit buttons; [endpoints] marks where the first line starts (green)
+ * and ends (red).
+ */
 @Composable
-fun TripPreviewLinesMap(lines: List<PreviewLine>, modifier: Modifier = Modifier) {
+fun TripPreviewLinesMap(
+    lines: List<PreviewLine>,
+    modifier: Modifier = Modifier,
+    interactive: Boolean = false,
+    endpoints: Boolean = false,
+) {
     val dark = isDarkTheme()
     val all = remember(lines) { lines.flatMap { it.points } }
     val holder = rememberVectorMap()
@@ -472,25 +500,79 @@ fun TripPreviewLinesMap(lines: List<PreviewLine>, modifier: Modifier = Modifier)
                     )
                 )
             }
+            val first = lines.firstOrNull()?.points
+            if (endpoints && first != null && first.size >= 2) {
+                listOf("start" to (first.first() to 0xFF43A047.toInt()), "end" to (first.last() to 0xFFE53935.toInt())).forEach { (id, v) ->
+                    val (p, c) = v
+                    style.addSource(GeoJsonSource("preview-$id", Feature.fromGeometry(Point.fromLngLat(p.longitude, p.latitude))))
+                    style.addLayer(
+                        CircleLayer("preview-$id-dot", "preview-$id").withProperties(
+                            PropertyFactory.circleRadius(6f),
+                            PropertyFactory.circleColor(c),
+                            PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE),
+                            PropertyFactory.circleStrokeWidth(2f),
+                        )
+                    )
+                }
+            }
             holder.withMap { m ->
-                m.uiSettings.setAllGesturesEnabled(false)
+                m.uiSettings.setAllGesturesEnabled(interactive)
+                if (interactive) {
+                    m.uiSettings.isRotateGesturesEnabled = false
+                    m.uiSettings.isTiltGesturesEnabled = false
+                }
                 m.uiSettings.isAttributionEnabled = false
-                if (all.size >= 2) {
-                    val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
-                        .includes(all.map { MLatLng(it.latitude, it.longitude) })
-                        .build()
-                    holder.mapView.post {
-                        runCatching { m.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds, 48)) }
-                    }
+                holder.mapView.post { fitPreview(m, all) }
+            }
+        }
+    }
+    Box(modifier) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                (holder.mapView.parent as? ViewGroup)?.removeView(holder.mapView)
+                holder.mapView
+            },
+        )
+        if (interactive) {
+            Column(
+                Modifier.align(Alignment.TopEnd).padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PreviewButton("Zoom in", { holder.withMap { it.animateCamera(org.maplibre.android.camera.CameraUpdateFactory.zoomBy(1.0), 250) } }) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+                PreviewButton("Zoom out", { holder.withMap { it.animateCamera(org.maplibre.android.camera.CameraUpdateFactory.zoomBy(-1.0), 250) } }) {
+                    // A plain minus sign; the core icon set has no "remove" glyph.
+                    Text("−", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+                PreviewButton("Show the whole trip", { holder.withMap { fitPreview(it, all) } }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
             }
         }
     }
-    AndroidView(
-        modifier = modifier,
-        factory = {
-            (holder.mapView.parent as? ViewGroup)?.removeView(holder.mapView)
-            holder.mapView
-        },
-    )
+}
+
+private fun fitPreview(m: MapLibreMap, all: List<LatLng>) {
+    if (all.size < 2) return
+    val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
+        .includes(all.map { MLatLng(it.latitude, it.longitude) })
+        .build()
+    runCatching { m.animateCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds, 48), 300) }
+}
+
+@Composable
+private fun PreviewButton(label: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Tip(label) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(36.dp).semantics { contentDescription = label },
+        ) {
+            Box(contentAlignment = Alignment.Center) { content() }
+        }
+    }
 }

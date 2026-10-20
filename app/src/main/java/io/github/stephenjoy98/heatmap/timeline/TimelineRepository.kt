@@ -86,7 +86,22 @@ sealed class DayEntry {
     }
 
     class Stay(override val start: Long, override val end: Long, val lat: Double, val lon: Double, val place: String?) : DayEntry()
+
+    /** Back-to-back trips in the same mode with no stop between them, shown as one; long-press for the parts. */
+    class Group(val moves: List<Move>) : DayEntry() {
+        override val start get() = moves.first().start
+        override val end get() = moves.last().end
+        val mode: TravelMode get() = moves.first().trip.mode
+        val distanceM: Double get() = moves.sumOf { it.trip.distanceM }
+        val needsReview: Boolean get() = moves.any { it.trip.needsReview }
+        val box: GeoBox? get() = moves.mapNotNull { it.box }.takeIf { it.isNotEmpty() }?.let { b ->
+            GeoBox(b.maxOf { it.north }, b.minOf { it.south }, b.maxOf { it.east }, b.minOf { it.west })
+        }
+    }
 }
+
+/** The entries with groups opened up into their trips. */
+fun List<DayEntry>.flattened(): List<DayEntry> = flatMap { if (it is DayEntry.Group) it.moves else listOf(it) }
 
 class TimelineData(
     val period: TimelinePeriod,
@@ -190,6 +205,26 @@ object TimelineRepository {
                 out += DayEntry.Stay(trip.endTime, nextStart, trip.endLat, trip.endLon, name(trip.endLat, trip.endLon))
             }
         }
+        return grouped(out)
+    }
+
+    /** Joins runs of back-to-back trips in the same mode (nothing between them) into groups. */
+    private fun grouped(entries: List<DayEntry>): List<DayEntry> {
+        val out = mutableListOf<DayEntry>()
+        var run = mutableListOf<DayEntry.Move>()
+        fun flush() {
+            if (run.size >= 2) out += DayEntry.Group(run) else out += run
+            run = mutableListOf()
+        }
+        for (e in entries) {
+            if (e is DayEntry.Move && (run.isEmpty() || run.last().trip.mode == e.trip.mode)) {
+                run += e
+            } else {
+                flush()
+                if (e is DayEntry.Move) run += e else out += e
+            }
+        }
+        flush()
         return out
     }
 

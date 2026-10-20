@@ -28,6 +28,7 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Units
 import io.github.stephenjoy98.heatmap.ui.MainActivity
 import io.github.stephenjoy98.heatmap.ui.formatInterval
@@ -148,6 +149,8 @@ class LocationTickerService : Service() {
                 accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
                 intervalMs = intervalMs.toInt(),
                 activity = ActivityTracker.current,
+                // The mode picked for the trip being taken right now, if any; the trip detector follows it.
+                mode = Prefs.currentMode.value ?: TravelMode.UNKNOWN.id,
                 altitude = altitudeOf(location),
             )
         )

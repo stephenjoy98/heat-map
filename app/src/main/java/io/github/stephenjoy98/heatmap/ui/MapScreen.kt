@@ -33,6 +33,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -110,6 +111,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val smoothRoutes by Prefs.smoothRoutes.collectAsStateWithLifecycle()
     val snapToRoads by Prefs.snapToRoads.collectAsStateWithLifecycle()
     var layersOpen by remember { mutableStateOf(false) }
+    var recordingSheet by remember { mutableStateOf(false) }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var accuracyOpen by rememberSaveable { mutableStateOf(false) }
     // Live GPS pauses while a page covers the map.
@@ -268,9 +270,12 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                         if (missing.isEmpty()) LocationTickerService.start(context) else permissionLauncher.launch(missing)
                     }
                 },
+                onOpen = { recordingSheet = true },
             )
         }
     }
+
+    if (recordingSheet) RecordingSheet(onDismiss = { recordingSheet = false })
 }
 
 /** Material's "filter_list" icon; the core icon set doesn't include it. */
@@ -322,16 +327,18 @@ private fun ModeFilterRow(filter: Set<TravelMode>) {
             label = { Text("All") },
             colors = chipColors,
         )
-        for (m in TravelMode.choosable + TravelMode.UNKNOWN) {
+        // Top-level modes only: a mode's chip covers its sub-modes too (PublicTransit includes Bus).
+        for (m in TravelMode.topLevel + TravelMode.UNKNOWN) {
             val on = !all && m in filter
             FilterChip(
                 selected = on,
                 onClick = {
                     // From "All", tapping a mode shows just that mode; after that, taps add or remove modes.
+                    val group = m.withChildren.toSet()
                     val next = when {
-                        all -> setOf(m)
-                        on -> filter - m
-                        else -> filter + m
+                        all -> group
+                        on -> filter - group
+                        else -> filter + group
                     }
                     Prefs.setModeFilter(next.ifEmpty { TravelMode.entries.toSet() })
                 },
@@ -375,8 +382,13 @@ private fun ControlPanel(
     tracking: Boolean,
     intervalSec: Int,
     onToggle: () -> Unit,
+    onOpen: () -> Unit,
 ) {
+    val currentId by Prefs.currentMode.collectAsStateWithLifecycle()
+    val current = currentId?.let { TravelMode.fromId(it) }
+    // Tapping the tile (anywhere but the button) picks the kind of trip and the recording interval.
     Surface(
+        onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
@@ -415,12 +427,26 @@ private fun ControlPanel(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (current != null) {
+                        Text(" · ", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        ModeDot(current, 8.dp)
+                        Spacer(Modifier.width(4.dp))
+                        Text(current.fullLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 val auto by Prefs.autoInterval.collectAsStateWithLifecycle()
                 val live by Prefs.liveIntervalSec.collectAsStateWithLifecycle()
                 Text(
                     if (auto) "Auto · ${if (tracking) "every ${formatInterval(live)}" else "adapts to you"}" else "Every ${formatInterval(intervalSec)}",
                     style = MaterialTheme.typography.titleLarge,
+                )
+            }
+            Tip("Trip type and interval") {
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 4.dp),
                 )
             }
         }

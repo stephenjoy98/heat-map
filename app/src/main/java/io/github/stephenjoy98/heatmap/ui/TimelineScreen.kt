@@ -103,8 +103,16 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.DpOffset
 import io.github.stephenjoy98.heatmap.data.DeleteResult
 import io.github.stephenjoy98.heatmap.data.Trip
+import io.github.stephenjoy98.heatmap.data.RoadQuestion
+import io.github.stephenjoy98.heatmap.roads.RoadSnapper
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.runtime.mutableStateMapOf
+import io.github.stephenjoy98.heatmap.timeline.flattened
 import kotlin.math.ln
 import kotlin.math.min
 
@@ -126,6 +134,18 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val data by produceState<TimelineData?>(null, period, changes, resumeTick, colors) {
         value = withContext(Dispatchers.IO) { TimelineRepository.load(context, period) }
     }
+
+    // Trips the app couldn't classify, answered at the top of the list.
+    val questions by produceState(emptyList<Trip>(), changes, resumeTick) {
+        value = withContext(Dispatchers.IO) { store.tripsNeedingReview() }
+    }
+    val roadQuestions by produceState(emptyList<Pair<RoadQuestion, Trip?>>(), changes, resumeTick) {
+        value = withContext(Dispatchers.IO) { store.openRoadQuestions().take(30).map { it to store.trip(it.tripId) } }
+    }
+    // A trip to zoom to once its day has loaded (from "Show on Timeline").
+    var focusTrip by remember { mutableStateOf<Long?>(null) }
+    // Grouped trips that are opened up into their parts, by start time.
+    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
 
     val camera = rememberMapCamera()
     val tilePx = remember { heatTilePx(context.resources.displayMetrics.density) }
@@ -214,6 +234,12 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         if (d.period != framedPeriod) {
             framedPeriod = d.period
             frame(camera, box)
+        }
+        focusTrip?.let { id ->
+            d.entries.flattened().firstOrNull { it is DayEntry.Move && it.trip.id == id }?.let { e ->
+                (e as DayEntry.Move).box?.let { frame(camera, it) }
+                focusTrip = null
+            }
         }
     }
 
@@ -348,7 +374,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     trip = trip,
                     state = retime,
                     loading = retimeLoading,
-                    entries = data?.entries.orEmpty(),
+                    entries = data?.entries.orEmpty().flattened(),
                     onCancel = { retiming = null },
                     onSave = { start, end ->
                         scope.launch {
@@ -366,6 +392,33 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (d == null) return@LazyColumn
+                if (questions.isNotEmpty()) {
+                    item(key = "questions") {
+                        TripQuestionsCard(
+                            questions = questions,
+                            onAnswer = { trip, mode -> changeMode(trip, mode) },
+                            onShowDay = { trip ->
+                                anchor = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate()
+                                scale = TimelineScale.DAY
+                                focusTrip = trip.id
+                            },
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                    }
+                }
+                if (roadQuestions.isNotEmpty()) {
+                    item(key = "roads") {
+                        RoadQuestionsCard(
+                            questions = roadQuestions,
+                            onAnswer = { q, choice ->
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { RoadSnapper.answer(context, q, choice) }
+                                }
+                            },
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                    }
+                }
                 item { Summary(d) }
                 when (scale) {
                     TimelineScale.DAY -> {
@@ -379,10 +432,25 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                     onRetime = { retiming = entry.trip },
                                 )
                                 is DayEntry.Stay -> StayRow(entry) { camera.animateTo(entry.lat, entry.lon, 16f) }
+                                is DayEntry.Group -> GroupRow(
+                                    group = entry,
+                                    expanded = expanded[entry.start] == true,
+                                    onToggle = { expanded[entry.start] = expanded[entry.start] != true },
+                                    onClick = { entry.box?.let { frame(camera, it) } },
+                                    onModeAll = { m -> entry.moves.forEach { changeMode(it.trip, m) } },
+                                    onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
+                                    onSectionMode = { mv, m -> changeMode(mv.trip, m) },
+                                    onSectionRetime = { mv -> retiming = mv.trip },
+                                )
                             }
                         }
-                        if (d.entries.any { it is DayEntry.Move }) {
-                            item { Hint("Long-press a trip to change how you travelled or when it started and ended.") }
+                        if (d.entries.any { it is DayEntry.Move || it is DayEntry.Group }) {
+                            item {
+                                Hint(
+                                    "Long-press a trip to change how you travelled or when it started and ended. " +
+                                        "Trips in a row in the same mode are shown together: long-press to see each part."
+                                )
+                            }
                         }
                     }
                     else -> {
@@ -445,7 +513,7 @@ private fun Summary(d: TimelineData) {
         if (d.kmByMode.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                (TravelMode.choosable + TravelMode.UNKNOWN).forEach { m ->
+                (TravelMode.ordered + TravelMode.UNKNOWN).forEach { m ->
                     val km = d.kmByMode[m] ?: return@forEach
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(10.dp).background(Color(m.color), CircleShape))
@@ -478,7 +546,13 @@ private fun duration(ms: Long): String {
 /** One step of the day: a coloured rail on the left, details on the right. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TimelineRow(color: Color, onClick: () -> Unit, onLongClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+private fun TimelineRow(
+    color: Color,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -493,6 +567,85 @@ private fun TimelineRow(color: Color, onClick: () -> Unit, onLongClick: (() -> U
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).padding(vertical = 4.dp)) { content() }
+        trailing?.let { Box(Modifier.align(Alignment.CenterVertically)) { it() } }
+    }
+}
+
+/**
+ * Back-to-back trips in the same mode, as one row. Long-press (or the arrow) opens it up into its parts, each
+ * of which can be edited like any trip; the menu changes the mode of all of them at once.
+ */
+@Composable
+private fun GroupRow(
+    group: DayEntry.Group,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onClick: () -> Unit,
+    onModeAll: (TravelMode) -> Unit,
+    onSectionClick: (DayEntry.Move) -> Unit,
+    onSectionMode: (DayEntry.Move, TravelMode) -> Unit,
+    onSectionRetime: (DayEntry.Move) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    var menu by remember { mutableStateOf(false) }
+    Column {
+        Box {
+            TimelineRow(
+                color = Color(group.mode.color),
+                onClick = onClick,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onToggle()
+                },
+                trailing = {
+                    Row {
+                        Tip("Change all ${group.moves.size} parts") {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Change all parts") }
+                        }
+                        Tip(if (expanded) "Hide the parts" else "Show the parts") {
+                            IconButton(onClick = onToggle) {
+                                Icon(
+                                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = if (expanded) "Hide the parts" else "Show the parts",
+                                )
+                            }
+                        }
+                    }
+                },
+            ) {
+                Text("${group.mode.fullLabel} · ${Insights.km(group.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "${timeFormat.format(Date(group.start))} – ${timeFormat.format(Date(group.end))} · ${duration(group.end - group.start)} · " +
+                        "${group.moves.size} parts" + (if (group.needsReview) " · needs your answer" else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, offset = DpOffset(48.dp, 0.dp)) {
+                Text(
+                    "How did you travel? (all ${group.moves.size} parts)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                ModeMenuItems(current = group.mode) { m ->
+                    menu = false
+                    if (m != group.mode || group.needsReview) onModeAll(m)
+                }
+            }
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(Modifier.padding(start = 20.dp)) {
+                group.moves.forEach { mv ->
+                    MoveRow(
+                        entry = mv,
+                        onClick = { onSectionClick(mv) },
+                        onMode = { onSectionMode(mv, it) },
+                        onRetime = { onSectionRetime(mv) },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -514,7 +667,7 @@ private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit, onMode: (TravelMo
             Text("${t.mode.label} · ${Insights.km(t.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
             Text(
                 "${timeFormat.format(Date(t.startTime))} – ${timeFormat.format(Date(t.endTime))} · ${duration(t.endTime - t.startTime)}" +
-                    (if (t.needsReview) " · needs your answer in Insights" else ""),
+                    (if (t.needsReview) " · needs your answer (long-press, or see above)" else ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -526,16 +679,9 @@ private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit, onMode: (TravelMo
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            TravelMode.choosable.forEach { m ->
-                DropdownMenuItem(
-                    text = { Text(m.label) },
-                    leadingIcon = { Box(Modifier.size(12.dp).background(Color(m.color), CircleShape)) },
-                    trailingIcon = { if (m == t.mode) Icon(Icons.Filled.Check, contentDescription = "Current") },
-                    onClick = {
-                        menu = false
-                        if (m != t.mode || t.needsReview) onMode(m)
-                    },
-                )
+            ModeMenuItems(current = t.mode) { m ->
+                menu = false
+                if (m != t.mode || t.needsReview) onMode(m)
             }
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             DropdownMenuItem(
@@ -564,6 +710,7 @@ private fun Hint(text: String) {
 private fun entryLabel(e: DayEntry): String = when (e) {
     is DayEntry.Move -> e.trip.mode.label
     is DayEntry.Stay -> e.place ?: "Stay"
+    is DayEntry.Group -> e.mode.label
 }
 
 /**
@@ -701,7 +848,7 @@ private fun PeriodRow(stat: PeriodStat, scale: TimelineScale, max: Double, onCli
         ) {
             if (max > 0) {
                 val shown = (stat.meters / max).toFloat().coerceIn(0f, 1f)
-                (TravelMode.choosable + TravelMode.UNKNOWN).forEach { m ->
+                (TravelMode.ordered + TravelMode.UNKNOWN).forEach { m ->
                     val part = stat.metersByMode[m] ?: return@forEach
                     if (part <= 0) return@forEach
                     Box(Modifier.fillMaxHeight().weight((part / stat.meters).toFloat() * shown).background(Color(m.color)))

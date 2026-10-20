@@ -49,6 +49,10 @@ object Prefs {
     private val _tracking = MutableStateFlow(false)
     val tracking: StateFlow<Boolean> = _tracking
 
+    /** The travel mode picked for the trip being taken right now (tags new dots), or null to detect it. */
+    private val _currentMode = MutableStateFlow<Int?>(null)
+    val currentMode: StateFlow<Int?> = _currentMode
+
     private val _highAccuracy = MutableStateFlow(true)
     val highAccuracy: StateFlow<Boolean> = _highAccuracy
 
@@ -115,13 +119,23 @@ object Prefs {
             sp.getString("deleted_modes", null).orEmpty().split(',').mapNotNull { it.toIntOrNull() },
             sp.getInt("next_mode_id", TravelMode.FIRST_CUSTOM_ID),
         )
+        TravelMode.loadLabels(sp.getString("mode_labels", null))
+        val modesBefore = TravelMode.entries
+        if (!sp.getBoolean("modes_seeded_v1", false)) {
+            TravelMode.seedDefaults()
+            sp.edit().putBoolean("modes_seeded_v1", true).apply()
+            saveModes()
+        }
         ModeColors.replace(ModeColors.decode(sp.getString("mode_colors", null)))
         _modeFilter.value = sp.getStringSet("mode_filter", null)
             ?.mapNotNull { it.toIntOrNull()?.let(TravelMode::fromId) }?.toSet()
+            // Modes added just now are shown if every mode was.
+            ?.let { f -> if (f.containsAll(modesBefore)) f + TravelMode.entries else f }
             ?: TravelMode.entries.toSet()
         _aiEngine.value = AiEngine.entries.byName(sp.getString("ai_engine", null))
         _cloudModel.value = sp.getString("cloud_model", null) ?: DEFAULT_CLOUD_MODEL
         _onboarded.value = sp.getBoolean("onboarded", false)
+        _currentMode.value = if (sp.contains("current_mode")) sp.getInt("current_mode", 0).takeIf { id -> TravelMode.fromId(id).id == id } else null
         _shareRoutes.value = sp.getBoolean("share_routes", true)
         _autoBackup.value = sp.getBoolean("auto_backup", true)
         _backupEveryHours.value = sp.getInt("backup_every_hours", 24)
@@ -145,6 +159,13 @@ object Prefs {
     fun setTracking(on: Boolean) {
         _tracking.value = on
         sp.edit().putBoolean("tracking", on).apply()
+        // A trip picked for "right now" ends when recording stops.
+        if (!on) setCurrentMode(null)
+    }
+
+    fun setCurrentMode(mode: TravelMode?) {
+        _currentMode.value = mode?.id
+        sp.edit().apply { if (mode == null) remove("current_mode") else putInt("current_mode", mode.id) }.apply()
     }
 
     fun setHighAccuracy(on: Boolean) {
@@ -170,21 +191,24 @@ object Prefs {
             .putString("custom_modes", TravelMode.encodeAdded())
             .putString("deleted_modes", TravelMode.deletedBuiltIns.joinToString(","))
             .putInt("next_mode_id", TravelMode.nextId)
+            .putString("mode_labels", TravelMode.encodeLabels())
             .apply()
         ModeColors.bump()
     }
 
     /** Adds a travel mode. If the map shows every mode, it shows the new one too. */
-    fun addMode(label: String, color: Long, kind: TravelMode.Kind): TravelMode {
+    fun addMode(label: String, color: Long, kind: TravelMode.Kind, parent: TravelMode? = null): TravelMode {
         val showingAll = _modeFilter.value.containsAll(TravelMode.entries)
-        val mode = TravelMode.create(label, color, kind)
+        // A sub-mode shows on the map whenever its parent does.
+        val parentShown = parent != null && parent in _modeFilter.value
+        val mode = TravelMode.create(label, color, kind, parent?.id)
         saveModes()
-        if (showingAll) setModeFilter(_modeFilter.value + mode)
+        if (showingAll || parentShown) setModeFilter(_modeFilter.value + mode)
         return mode
     }
 
-    fun editMode(mode: TravelMode, label: String, color: Long, kind: TravelMode.Kind) {
-        TravelMode.edit(mode, label, color, kind)
+    fun editMode(mode: TravelMode, label: String, color: Long, kind: TravelMode.Kind, parent: TravelMode?) {
+        TravelMode.edit(mode, label, color, kind, parent?.id)
         saveModes()
     }
 

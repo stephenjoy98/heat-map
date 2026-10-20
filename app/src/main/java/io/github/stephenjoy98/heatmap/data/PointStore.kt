@@ -715,13 +715,14 @@ class PointStore private constructor(context: Context) :
     fun tripCountForMode(mode: TravelMode): Int = long("SELECT COUNT(*) FROM trips WHERE mode = ${mode.id}").toInt()
 
     /**
-     * Moves every trip and dot of a travel mode that's being deleted to Other, and asks about those trips again
-     * on the Insights page. Returns the local days whose dots changed, for backups.
+     * Moves every trip and dot of a travel mode that's being deleted to [to]: a sub-mode's go to its parent,
+     * otherwise to Other, and then they're asked about again. Returns the local days whose dots changed.
      */
-    fun replaceMode(mode: TravelMode): Set<String> {
+    fun replaceMode(mode: TravelMode, to: TravelMode = TravelMode.UNKNOWN): Set<String> {
         val db = writableDatabase
         val days = HashSet<String>()
-        val other = TravelMode.UNKNOWN.id
+        val other = to.id
+        val ask = if (to == TravelMode.UNKNOWN) 1 else 0
         db.beginTransaction()
         try {
             db.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM points WHERE mode = ${mode.id}", null)
@@ -729,7 +730,7 @@ class PointStore private constructor(context: Context) :
             db.execSQL("DELETE FROM trip_paths WHERE trip_id IN (SELECT id FROM trips WHERE mode = ${mode.id})")
             db.execSQL("DELETE FROM road_questions WHERE trip_id IN (SELECT id FROM trips WHERE mode = ${mode.id})")
             db.execSQL("UPDATE trips SET inferred_mode = $other WHERE inferred_mode = ${mode.id}")
-            db.execSQL("UPDATE trips SET mode = $other, needs_review = 1, uploaded = 0 WHERE mode = ${mode.id}")
+            db.execSQL("UPDATE trips SET mode = $other, needs_review = MAX(needs_review, $ask), uploaded = 0 WHERE mode = ${mode.id}")
             db.execSQL("UPDATE points SET mode = $other WHERE mode = ${mode.id}")
             db.setTransactionSuccessful()
         } finally {

@@ -89,9 +89,18 @@ up to your Google account, and lets you compare explored areas with friends.
 - A map of the period's routes, drawn as solid lines in each travel mode's colour, framed to fit.
 - **Day**: a vertical timeline of trips (mode, distance, times) and the stays between them, named by
   street and town. Tap a trip or stay to zoom the map to it.
+- **Questions at the top**: "How did you travel?" and "Which road did you take?" one at a time, on a map you
+  can pinch-zoom (green start, red end), with ‹ › to step through them. A badge on the Timeline tab counts
+  them.
+- **Grouped trips**: back-to-back trips in the same mode show as one entry; long-press it (or tap the arrow)
+  to see and edit each part, or change the mode of all parts from its menu.
 - **Long-press a trip** to change how you travelled (walking, cycling, driving, car share, transit) or
   **Change times**: a start–end slider over the day's dots, like Edit dots, picks the trip's first and last
   dot. The trips or stays before and after it grow or shrink to match.
+- **Right now**: tap the recording tile on the map to say what kind of trip you're on (new dots are filed
+  under it until you stop recording) and switch between automatic and a set interval.
+- **Sub-modes**: CarPool, RideShare › Bike and Car, PublicTransit › SkyTrain, Bus and SeaBus come
+  suggested; add your own with "Part of". Train and boat modes aren't snapped to roads.
 - **Travel modes** in Settings: pick each mode's colour with a colour picker or a hex code (reset one or all
   to the defaults), **add your own modes** (a name, a colour, and whether it travels on foot, by bike, by car
   or by public transport, which decides how its trips are matched to roads), and **delete** modes you don't

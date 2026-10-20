@@ -19,10 +19,12 @@ object Valhalla {
     private const val BASE = "https://valhalla1.openstreetmap.de"
     private const val USER_AGENT = "LocationTicker/2 (io.github.stephenjoy98.heatmap)"
 
-    fun costing(mode: TravelMode) = when (mode.kind) {
+    /** The road network a mode travels on; null for trains and boats, which aren't matched to roads. */
+    fun costing(mode: TravelMode): String? = when (mode.kind) {
         TravelMode.Kind.FOOT -> "pedestrian"
         TravelMode.Kind.BIKE -> "bicycle"
         TravelMode.Kind.PUBLIC -> "bus"
+        TravelMode.Kind.TRACK -> null
         else -> "auto"
     }
 

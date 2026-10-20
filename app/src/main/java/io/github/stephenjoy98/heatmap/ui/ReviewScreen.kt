@@ -98,9 +98,6 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
     val data by produceState<ReviewData?>(null, period, changes, refresh, resumeTick) {
         value = withContext(Dispatchers.IO) { ReviewRepository.load(context, period) }
     }
-    val roadQuestions by produceState(emptyList<Pair<RoadQuestion, Trip?>>(), changes, refresh, resumeTick) {
-        value = withContext(Dispatchers.IO) { store.openRoadQuestions().take(10).map { it to store.trip(it.tripId) } }
-    }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
@@ -144,22 +141,7 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
                 return@LazyColumn
             }
 
-            if (d.questions.isNotEmpty()) {
-                item {
-                    Text("How did you travel?", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "The app couldn't tell these trips apart. Your answer also teaches it your regular routes.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                items(d.questions.take(10), key = { it.id }) { trip ->
-                    QuestionCard(trip) { mode ->
-                        store.setTripMode(trip.id, mode)
-                        refresh++
-                    }
-                }
-            }
+            // Trip questions ("How did you travel?") are answered at the top of the Timeline tab.
 
             item { StatGrid(d) }
             item { ModeBreakdown(d) }
@@ -203,7 +185,7 @@ private fun ModeBreakdown(d: ReviewData) {
             if (max <= 0) {
                 Text("No trips yet in this period.", style = MaterialTheme.typography.bodySmall)
             }
-            for (mode in TravelMode.choosable + TravelMode.UNKNOWN) {
+            for (mode in TravelMode.ordered + TravelMode.UNKNOWN) {
                 val km = d.kmByMode[mode] ?: 0.0
                 if (km <= 0 && mode == TravelMode.UNKNOWN) continue
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -352,93 +334,4 @@ private fun InsightsCard(d: ReviewData) {
     if (showChoice) AiChoiceDialog(onDismiss = { showChoice = false })
 }
 
-@Composable
-private fun QuestionCard(trip: Trip, onAnswer: suspend (TravelMode) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val path by produceState<List<LatLng>>(emptyList(), trip.id) {
-        value = withContext(Dispatchers.IO) {
-            val p = PointStore.get(context).tripPath(trip.id)
-            List(p.size / 2) { LatLng(p[it * 2], p[it * 2 + 1]) }
-        }
-    }
-    val start = Date(trip.startTime)
-    val day = DateFormat.getDateInstance(DateFormat.MEDIUM).format(start)
-    val time = DateFormat.getTimeInstance(DateFormat.SHORT)
 
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
-            Text("$day · ${time.format(start)}–${time.format(Date(trip.endTime))}", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "${Insights.km(trip.distanceM / 1000)} · average ${Units.speed(trip.avgSpeedKmh)} · best guess: ${trip.inferredMode.label}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (path.size >= 2) {
-                Spacer(Modifier.height(8.dp))
-                TripPreview(path)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (mode in TravelMode.choosable) {
-                    AssistChip(
-                        onClick = { scope.launch { withContext(Dispatchers.IO) { onAnswer(mode) } } },
-                        label = { Text(mode.label) },
-                        leadingIcon = { Box(Modifier.size(10.dp).background(Color(mode.color), CircleShape)) },
-                        colors = if (mode == trip.inferredMode) {
-                            AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                        } else {
-                            AssistChipDefaults.assistChipColors()
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-private val optionColors = listOf(Color(0xFFFF7A1A), Color(0xFF3D9BFF), Color(0xFF66BB6A), Color(0xFFAB47BC))
-private val recordedColor = Color(0xFF9E9E9E)
-
-@Composable
-private fun RoadQuestionCard(question: RoadQuestion, trip: Trip?, onAnswer: suspend (Int) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val colors = remember(question.id) {
-        var road = 0
-        question.options.map { if (it.recorded) recordedColor else optionColors[road++ % optionColors.size] }
-    }
-    val lines = remember(question.id) {
-        question.options.mapIndexed { i, o ->
-            val pts = Polyline.decode(o.poly)
-            PreviewLine(List(pts.size / 2) { LatLng(pts[it * 2], pts[it * 2 + 1]) }, colors[i], if (o.recorded) 2.5f else 4.5f)
-        }.sortedByDescending { it.widthDp } // Recorded line on top, thin.
-    }
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
-            trip?.let {
-                val start = Date(it.startTime)
-                Text(
-                    "${DateFormat.getDateInstance(DateFormat.MEDIUM).format(start)} · ${DateFormat.getTimeInstance(DateFormat.SHORT).format(start)} · ${it.mode.label}",
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            TripPreviewLinesMap(lines, Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(12.dp)))
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                question.options.forEachIndexed { i, option ->
-                    AssistChip(
-                        onClick = { scope.launch { withContext(Dispatchers.IO) { onAnswer(i) } } },
-                        label = { Text(option.label) },
-                        leadingIcon = { Box(Modifier.size(10.dp).background(colors[i], CircleShape)) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TripPreview(path: List<LatLng>) {
-    TripPreviewMap(path, Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(12.dp)))
-}

@@ -1,6 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -128,15 +128,21 @@ private var avatarBounds by mutableStateOf<Rect?>(null)
 
 /**
  * The account button for the top-right corner of every tab, like Google's apps. A badge shows how many
- * trips and roads are waiting for an answer on the Insights page.
+ * trips and roads are waiting for an answer on the Timeline.
  */
 @Composable
 fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val pending = LocalReviewCount.current
-    val tip = if (pending > 0) "Your account · $pending waiting in Insights" else "Your account: profile, friends, insights, backup and settings"
+    val tip = if (pending > 0) "Your account · $pending waiting for your answer on the Timeline" else "Your account: profile, friends, insights, backup and settings"
     Tip(tip, modifier) {
-        IconButton(onClick = onClick, modifier = Modifier.trackBounds { avatarBounds = it }) {
-            BadgedBox(badge = { if (pending > 0) Badge { Text(pending.toString()) } }) { Avatar(32) }
+        // The badge sits over the button rather than inside it, so the button's round clip can't cut it off.
+        Box {
+            IconButton(onClick = onClick, modifier = Modifier.trackBounds { avatarBounds = it }) { Avatar(32) }
+            if (pending > 0) {
+                Badge(Modifier.align(Alignment.TopEnd).offset(x = (-2).dp, y = 2.dp)) {
+                    Text(if (pending > 99) "99+" else pending.toString())
+                }
+            }
         }
     }
 }
@@ -154,6 +160,7 @@ fun AccountMenu(
     onReview: () -> Unit,
     onSettings: () -> Unit,
     onAbout: () -> Unit,
+    onQuestions: () -> Unit = {},
     reviewCount: Int = 0,
 ) {
     val context = LocalContext.current
@@ -242,13 +249,39 @@ fun AccountMenu(
                     }
                 }
 
+                // What the badge on the account button is about, highlighted, and a tap away.
+                if (reviewCount > 0) {
+                    Surface(
+                        onClick = { go(onQuestions) },
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Badge { Text(if (reviewCount > 99) "99+" else reviewCount.toString()) }
+                            Spacer(Modifier.width(16.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    if (reviewCount == 1) "1 trip question waiting" else "$reviewCount trip questions waiting",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                Text(
+                                    "How you travelled and which road you took · answer them on the Timeline",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                        }
+                    }
+                }
                 MenuRow(Icons.Filled.AccountCircle, "Profile", "Your stats and the places you've explored") { go(onProfile) }
                 MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas") { go(onFriends) }
                 MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history") { go(onBackup) }
                 MenuRow(
                     Icons.Filled.Star,
                     "Insights",
-                    if (reviewCount > 0) "$reviewCount waiting for your answer · insights and stats" else "Insights, stats and questions about your trips",
+                    "Your stats, steps and write-ups about your travels",
                 ) { go(onReview) }
                 MenuRow(Icons.Filled.Settings, "Settings", null) { go(onSettings) }
                 MenuRow(Icons.Filled.Info, "About", "Who made it, open source and licences") { go(onAbout) }

@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -102,7 +104,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Pending review questions, shown as a badge on the account button. */
+/** Trip and road questions waiting on the Timeline, shown as a badge on the account button. */
 val LocalReviewCount = compositionLocalOf { 0 }
 
 @Composable
@@ -217,6 +219,7 @@ private fun AppScaffold(
             onReview = { stack.push(Page.REVIEW) },
             onSettings = { stack.push(Page.SETTINGS) },
             onAbout = { stack.push(Page.ABOUT) },
+            onQuestions = { tab = MainActivity.TAB_TIMELINE },
         )
     }
 
@@ -239,7 +242,12 @@ private fun AppScaffold(
                             NavigationBarItem(
                                 selected = tab == MainActivity.TAB_TIMELINE,
                                 onClick = { tab = MainActivity.TAB_TIMELINE },
-                                icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                                icon = {
+                                    // Questions about trips wait at the top of the Timeline.
+                                    BadgedBox(badge = { if (questions > 0) Badge { Text(if (questions > 99) "99+" else questions.toString()) } }) {
+                                        Icon(Icons.Filled.DateRange, contentDescription = null)
+                                    }
+                                },
                                 label = { Text("Timeline") },
                             )
                         }

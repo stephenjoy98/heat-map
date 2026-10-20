@@ -91,6 +91,11 @@ object RoadSnapper {
         val lat = DoubleArray(idx.size) { raw[idx[it] * 2] }
         val lon = DoubleArray(idx.size) { raw[idx[it] * 2 + 1] }
         val costing = Valhalla.costing(trip.mode)
+        if (costing == null) {
+            // Trains and boats: keep the recorded line.
+            store.saveTripPath(trip.id, STATUS_RECORDED, null, null)
+            return 0
+        }
 
         val matched = Valhalla.match(lat, lon, costing)
         if (matched == null) {

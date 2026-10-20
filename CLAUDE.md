@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.18.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.19.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -77,6 +77,13 @@ travel stats, Insights (AI write-ups), backup and friends.
   `defaultColor`. Deleting a mode runs `PointStore.replaceMode` (trips → Other, needs_review). Backups
   write a `backup/modes` doc; restore merges it first. UI: `TravelModesSection` + `ColorPickerDialog`.
   When checking "all modes shown" use `containsAll(TravelMode.entries)`, not sizes.
+  Since 2.19.0: sub-modes via `parentId` (one level; `topLevel`, `ordered`, `children`, `withChildren`,
+  `fullLabel`); built-ins renamable (Prefs "mode_labels"); defaults seeded once ("modes_seeded_v1":
+  CarPool, RideShare › Bike/Car, PublicTransit › SkyTrain/Bus/SeaBus); Kind.TRACK = no road matching
+  (`Valhalla.costing` returns null). Pickers: `ModeChips` / `ModeMenuItems` (ModePicker.kt). Map filter chips
+  are top-level and toggle `withChildren`. Deleting a sub-mode moves its trips to the parent.
+  `Prefs.currentMode` (set from `RecordingSheet`, opened by tapping the record tile) tags new dots' `mode`;
+  cleared when tracking stops; TripDetector follows a majority of tagged dots.
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
   `Route3d` (3D route geometry), `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
 - `map/`: `VectorMapSupport.kt` (`VectorMaps`: OpenFreeMap Positron style, dark recolour, terrain hillshade
@@ -94,7 +101,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   with range slider, soft delete/restore, undo snackbar over the map, layers button; long-press a trip row
   for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
-  the map is framed only when the period changes, not on every reload), `MapEditor`,
+  the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back
+  same-mode trips (long-press expands; `flattened()` for lookups); `TripQuestionsCard` and
+  `RoadQuestionsCard` (TripQuestions.kt) sit at the top of the list — questions moved off Insights in 2.19.0;
+  Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton, ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
   pictures + 3D buildings), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
   `ProfileMenu` (account menu; badge for pending questions), `SettingsScreen` (+ `PermissionsSection`),

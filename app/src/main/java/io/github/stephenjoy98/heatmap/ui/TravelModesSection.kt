@@ -2,6 +2,8 @@ package io.github.stephenjoy98.heatmap.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,30 +61,31 @@ import kotlinx.coroutines.withContext
 fun TravelModesSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var recolouring by remember { mutableStateOf<TravelMode?>(null) }
     var editing by remember { mutableStateOf<TravelMode?>(null) }
     var adding by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<TravelMode?>(null) }
 
     Section("Travel modes") {
-        (TravelMode.choosable + TravelMode.UNKNOWN).forEachIndexed { i, mode ->
+        (TravelMode.ordered + TravelMode.UNKNOWN).forEachIndexed { i, mode ->
+            val sub = mode.parentId != null
             if (i > 0) ItemDivider()
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable { if (mode.builtIn) recolouring = mode else editing = mode }
-                    .padding(start = 16.dp, end = if (mode.deletable) 4.dp else 16.dp, top = 10.dp, bottom = 10.dp),
+                    .clickable { editing = mode }
+                    .padding(start = if (sub) 40.dp else 16.dp, end = if (mode.deletable) 4.dp else 16.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(28.dp).background(Color(mode.color), CircleShape))
+                Box(Modifier.size(if (sub) 22.dp else 28.dp).background(Color(mode.color), CircleShape))
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(mode.label, style = MaterialTheme.typography.bodyLarge)
                     Text(
                         when {
+                            sub -> "In ${mode.parent?.label} · ${mode.kind.label}"
                             !mode.builtIn -> "Added · ${mode.kind.label}"
                             mode.color != mode.defaultColor -> "Custom colour"
-                            else -> "Default colour"
+                            else -> "Built in"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -143,33 +146,18 @@ fun TravelModesSection() {
         }
     }
 
-    recolouring?.let { mode ->
-        ColorPickerDialog(
-            title = "${mode.label} colour",
-            initial = mode.color,
-            default = mode.defaultColor,
-            onDismiss = { recolouring = null },
-            onReset = {
-                Prefs.setModeColor(mode, null)
-                recolouring = null
-            },
-            onPick = {
-                Prefs.setModeColor(mode, it)
-                recolouring = null
-            },
-        )
-    }
-
     if (adding) {
-        ModeDialog(mode = null, onDismiss = { adding = false }) { label, color, kind ->
-            Prefs.addMode(label, color, kind)
+        ModeDialog(mode = null, onDismiss = { adding = false }) { label, color, kind, parent ->
+            Prefs.addMode(label, color, kind, parent)
             adding = false
         }
     }
     editing?.let { mode ->
-        ModeDialog(mode = mode, onDismiss = { editing = null }) { label, color, kind ->
-            val rematch = kind != mode.kind
-            Prefs.editMode(mode, label, color, kind)
+        ModeDialog(mode = mode, onDismiss = { editing = null }) { label, color, kind, parent ->
+            val rematch = !mode.builtIn && kind != mode.kind
+            Prefs.editMode(mode, label, color, kind, parent)
+            // Built-in modes keep their default colour; the one picked is saved as a custom colour.
+            if (mode.builtIn) Prefs.setModeColor(mode, color)
             editing = null
             if (rematch) {
                 // Match its trips to footpaths, cycle routes, roads or bus routes again.
@@ -182,21 +170,26 @@ fun TravelModesSection() {
     }
 
     deleting?.let { mode ->
+        val subs = mode.children
+        val parent = mode.parent
         val trips by produceState<Int?>(null, mode) {
-            value = withContext(Dispatchers.IO) { PointStore.get(context).tripCountForMode(mode) }
+            value = withContext(Dispatchers.IO) { mode.withChildren.sumOf { PointStore.get(context).tripCountForMode(it) } }
         }
         AlertDialog(
             onDismissRequest = { deleting = null },
             icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
             title = { Text("Delete ${mode.label}?") },
             text = {
+                val becomes = parent?.label ?: "Other"
+                val ask = if (parent == null) ", and you'll be asked how you travelled them" else ""
                 val count = when (val n = trips) {
                     null -> "Counting trips…"
                     0 -> "No trips use it."
-                    1 -> "1 trip travelled by ${mode.label} becomes Other, and Insights will ask how you travelled it."
-                    else -> "$n trips travelled by ${mode.label} become Other, and Insights will ask how you travelled them."
+                    1 -> "1 trip becomes $becomes$ask."
+                    else -> "$n trips become $becomes$ask."
                 }
-                Text(if (mode.builtIn) "$count You can add it back later." else count)
+                val also = if (subs.isNotEmpty()) " Its sub-modes (${subs.joinToString { it.label }}) are deleted too." else ""
+                Text(count + also + if (mode.builtIn) " You can add it back later." else "")
             },
             confirmButton = {
                 TextButton(
@@ -204,9 +197,13 @@ fun TravelModesSection() {
                     onClick = {
                         deleting = null
                         scope.launch {
-                            val days = withContext(Dispatchers.IO) { PointStore.get(context).replaceMode(mode) }
-                            Prefs.deleteMode(mode)
-                            Prefs.addDirtyBackupDays(days)
+                            val store = PointStore.get(context)
+                            // Sub-modes go first, then the mode: its trips go to its parent, or to Other.
+                            for (m in subs + mode) {
+                                val days = withContext(Dispatchers.IO) { store.replaceMode(m, if (m == mode) parent ?: TravelMode.UNKNOWN else TravelMode.UNKNOWN) }
+                                Prefs.deleteMode(m)
+                                Prefs.addDirtyBackupDays(days)
+                            }
                             RoadSnapWorker.runNow(context)
                         }
                     },
@@ -217,32 +214,41 @@ fun TravelModesSection() {
     }
 }
 
-/** Adds a travel mode ([mode] null) or edits one you added: its name, what it travels like and its colour. */
+/**
+ * Adds a travel mode ([mode] null) or edits one. Built-in modes can be renamed and recoloured; modes you
+ * added can also change what they travel like and which mode they're part of.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ModeDialog(mode: TravelMode?, onDismiss: () -> Unit, onSave: (String, Long, TravelMode.Kind) -> Unit) {
+private fun ModeDialog(
+    mode: TravelMode?,
+    onDismiss: () -> Unit,
+    onSave: (String, Long, TravelMode.Kind, TravelMode?) -> Unit,
+) {
     val suggested = remember {
         val used = TravelMode.entries.map { it.color }.toSet()
         SWATCHES.firstOrNull { it !in used } ?: SWATCHES.first()
     }
+    val builtIn = mode?.builtIn == true
     var label by remember { mutableStateOf(mode?.label.orEmpty()) }
     var kind by remember { mutableStateOf(mode?.kind ?: TravelMode.Kind.CAR) }
-    var color by remember { mutableStateOf(mode?.defaultColor ?: suggested) }
+    var color by remember { mutableStateOf(mode?.color ?: suggested) }
+    var parent by remember { mutableStateOf(mode?.parent) }
     var picking by remember { mutableStateOf(false) }
+    // A mode with sub-modes can't become a sub-mode itself (one level only).
+    val parents = TravelMode.topLevel.filter { it != mode }
+    val canNest = !builtIn && mode?.children.isNullOrEmpty()
 
     val name = label.trim()
-    val taken = TravelMode.entries.any { it != mode && it.label.equals(name, ignoreCase = true) } ||
+    val taken = TravelMode.entries.any { it != mode && it.parentId == parent?.id && it.label.equals(name, ignoreCase = true) } ||
         TravelMode.removedBuiltIns.any { it.label.equals(name, ignoreCase = true) }
-    val error = when {
-        taken -> "There's already a mode called $name"
-        else -> null
-    }
+    val error = if (taken) "There's already a mode called $name" else null
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (mode == null) "Add travel mode" else "Edit ${mode.label}") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it.take(24) },
@@ -253,17 +259,44 @@ private fun ModeDialog(mode: TravelMode?, onDismiss: () -> Unit, onSave: (String
                     supportingText = { error?.let { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
-                Text("Travels like", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    "Used to match trips to footpaths, cycle routes, roads or bus routes",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TravelMode.Kind.choosable.forEach { k ->
-                        FilterChip(selected = k == kind, onClick = { kind = k }, label = { Text(k.label) })
+                if (canNest) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Part of", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "Make it a sub-mode, like Bus in PublicTransit",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = parent == null, onClick = { parent = null }, label = { Text("Nothing") })
+                        parents.forEach { p ->
+                            FilterChip(
+                                selected = p == parent,
+                                onClick = {
+                                    parent = p
+                                    // A new sub-mode usually travels like its parent.
+                                    if (mode == null) kind = p.kind
+                                },
+                                label = { Text(p.label) },
+                                leadingIcon = { ModeDot(p) },
+                            )
+                        }
+                    }
+                }
+                if (!builtIn) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Travels like", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "Used to match trips to footpaths, cycle routes, roads or bus routes. Trains and boats aren't matched.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TravelMode.Kind.choosable.forEach { k ->
+                            FilterChip(selected = k == kind, onClick = { kind = k }, label = { Text(k.label) })
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -281,7 +314,7 @@ private fun ModeDialog(mode: TravelMode?, onDismiss: () -> Unit, onSave: (String
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name, color, kind) }, enabled = name.isNotEmpty() && error == null) {
+            TextButton(onClick = { onSave(name, color, kind, parent) }, enabled = name.isNotEmpty() && error == null) {
                 Text(if (mode == null) "Add" else "Save")
             }
         },

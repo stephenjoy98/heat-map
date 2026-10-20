@@ -12,6 +12,30 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-10-20
+
+### Added
+- Sub-modes: a travel mode can sit inside another. New suggested modes: CarPool, RideShare › Bike and Car,
+  and PublicTransit › SkyTrain, Bus and SeaBus (modes you already have with those names are kept).
+  Pick a sub-mode anywhere you pick a mode; the map filter for a mode includes its sub-modes.
+- Add your own sub-modes in Settings → Travel modes with "Part of", and rename built-in modes.
+- "Train or boat" kind for modes like SkyTrain and SeaBus: their trips aren't snapped to roads.
+- Tap the recording tile on the map to say what kind of trip you're on right now (dots recorded from then on
+  are filed under it, without being asked), and to switch between automatic and a set interval.
+- Back-to-back trips in the same mode show as one entry on the Timeline. Long-press it, or tap the arrow, to
+  see each part, and edit any part like a normal trip; the menu changes the mode of all parts at once.
+- A badge on the Timeline tab counts the questions waiting for you.
+
+### Changed
+- "How did you travel?" and "Which road did you take?" are at the top of the Timeline, one at a time. The
+  map can be pinch-zoomed and has zoom buttons, with the start in green and the end in red.
+- The account menu highlights the questions waiting and takes you straight to them.
+- Car share is now called RideShare, and Transit is PublicTransit.
+
+### Fixed
+- The badge on the account button is no longer cut off.
+- Road questions counted in the badge can be answered again (they had no place in the app).
+
 ## [2.18.0] - 2026-10-20
 
 ### Added

@@ -200,7 +200,7 @@ object TripDetector {
         val open = PendingIntent.getActivity(
             context, 3,
             Intent(context, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_REVIEW)
+                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_TIMELINE)
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )

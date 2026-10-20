@@ -371,7 +371,7 @@ private fun ActionRow(title: String, subtitle: String, onClick: () -> Unit, colo
 }
 
 @Composable
-private fun IntervalSlider(intervalSec: Int, onChange: (Int) -> Unit) {
+internal fun IntervalSlider(intervalSec: Int, onChange: (Int) -> Unit) {
     // Drag locally, apply once on release, so the recorder isn't restarted for every slider step.
     var position by remember(intervalSec) { mutableFloatStateOf(nearestPreset(intervalSec).toFloat()) }
     val preview = INTERVAL_PRESETS[position.roundToInt()]
