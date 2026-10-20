@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +56,9 @@ private fun Release.dateLabel(): String? =
 @Composable
 fun WhatsNewDialog(releases: List<Release>, onDismiss: () -> Unit, onFullChangelog: () -> Unit) {
     AlertDialog(
+        // As wide as the other full-width cards, rather than the platform's narrow dialog width.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDismiss,
         icon = { JoyEmoji("🎉", size = 32) },
         title = {

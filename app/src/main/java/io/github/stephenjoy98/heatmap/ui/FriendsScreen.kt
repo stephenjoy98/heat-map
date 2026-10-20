@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import io.github.stephenjoy98.heatmap.cloud.StorageUsage
@@ -176,6 +177,9 @@ private fun RestorePreviewDialog(preview: Backup.Preview, onDismiss: () -> Unit,
         if (p.hasSettings) add("⚙️" to "Your settings: recording, map, theme, units, travel mode names and colours, filters and backup choices")
     }
     AlertDialog(
+        // As wide as the other full-width cards, rather than the platform's narrow dialog width.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDismiss,
         title = { Text("Restore from backup?") },
         text = {

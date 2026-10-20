@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -111,6 +112,9 @@ private fun androidx.compose.foundation.layout.RowScope.ModeBar(label: String, k
 @Composable
 fun ListDialog(title: String, explanation: String, rows: List<Pair<String, String>>, empty: String, onDismiss: () -> Unit) {
     AlertDialog(
+        // As wide as the other full-width cards, rather than the platform's narrow dialog width.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {

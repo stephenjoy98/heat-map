@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.27.1] - 2026-10-20
+
+### Changed
+- "What's new", the restore preview and the areas and cities lists are as wide as the app's other cards.
+
 ## [2.27.0] - 2026-10-20
 
 ### Added
