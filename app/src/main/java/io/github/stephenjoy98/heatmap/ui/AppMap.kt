@@ -17,6 +17,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Dispatchers
 import io.github.stephenjoy98.heatmap.data.Route3d
 import io.github.stephenjoy98.heatmap.data.GeoBox
+import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.ElevationPoint
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.DisposableEffect
@@ -423,9 +424,15 @@ private fun VectorAppMap(
             .collectLatest {
                 val m = holder.map ?: return@collectLatest
                 val b = m.projection.visibleRegion.latLngBounds
-                val box = GeoBox(b.latitudeNorth, b.latitudeSouth, b.longitudeEast, b.longitudeWest)
+                // A margin around the view, so routes don't visibly end at the screen edge while panning.
+                val padLat = (b.latitudeNorth - b.latitudeSouth) / 2
+                val padLon = (b.longitudeEast - b.longitudeWest) / 2
+                val box = GeoBox(b.latitudeNorth + padLat, b.latitudeSouth - padLat, b.longitudeEast + padLon, b.longitudeWest - padLon)
                 val load = loadRoute3d ?: return@collectLatest
-                val segments = withContext(Dispatchers.IO) { Route3d.build(load(box)) }
+                val segments = withContext(Dispatchers.IO) {
+                    // One fixed baseline, so heights don't change as the map moves.
+                    Route3d.build(load(box), PointStore.get(holder.mapView.context).altitudeBaseline())
+                }
                 m.style?.let { VectorMaps.showRoute3d(it, segments) }
             }
     }

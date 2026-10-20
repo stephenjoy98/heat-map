@@ -35,6 +35,10 @@ object Prefs {
     private val _liveIntervalSec = MutableStateFlow(60)
     val liveIntervalSec: StateFlow<Int> = _liveIntervalSec
 
+    /** Settings shown as a page per section (true) or as one long list. */
+    private val _settingsAsPages = MutableStateFlow(true)
+    val settingsAsPages: StateFlow<Boolean> = _settingsAsPages
+
     /** Home, work and other places where recording slows down while you're there. */
     private val _savedPlaces = MutableStateFlow<List<SavedPlace>>(emptyList())
     val savedPlaces: StateFlow<List<SavedPlace>> = _savedPlaces
@@ -153,6 +157,7 @@ object Prefs {
         _autoInterval.value = sp.getBoolean("auto_interval", false)
         _liveIntervalSec.value = _intervalSec.value
         _savedPlaces.value = SavedPlace.decode(sp.getString("saved_places", null))
+        _settingsAsPages.value = sp.getBoolean("settings_pages", true)
         _mapLayer.value = MapLayerType.entries.byName(sp.getString("map_layer", null)) ?: MapLayerType.DEFAULT
         _buildings3d.value = sp.getBoolean("buildings_3d", false)
         _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
@@ -319,6 +324,11 @@ object Prefs {
     fun setAutoInterval(on: Boolean) {
         _autoInterval.value = on
         sp.edit().putBoolean("auto_interval", on).apply()
+    }
+
+    fun setSettingsAsPages(on: Boolean) {
+        _settingsAsPages.value = on
+        sp.edit().putBoolean("settings_pages", on).apply()
     }
 
     fun friendsCache(): String? = sp.getString("friends_cache", null)

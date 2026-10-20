@@ -1,5 +1,8 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -85,6 +88,19 @@ import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/** The sections of Settings, each its own page when settings are shown as pages. */
+private enum class SettingsPage(val title: String, val summary: String, val emoji: String) {
+    RECORDING("Recording", "Automatic or set interval, GPS accuracy", "🎯"),
+    PLACES("Places", "Home, work and other places where recording slows down", "🏠"),
+    BATTERY("Battery", "Battery used at each recording interval", "🔋"),
+    APPEARANCE("Appearance", "Theme, units and Material expressive colours", "🎨"),
+    MAP("Map & routes", "Routes or points, smoothing and road snapping", "🗺️"),
+    MODES("Travel modes", "Add, rename, recolour and delete modes and sub-modes", "🚲"),
+    INSIGHTS("Insights", "Who writes your insights", "✨"),
+    PERMISSIONS("Permissions", "Location, activity, notifications, battery and Health Connect", "🔐"),
+    DATA("Data", "Export to GPX, or delete your history", "💾"),
+}
+
 private enum class IntervalUnit(val label: String, val seconds: Int) {
     SEC("sec", 1), MIN("min", 60), HOUR("h", 3600), DAY("day", 86_400)
 }
@@ -113,6 +129,11 @@ fun SettingsScreen(
     val aiEngine by Prefs.aiEngine.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     var showAiChoice by remember { mutableStateOf(false) }
+    val asPages by Prefs.settingsAsPages.collectAsStateWithLifecycle()
+    // The section open as its own page; null for the list of sections.
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    fun shows(p: SettingsPage) = !asPages || page == p
+    BackHandler(enabled = asPages && page != null && !LocalCovered.current) { page = null }
 
     // A running recorder picks up new settings when it is (re)started.
     fun applyToService() {
@@ -144,9 +165,9 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Settings") },
+                title = { Text(page?.takeIf { asPages }?.title ?: "Settings") },
                 navigationIcon = {
-                    BackButton(onBack)
+                    BackButton { if (asPages && page != null) page = null else onBack() }
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -161,7 +182,39 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
         ) {
-            Section("Recording") {
+            if (!asPages || page == null) {
+                Section("Layout") {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Show settings as", style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(8.dp))
+                        SegmentedChoice(
+                            options = listOf(true to "A page per section", false to "One list"),
+                            selected = asPages,
+                            onSelect = Prefs::setSettingsAsPages,
+                        )
+                    }
+                }
+            }
+            if (asPages && page == null) {
+                Section("Sections") {
+                    SettingsPage.entries.forEachIndexed { i, p ->
+                        if (i > 0) ItemDivider()
+                        Row(
+                            Modifier.fillMaxWidth().clickable { page = p }.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            JoyEmoji(p.emoji, size = 28)
+                            Spacer(Modifier.width(16.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(p.title, style = MaterialTheme.typography.bodyLarge)
+                                Text(p.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            if (shows(SettingsPage.RECORDING)) Section("Recording") {
                 SettingRow(
                     title = "Automatic interval",
                     subtitle = "Chooses how often to record from your movement and activity",
@@ -207,11 +260,11 @@ fun SettingsScreen(
                 }
             }
 
-            PlacesSection()
+            if (shows(SettingsPage.PLACES)) PlacesSection()
 
-            BatterySection()
+            if (shows(SettingsPage.BATTERY)) BatterySection()
 
-            Section("Appearance") {
+            if (shows(SettingsPage.APPEARANCE)) Section("Appearance") {
                 Column(Modifier.padding(16.dp)) {
                     Text("Theme", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
@@ -248,7 +301,7 @@ fun SettingsScreen(
                 }
             }
 
-            Section("Map & routes") {
+            if (shows(SettingsPage.MAP)) Section("Map & routes") {
                 Column(Modifier.padding(16.dp)) {
                     Text("Show", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
@@ -278,19 +331,19 @@ fun SettingsScreen(
                 }
             }
 
-            TravelModesSection()
+            if (shows(SettingsPage.MODES)) TravelModesSection()
 
-            Section("Insights") {
+            if (shows(SettingsPage.INSIGHTS)) Section("Insights") {
                 SettingRow(title = "Who writes your insights", subtitle = engineLabel(aiEngine)) {
                     OutlinedButton(onClick = { showAiChoice = true }) { Text("Change") }
                 }
             }
 
-            PermissionsSection(resumeTick) {
+            if (shows(SettingsPage.PERMISSIONS)) PermissionsSection(resumeTick) {
                 scope.launch { snackbar.showSnackbar("Allow location first, then \"all the time\"") }
             }
 
-            Section("Data") {
+            if (shows(SettingsPage.DATA)) Section("Data") {
                 ActionRow(
                     title = "Export GPX",
                     subtitle = "Save your whole history as a GPX file",

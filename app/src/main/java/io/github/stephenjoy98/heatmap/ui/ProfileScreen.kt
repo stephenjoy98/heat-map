@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import io.github.stephenjoy98.heatmap.data.Units
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -106,6 +108,7 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
     val code by Account.friendCode.collectAsStateWithLifecycle()
     val changes by store.changes.collectAsStateWithLifecycle()
     var year by rememberSaveable { mutableStateOf<Int?>(null) }
+    var showAreas by remember { mutableStateOf(false) }
     val stats by produceState<ProfileStats?>(null, year, changes, resumeTick, user?.uid) {
         val created = user?.metadata?.creationTimestamp
         value = withContext(Dispatchers.IO) { ProfileRepository.load(context, year, created) }
@@ -157,12 +160,28 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
         } else {
             HomeBaseCard(s)
             YearChips(s.years, year) { year = it }
-            HeroCard(s)
+            HeroCard(s, onAreas = { showAreas = true })
             TimeCapturedCard(s)
+            Card {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("BY TRAVEL MODE", style = capsLabel)
+                    ModeBreakdownRows(s.kmByMode)
+                }
+            }
             MostVisitedTile(s, Modifier)
             PlacesCard(s, onExplore)
             CarbonCard(s)
             // Stamps are hidden for now; more will be added to this section later.
+            if (showAreas) {
+                ListDialog(
+                    title = "${formatCount(s.areas)} areas",
+                    explanation = "$AREA_EXPLANATION These are all the squares you've been to" +
+                        (if (s.year != null) " in ${s.year}" else "") + ", by city:",
+                    rows = s.areasByCity.map { (city, n) -> city to "$n ${if (n == 1) "area" else "areas"}" },
+                    empty = "No areas yet.",
+                    onDismiss = { showAreas = false },
+                )
+            }
         }
     }
     }
@@ -229,7 +248,7 @@ private fun compact(n: Double): String = when {
 }
 
 @Composable
-private fun HeroCard(s: ProfileStats) {
+private fun HeroCard(s: ProfileStats, onAreas: () -> Unit) {
     val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     Card {
         Box {
@@ -250,8 +269,9 @@ private fun HeroCard(s: ProfileStats) {
                     listOf(
                         compact(Units.fromKm(s.totalKm)) to "${Units.longUnit.uppercase()} TRAVELLED",
                         compact(s.trips.toDouble()) to "TRIPS",
-                        compact(s.areas.toDouble()) to "AREAS",
-                    )
+                        compact(s.areas.toDouble()) to "AREAS ›",
+                    ),
+                    onClick = mapOf(2 to onAreas),
                 )
             }
         }
@@ -259,11 +279,12 @@ private fun HeroCard(s: ProfileStats) {
 }
 
 @Composable
-private fun StatRow(items: List<Pair<String, String>>) {
+private fun StatRow(items: List<Pair<String, String>>, onClick: Map<Int, () -> Unit> = emptyMap()) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         items.forEachIndexed { i, (value, label) ->
             if (i > 0) VerticalDivider(Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            Column(Modifier.weight(1f)) {
+            val tap = onClick[i]
+            Column(Modifier.weight(1f).then(if (tap != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = tap) else Modifier)) {
                 Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 1)
                 Text(label, style = capsLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
@@ -437,7 +458,7 @@ private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDism
             Triple(
                 c.countryCode?.let(JoyPixels::flag) ?: "🏙️",
                 c.name,
-                listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}").joinToString(" · "),
+                listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}", Insights.km(c.km)).joinToString(" · "),
             )
         }
         PlaceKind.CONTINENTS -> s.continents.map { continent ->

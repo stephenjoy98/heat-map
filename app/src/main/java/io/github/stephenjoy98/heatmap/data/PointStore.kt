@@ -364,19 +364,16 @@ class PointStore private constructor(context: Context) :
     fun countIn(box: GeoBox, modes: Set<TravelMode>): Int =
         long("SELECT COUNT(*) FROM points WHERE ${where(box)}${modeClause(modes)}").toInt()
 
-    /** Points in time order; with [skipSnapped], leaves out trips that have a road-snapped shape. */
-    /**
-     * Dots with a height in [box], split into continuous routes with the same rules as the map. Capped so a
-     * zoomed-out view of a long history stays quick; dots without a height are left out.
-     */
-    fun elevationTracksIn(box: GeoBox, modes: Set<TravelMode>, limit: Int = 60_000): List<List<ElevationPoint>> {
-        val tracks = ArrayList<List<ElevationPoint>>()
+    /** Dots with heights in [box], split into runs at gaps and at changes of trip, with each run's trip id. */
+    fun elevationRunsIn(box: GeoBox, modes: Set<TravelMode>, limit: Int = 60_000): List<Pair<Long, List<ElevationPoint>>> {
+        val runs = ArrayList<Pair<Long, List<ElevationPoint>>>()
         var current = ArrayList<ElevationPoint>()
+        var currentTrip = 0L
         var prevTime = 0L
         var prevLat = 0.0
         var prevLon = 0.0
         readableDatabase.rawQuery(
-            "SELECT time, lat, lon, interval_ms, altitude FROM points WHERE ${where(box)}${modeClause(modes)} " +
+            "SELECT time, lat, lon, interval_ms, altitude, trip_id FROM points WHERE ${where(box)}${modeClause(modes)} " +
                 "AND altitude IS NOT NULL ORDER BY time LIMIT $limit",
             null,
         ).use { c ->
@@ -384,20 +381,46 @@ class PointStore private constructor(context: Context) :
                 val time = c.getLong(0)
                 val lat = c.getDouble(1)
                 val lon = c.getDouble(2)
-                if (current.isNotEmpty() && TrackRules.isBreak(prevTime, prevLat, prevLon, time, lat, lon, c.getInt(3))) {
-                    if (current.size >= 2) tracks += current
+                val trip = c.getLong(5)
+                if (current.isNotEmpty() && (trip != currentTrip || TrackRules.isBreak(prevTime, prevLat, prevLon, time, lat, lon, c.getInt(3)))) {
+                    if (current.size >= 2) runs += currentTrip to current
                     current = ArrayList()
                 }
+                currentTrip = trip
                 current += ElevationPoint(lat, lon, c.getDouble(4))
                 prevTime = time
                 prevLat = lat
                 prevLon = lon
             }
         }
-        if (current.size >= 2) tracks += current
-        return tracks
+        if (current.size >= 2) runs += currentTrip to current
+        return runs
     }
 
+    /** All of a trip's dots that have heights, in order. */
+    fun tripElevations(tripId: Long): List<ElevationPoint> =
+        readableDatabase.rawQuery("SELECT lat, lon, altitude FROM points WHERE trip_id = $tripId AND altitude IS NOT NULL ORDER BY time", null).use { c ->
+            buildList { while (c.moveToNext()) add(ElevationPoint(c.getDouble(0), c.getDouble(1), c.getDouble(2))) }
+        }
+
+    @Volatile private var baselineCache: Pair<Long, Double>? = null
+
+    /**
+     * A fixed height that 3D routes are measured up from: a low point (5th percentile, so the odd bad GPS
+     * reading doesn't count) of every height recorded. Worked out again at most every 10 minutes.
+     */
+    fun altitudeBaseline(): Double {
+        val now = System.currentTimeMillis()
+        baselineCache?.let { (at, value) -> if (now - at < 10 * 60_000L) return value }
+        val count = long("SELECT COUNT(*) FROM points WHERE altitude IS NOT NULL")
+        val value = if (count == 0L) 0.0 else readableDatabase.rawQuery(
+            "SELECT altitude FROM points WHERE altitude IS NOT NULL ORDER BY altitude LIMIT 1 OFFSET ${count / 20}", null
+        ).use { c -> if (c.moveToFirst()) c.getDouble(0) else 0.0 }
+        baselineCache = now to value
+        return value
+    }
+
+    /** Points in time order; with [skipSnapped], leaves out trips that have a road-snapped shape. */
     fun tracksIn(box: GeoBox, modes: Set<TravelMode>, skipSnapped: Boolean = false): TrackData =
         readableDatabase.rawQuery(
             "SELECT time, lat, lon, interval_ms FROM points WHERE ${where(box)}${modeClause(modes)}" +
@@ -1267,6 +1290,55 @@ class PointStore private constructor(context: Context) :
     /** Distinct ~220 m cells visited in the period. */
     fun cellsVisited(from: Long, to: Long): Long =
         long("SELECT COUNT(*) FROM (SELECT DISTINCT ${Cells.SQL_ROW}, ${Cells.SQL_COL} FROM points WHERE time >= $from AND time < $to)")
+
+    /** The ~5 km area key ([coarseAreas]) a position is in. */
+    private fun areaKey(lat: Double, lon: Double) = "${((lat + 90) * 20).toInt()}:${((lon + 180) * 20).toInt()}"
+
+    /** Kilometres travelled in each ~5 km area ([coarseAreas] keys) during the period, by where each hop starts. */
+    fun kmByArea(from: Long, to: Long): Map<String, Double> {
+        val out = HashMap<String, Double>()
+        var prevTime = 0L
+        var prevLat = 0.0
+        var prevLon = 0.0
+        var first = true
+        readableDatabase.rawQuery("SELECT time, lat, lon, interval_ms FROM points WHERE time >= $from AND time < $to ORDER BY time", null).use { c ->
+            while (c.moveToNext()) {
+                val time = c.getLong(0)
+                val lat = c.getDouble(1)
+                val lon = c.getDouble(2)
+                if (!first && !TrackRules.isBreak(prevTime, prevLat, prevLon, time, lat, lon, c.getInt(3))) {
+                    val key = areaKey(prevLat, prevLon)
+                    out[key] = (out[key] ?: 0.0) + TrackRules.distanceMeters(prevLat, prevLon, lat, lon) / 1000.0
+                }
+                first = false
+                prevTime = time
+                prevLat = lat
+                prevLon = lon
+            }
+        }
+        return out
+    }
+
+    /**
+     * Map squares (~220 m, see [Cells]) in each ~5 km area during the period: every square visited, or with
+     * [onlyNew] only those visited for the very first time.
+     */
+    fun cellsByArea(from: Long, to: Long, onlyNew: Boolean): Map<String, Int> {
+        val sql = if (onlyNew) {
+            """SELECT AVG(lat), AVG(lon) FROM points GROUP BY ${Cells.SQL_ROW}, ${Cells.SQL_COL}
+               HAVING MIN(time) >= $from AND MIN(time) < $to"""
+        } else {
+            """SELECT AVG(lat), AVG(lon) FROM points WHERE time >= $from AND time < $to GROUP BY ${Cells.SQL_ROW}, ${Cells.SQL_COL}"""
+        }
+        val out = HashMap<String, Int>()
+        readableDatabase.rawQuery(sql, null).use { c ->
+            while (c.moveToNext()) {
+                val key = areaKey(c.getDouble(0), c.getDouble(1))
+                out[key] = (out[key] ?: 0) + 1
+            }
+        }
+        return out
+    }
 
     /** Cells visited for the very first time during the period. */
     fun newCells(from: Long, to: Long): Long =

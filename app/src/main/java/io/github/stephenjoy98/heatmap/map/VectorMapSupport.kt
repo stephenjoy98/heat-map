@@ -167,6 +167,8 @@ object VectorMaps {
             Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
                 addNumberProperty("h", seg.heightM)
                 addNumberProperty("t", seg.heightM + RIBBON_M)
+                // The curtain stops just under the ribbon: touching faces flicker as the map moves.
+                addNumberProperty("c", (seg.heightM - CURTAIN_GAP_M).coerceAtLeast(0.0))
             }
         }
         val data = FeatureCollection.fromFeatures(features)
@@ -179,8 +181,8 @@ object VectorMaps {
         val curtain = FillExtrusionLayer(ROUTE_CURTAIN, ROUTE_SOURCE).withProperties(
             PropertyFactory.fillExtrusionColor(routeColor),
             PropertyFactory.fillExtrusionBase(0f),
-            PropertyFactory.fillExtrusionHeight(Expression.get("h")),
-            PropertyFactory.fillExtrusionOpacity(0.28f),
+            PropertyFactory.fillExtrusionHeight(Expression.get("c")),
+            PropertyFactory.fillExtrusionOpacity(0.2f),
         )
         val ribbon = FillExtrusionLayer(ROUTE_RIBBON, ROUTE_SOURCE).withProperties(
             PropertyFactory.fillExtrusionColor(routeColor),
@@ -206,6 +208,7 @@ object VectorMaps {
     private const val ROUTE_CURTAIN = "route-3d-curtain"
     private const val ROUTE_RIBBON = "route-3d-ribbon"
     private const val RIBBON_M = 1.5
+    private const val CURTAIN_GAP_M = 0.4
     private val routeColor = Color.parseColor("#FF7A1A")
 
     private fun firstLayerAbove(style: Style, match: (id: String, layer: Layer) -> Boolean): String? =

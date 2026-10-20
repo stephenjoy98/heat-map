@@ -12,6 +12,28 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-10-20
+
+### Added
+- Tap "new areas explored" on Insights to see what an area is (a map square about 220 m across), how many
+  you were in, how many were new, and which cities you found them in.
+- Tap "cities" on Insights for every city with the distance you travelled in it and your share of time.
+- The same on your profile: tap Areas for the squares you've been to by city; the cities list shows the
+  distance in each; and a travel mode breakdown.
+- Settings can show a page per section (the new default) or everything in one list, chosen at the top of
+  Settings.
+
+### Changed
+- Travel mode breakdowns group sub-modes under their mode: PublicTransit shows SkyTrain, Bus and SeaBus
+  added together; tap it to see each.
+
+### Fixed
+- 3D routes keep the same height however you move the map; heights are now measured from one fixed low
+  point of everything you've recorded, not from what's on screen.
+- 3D routes follow the same line as the flat route (smoothed, or snapped to the road), as one continuous
+  ribbon without gaps at the bends, with heights smoothed and GPS height spikes removed.
+- The 3D route no longer flickers where its curtain met the ribbon.
+
 ## [2.22.0] - 2026-10-20
 
 ### Added

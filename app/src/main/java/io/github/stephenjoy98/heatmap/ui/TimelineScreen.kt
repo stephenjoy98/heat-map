@@ -70,6 +70,7 @@ import io.github.stephenjoy98.heatmap.data.ModeColors
 import io.github.stephenjoy98.heatmap.data.PeriodStat
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
+import io.github.stephenjoy98.heatmap.map.Route3dTracks
 import io.github.stephenjoy98.heatmap.map.TileMath
 import io.github.stephenjoy98.heatmap.map.heatTilePx
 import io.github.stephenjoy98.heatmap.review.Insights
@@ -179,7 +180,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val scope = rememberCoroutineScope()
     val tapRadiusPx = 32 * context.resources.displayMetrics.density
     var layersOpen by remember { mutableStateOf(false) }
-    val route3d = remember { { box: GeoBox -> store.elevationTracksIn(box, TravelMode.entries.toSet()) } }
+    val route3d = remember { { box: GeoBox -> Route3dTracks.load(store, box, TravelMode.entries.toSet()) } }
     // Changing a trip's times: the day's dots with the trip's stretch picked out, adjusted with a slider.
     var retiming by remember { mutableStateOf<Trip?>(null) }
     val retime = remember { DotEditState(anchor) }

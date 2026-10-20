@@ -1,6 +1,8 @@
 package io.github.stephenjoy98.heatmap.review
 
 import android.content.Context
+import io.github.stephenjoy98.heatmap.data.CoarseArea
+import io.github.stephenjoy98.heatmap.data.Place
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Trip
@@ -9,7 +11,7 @@ import java.time.ZoneId
 
 enum class ReviewPeriod(val label: String) { WEEK("Week"), MONTH("Month"), YEAR("Year"), ALL("All time") }
 
-class CityVisit(val city: String, val country: String?, val points: Int)
+class CityVisit(val city: String, val country: String?, val points: Int, val km: Double = 0.0)
 
 class ReviewData(
     val period: ReviewPeriod,
@@ -23,6 +25,8 @@ class ReviewData(
     val steps: StepsSummary?,
     val busiestDay: Pair<LocalDate, Double>?,
     val questions: List<Trip>,
+    /** New map squares explored in the period, by city, most first. */
+    val newAreasByCity: List<Pair<String, Int>> = emptyList(),
 ) {
     val totalKm: Double get() = kmByMode.values.sum()
 }
@@ -46,7 +50,8 @@ object ReviewRepository {
     suspend fun load(context: Context, period: ReviewPeriod): ReviewData {
         val store = PointStore.get(context)
         val (from, to) = range(period)
-        val cities = cities(context, store, from, to)
+        val areaPlaces = Places.resolve(context, store, store.coarseAreas(from, to), MAX_GEOCODES_PER_LOAD)
+        val cities = cities(areaPlaces, store.kmByArea(from, to))
         val stepsFrom = if (period == ReviewPeriod.ALL) LocalDate.now().minusDays(364)
             .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() else from
         return ReviewData(
@@ -62,17 +67,31 @@ object ReviewRepository {
             busiestDay = store.distanceByDay(from, to).maxByOrNull { it.value }
                 ?.let { LocalDate.parse(it.key) to it.value / 1000.0 },
             questions = store.tripsNeedingReview(),
+            newAreasByCity = byCity(areaPlaces, store.cellsByArea(from, to, onlyNew = true)),
         )
     }
 
-    /** Cities visited, busiest first, reverse-geocoding ~5 km areas once and caching the answer. */
-    private fun cities(context: Context, store: PointStore, from: Long, to: Long): List<CityVisit> {
+    /** Cities visited, busiest first, with the distance travelled in each (~5 km areas, geocoded once and cached). */
+    private fun cities(areas: List<Pair<CoarseArea, Place>>, kmByArea: Map<String, Double>): List<CityVisit> {
         val byCity = LinkedHashMap<String, CityVisit>()
-        for ((area, place) in Places.resolve(context, store, store.coarseAreas(from, to), MAX_GEOCODES_PER_LOAD)) {
+        for ((area, place) in areas) {
             val city = place.city ?: continue
             val prev = byCity[city]
-            byCity[city] = CityVisit(city, place.country ?: prev?.country, (prev?.points ?: 0) + area.points)
+            byCity[city] = CityVisit(
+                city,
+                place.country ?: prev?.country,
+                (prev?.points ?: 0) + area.points,
+                (prev?.km ?: 0.0) + (kmByArea[area.key] ?: 0.0),
+            )
         }
         return byCity.values.sortedByDescending { it.points }
+    }
+
+    /** Sums per-area counts into cities (areas without a known city go under "Elsewhere"), largest first. */
+    fun byCity(areas: List<Pair<CoarseArea, Place>>, perArea: Map<String, Int>): List<Pair<String, Int>> {
+        val cityOf = areas.associate { (area, place) -> area.key to (place.city ?: "Elsewhere") }
+        val out = HashMap<String, Int>()
+        perArea.forEach { (key, n) -> val city = cityOf[key] ?: "Elsewhere"; out[city] = (out[city] ?: 0) + n }
+        return out.entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
 }

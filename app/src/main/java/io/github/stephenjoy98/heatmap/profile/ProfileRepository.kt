@@ -5,6 +5,7 @@ import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Trip
 import io.github.stephenjoy98.heatmap.review.Places
+import io.github.stephenjoy98.heatmap.review.ReviewRepository
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -16,7 +17,7 @@ class Stamp(val name: String, val description: String, val icon: StampIcon, val 
 
 enum class StampIcon { DOTS, DISTANCE, WALK, CYCLE, CITY, GLOBE, CONTINENT, AREA, CALENDAR }
 
-class CityEntry(val name: String, val country: String?, val countryCode: String?, val days: Int)
+class CityEntry(val name: String, val country: String?, val countryCode: String?, val days: Int, val km: Double = 0.0)
 
 class CountryEntry(val code: String, val name: String)
 
@@ -42,6 +43,8 @@ class ProfileStats(
     val topCityDays: Int,
     val longestTrip: Trip?,
     val stamps: List<Stamp>,
+    /** Map squares visited in the period, by city, most first. */
+    val areasByCity: List<Pair<String, Int>> = emptyList(),
 ) {
     /** Everything travelled, including the same routes again and again. */
     val totalKm: Double get() = kmByMode.values.sum()
@@ -90,6 +93,7 @@ object ProfileRepository {
             topCityDays = period.topCityDays,
             longestTrip = store.longestTrip(from, to),
             stamps = stamps(store, allTime, allCoverage[1]),
+            areasByCity = period.areasByCity,
         )
     }
 
@@ -102,10 +106,13 @@ object ProfileRepository {
         val topCity: String?,
         val topCountry: String?,
         val topCityDays: Int,
+        val areasByCity: List<Pair<String, Int>>,
     )
 
     private fun summarize(context: Context, store: PointStore, from: Long, to: Long): Summary {
         val places = Places.resolve(context, store, store.coarseAreas(from, to, 500))
+        val kmByArea = store.kmByArea(from, to)
+        val cityKm = HashMap<String, Double>()
         val cityDays = HashMap<String, Int>()
         val cityCountry = HashMap<String, String?>()
         val cityCode = HashMap<String, String?>()
@@ -115,6 +122,7 @@ object ProfileRepository {
             place.city?.let {
                 // Days in a city: the most days seen in any one of its areas (areas overlap the same days).
                 cityDays[it] = maxOf(cityDays[it] ?: 0, area.days)
+                cityKm[it] = (cityKm[it] ?: 0.0) + (kmByArea[area.key] ?: 0.0)
                 cityCountry[it] = place.country
                 cityCode[it] = place.countryCode
             }
@@ -126,13 +134,14 @@ object ProfileRepository {
         return Summary(
             kmByMode = store.distanceByMode(from, to).mapValues { it.value / 1000.0 },
             cities = cityDays.entries.sortedByDescending { it.value }
-                .map { CityEntry(it.key, cityCountry[it.key], cityCode[it.key], it.value) },
+                .map { CityEntry(it.key, cityCountry[it.key], cityCode[it.key], it.value, cityKm[it.key] ?: 0.0) },
             states = states,
             countries = countries.entries.map { CountryEntry(it.key, it.value) }.sortedBy { it.name },
             continents = countries.keys.mapNotNull(Places::continentOf).distinct(),
             topCity = top?.key,
             topCountry = top?.key?.let { cityCountry[it] },
             topCityDays = top?.value ?: 0,
+            areasByCity = ReviewRepository.byCity(places, store.cellsByArea(from, to, onlyNew = false)),
         )
     }
 

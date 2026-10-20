@@ -78,6 +78,7 @@ import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Stats
 import io.github.stephenjoy98.heatmap.data.TravelMode
+import io.github.stephenjoy98.heatmap.map.Route3dTracks
 import io.github.stephenjoy98.heatmap.map.HeatRamps
 import io.github.stephenjoy98.heatmap.map.HeatTiles
 import io.github.stephenjoy98.heatmap.map.heatTilePx
@@ -119,7 +120,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
     val signal = rememberFixQuality(liveFix)
     // Routes at their recorded heights, for the 3D buildings view.
-    val route3d = remember(filter) { { box: GeoBox -> store.elevationTracksIn(box, filter) } }
+    val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
         listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
     }

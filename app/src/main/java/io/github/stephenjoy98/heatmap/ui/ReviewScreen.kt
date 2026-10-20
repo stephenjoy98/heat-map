@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.clickable
 import io.github.stephenjoy98.heatmap.data.Units
 import android.content.Intent
 import android.net.Uri
@@ -154,21 +156,45 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
 
 @Composable
 private fun StatGrid(d: ReviewData) {
+    var showAreas by remember { mutableStateOf(false) }
+    var showCities by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile(Insights.km(d.totalKm), "travelled", Modifier.weight(1f))
-            StatTile(formatCount(d.newAreas), "new areas explored", Modifier.weight(1f))
+            StatTile(formatCount(d.newAreas), "new areas explored ›", Modifier.weight(1f)) { showAreas = true }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatTile(d.cities.size.toString(), if (d.cities.size == 1) "city" else "cities", Modifier.weight(1f))
+            StatTile(d.cities.size.toString(), (if (d.cities.size == 1) "city" else "cities") + " ›", Modifier.weight(1f)) { showCities = true }
             StatTile(d.steps?.let { formatCount(it.perDay) } ?: "–", "steps a day", Modifier.weight(1f))
         }
+    }
+    if (showAreas) {
+        val pct = if (d.areasVisited > 0) d.newAreas * 100 / d.areasVisited else 0
+        ListDialog(
+            title = "New areas explored",
+            explanation = "$AREA_EXPLANATION A new area is one you'd never been to before this period. " +
+                "You were in ${formatCount(d.areasVisited)} areas this period, and ${formatCount(d.newAreas)} of them ($pct%) were new. " +
+                "Where you found them:",
+            rows = d.newAreasByCity.map { (city, n) -> city to "$n ${if (n == 1) "area" else "areas"}" },
+            empty = "No new ground this period.",
+            onDismiss = { showAreas = false },
+        )
+    }
+    if (showCities) {
+        val total = d.cities.sumOf { it.points }.coerceAtLeast(1)
+        ListDialog(
+            title = if (d.cities.size == 1) "1 city" else "${d.cities.size} cities",
+            explanation = "Cities you were in this period, with the distance you travelled in each and the share of your time.",
+            rows = d.cities.map { c -> c.city to "${Insights.km(c.km)} · ${c.points * 100 / total}%" },
+            empty = "No cities found yet.",
+            onDismiss = { showCities = false },
+        )
     }
 }
 
 @Composable
-private fun StatTile(value: String, label: String, modifier: Modifier) {
-    ElevatedCard(modifier) {
+private fun StatTile(value: String, label: String, modifier: Modifier, onClick: (() -> Unit)? = null) {
+    ElevatedCard(modifier.then(if (onClick != null) Modifier.clip(CardDefaults.elevatedShape).clickable(onClick = onClick) else Modifier)) {
         Column(Modifier.padding(16.dp)) {
             Text(value, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -181,23 +207,7 @@ private fun ModeBreakdown(d: ReviewData) {
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("By travel mode", style = MaterialTheme.typography.titleMedium)
-            val max = d.kmByMode.values.maxOrNull() ?: 0.0
-            if (max <= 0) {
-                Text("No trips yet in this period.", style = MaterialTheme.typography.bodySmall)
-            }
-            for (mode in TravelMode.ordered + TravelMode.UNKNOWN) {
-                val km = d.kmByMode[mode] ?: 0.0
-                if (km <= 0 && mode == TravelMode.UNKNOWN) continue
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(mode.label, Modifier.width(84.dp), style = MaterialTheme.typography.bodyMedium)
-                    Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                        if (max > 0 && km > 0) {
-                            Box(Modifier.fillMaxHeight().fillMaxWidth((km / max).toFloat().coerceIn(0.02f, 1f)).background(Color(mode.color)))
-                        }
-                    }
-                    Text(Insights.km(km), Modifier.width(72.dp).padding(start = 8.dp), style = MaterialTheme.typography.bodySmall)
-                }
-            }
+            ModeBreakdownRows(d.kmByMode)
         }
     }
 }
@@ -267,7 +277,7 @@ private fun CitiesCard(d: ReviewData) {
             d.cities.take(12).forEach { c ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(c.city, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text("${c.points * 100 / total}% of time", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${Insights.km(c.km)} · ${c.points * 100 / total}% of time", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
