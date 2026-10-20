@@ -120,11 +120,11 @@ fun PageHost(stack: PageStack, base: @Composable () -> Unit, page: @Composable (
     Box(Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalCovered provides stack.pages.isNotEmpty()) { base() }
         val pages = stack.pages
-        val revealing = gesture.value > 0f || stack.leaving != null
         pages.forEachIndexed { i, p ->
             val isTop = i == pages.lastIndex
-            // Only the top page is drawn, plus the one below it while it's being revealed.
-            if (isTop || (revealing && i == pages.lastIndex - 1)) key(p) {
+            // The top page, and the one below it kept ready underneath, so going back reveals it straight away
+            // rather than flashing the tabs while it's built.
+            if (i >= pages.lastIndex - 1) key(p) {
                 PageFrame(
                     stack = stack,
                     page = p,

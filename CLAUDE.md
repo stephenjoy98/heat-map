@@ -50,7 +50,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.30.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.30.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -153,8 +153,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   `FriendProfileScreen` (`Page.FRIEND`): stats + heatmap of `friend_routes` framed by `PointStore.friendBounds`.
 - `ui/Breakdowns.kt`: `ModeBreakdownRows` (top-level modes with children summed, tap to expand; used on Insights
   and Profile), `ListDialog`, `AREA_EXPLANATION`. `PointStore.kmByArea` / `cellsByArea` + `ReviewRepository.byCity`
-  give km and areas per city. Settings: `SettingsPage` enum, page-per-section by default (Prefs
-  "settings_pages"), "One list" option at the top.
+  give km and areas per city. Settings: `SettingsPage` enum with a `group` (Recording / Map and trips / App /
+  System), page-per-section by default (Prefs "settings_pages"), the "One list" choice and Units live on the
+  General page; sections switch with an AnimatedContent shared-axis slide. `PageHost` keeps the page under the top one
+  composed so popping never flashes the tabs.
 - `update/` (2.30.0): `Updater` (GitHub releases/latest → `Release`; newer = higher SemVer, or same version with a
   different `<!-- build: sha -->` marker in the notes vs `BuildConfig.BUILD_COMMIT` from CI's GITHUB_SHA; downloads to
   cacheDir/updates, installs via PackageInstaller session with USER_ACTION_NOT_REQUIRED on 31+; `inForeground` set by

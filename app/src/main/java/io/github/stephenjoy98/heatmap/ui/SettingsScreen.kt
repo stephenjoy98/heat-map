@@ -1,5 +1,14 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -90,18 +99,19 @@ import androidx.annotation.DrawableRes
 import io.github.stephenjoy98.heatmap.R
 import kotlin.math.roundToInt
 
-/** The sections of Settings, each its own page when settings are shown as pages. */
-private enum class SettingsPage(val title: String, val summary: String, @DrawableRes val icon: Int) {
-    RECORDING("Recording", "Automatic or set interval, GPS accuracy", R.drawable.ic_my_location),
-    PLACES("Places", "Home, work and other places where recording slows down", R.drawable.ic_home),
-    BATTERY("Battery", "Battery used at each recording interval", R.drawable.ic_battery_charging_full),
-    APPEARANCE("Appearance", "Theme, units and Material expressive colours", R.drawable.ic_palette),
-    MAP("Map & routes", "Routes or points, smoothing and road snapping", R.drawable.ic_map),
-    MODES("Travel modes", "Add, rename, recolour and delete modes and sub-modes", R.drawable.ic_directions_bike),
-    INSIGHTS("Insights", "Who writes your insights", R.drawable.ic_auto_awesome),
-    PERMISSIONS("Permissions", "Location, activity, notifications, battery and Health Connect", R.drawable.ic_lock),
-    DATA("Data", "Export to GPX, or delete your history", R.drawable.ic_storage),
-    UPDATES("Updates", "Check for new versions and install them automatically", R.drawable.ic_system_update),
+/** The sections of Settings, each its own page when settings are shown as pages, listed under [group]. */
+private enum class SettingsPage(val title: String, val summary: String, @DrawableRes val icon: Int, val group: String) {
+    RECORDING("Recording", "Automatic or set interval, GPS accuracy", R.drawable.ic_my_location, "Recording"),
+    PLACES("Places", "Home, work and other places where recording slows down", R.drawable.ic_home, "Recording"),
+    BATTERY("Battery", "Battery used at each recording interval", R.drawable.ic_battery_charging_full, "Recording"),
+    MAP("Map & routes", "Routes or points, smoothing and road snapping", R.drawable.ic_map, "Map and trips"),
+    MODES("Travel modes", "Add, rename, recolour and delete modes and sub-modes", R.drawable.ic_directions_bike, "Map and trips"),
+    GENERAL("General", "Units, and how Settings are laid out", R.drawable.ic_tune, "App"),
+    APPEARANCE("Appearance", "Theme and Material expressive colours", R.drawable.ic_palette, "App"),
+    INSIGHTS("Insights", "Who writes your insights", R.drawable.ic_auto_awesome, "App"),
+    PERMISSIONS("Permissions", "Location, activity, notifications, battery and Health Connect", R.drawable.ic_lock, "System"),
+    DATA("Data", "Export to GPX, or delete your history", R.drawable.ic_storage, "System"),
+    UPDATES("Updates", "Check for new versions and install them automatically", R.drawable.ic_system_update, "System"),
 }
 
 private enum class IntervalUnit(val label: String, val seconds: Int) {
@@ -135,7 +145,6 @@ fun SettingsScreen(
     val asPages by Prefs.settingsAsPages.collectAsStateWithLifecycle()
     // The section open as its own page; null for the list of sections.
     var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
-    fun shows(p: SettingsPage) = !asPages || page == p
     BackHandler(enabled = asPages && page != null && !LocalCovered.current) { page = null }
 
     // A running recorder picks up new settings when it is (re)started.
@@ -168,7 +177,9 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text(page?.takeIf { asPages }?.title ?: "Settings") },
+                title = {
+                    Crossfade(page?.takeIf { asPages }?.title ?: "Settings", label = "settings title") { Text(it) }
+                },
                 navigationIcon = {
                     BackButton { if (asPages && page != null) page = null else onBack() }
                 },
@@ -177,6 +188,18 @@ fun SettingsScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { inner ->
+        // Opening a section slides it in from the side and the list out the other way (Material's shared axis
+        // motion), and back reverses it, instead of the page swapping in a single frame.
+        AnimatedContent(
+            targetState = page.takeIf { asPages },
+            transitionSpec = {
+                val dir = if (targetState != null) 1 else -1
+                (slideInHorizontally(tween(320)) { dir * it / 5 } + fadeIn(tween(320, delayMillis = 60))) togetherWith
+                    (slideOutHorizontally(tween(320)) { -dir * it / 5 } + fadeOut(tween(160)))
+            },
+            label = "settings page",
+        ) { shown ->
+        fun shows(p: SettingsPage) = !asPages || shown == p
         Column(
             Modifier
                 .fillMaxSize()
@@ -185,34 +208,23 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
         ) {
-            if (!asPages || page == null) {
-                Section("Layout") {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Show settings as", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(8.dp))
-                        SegmentedChoice(
-                            options = listOf(true to "A page per section", false to "One list"),
-                            selected = asPages,
-                            onSelect = Prefs::setSettingsAsPages,
-                        )
-                    }
-                }
-            }
-            if (asPages && page == null) {
-                Section("Sections") {
-                    SettingsPage.entries.forEachIndexed { i, p ->
-                        if (i > 0) ItemDivider()
-                        Row(
-                            Modifier.fillMaxWidth().clickable { page = p }.padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            MaterialIcon(p.icon, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(16.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(p.title, style = MaterialTheme.typography.bodyLarge)
-                                Text(p.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (asPages && shown == null) {
+                SettingsPage.entries.groupBy { it.group }.forEach { (group, pages) ->
+                    Section(group) {
+                        pages.forEachIndexed { i, p ->
+                            if (i > 0) ItemDivider()
+                            Row(
+                                Modifier.fillMaxWidth().clickable { page = p }.padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                MaterialIcon(p.icon, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(16.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(p.title, style = MaterialTheme.typography.bodyLarge)
+                                    Text(p.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -267,43 +279,6 @@ fun SettingsScreen(
 
             if (shows(SettingsPage.BATTERY)) BatterySection()
 
-            if (shows(SettingsPage.APPEARANCE)) Section("Appearance") {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Theme", style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.height(8.dp))
-                    SegmentedChoice(
-                        options = listOf(MapTheme.LIGHT to "Light", MapTheme.DARK to "Dark", MapTheme.SYSTEM to "System"),
-                        selected = mapTheme,
-                        onSelect = Prefs::setMapTheme,
-                    )
-                }
-                ItemDivider()
-                Column(Modifier.padding(16.dp)) {
-                    Text("Units", style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.height(8.dp))
-                    SegmentedChoice(
-                        options = listOf(UnitSystem.METRIC to "Metric (km, m)", UnitSystem.IMPERIAL to "Imperial (mi, ft)"),
-                        selected = units,
-                        onSelect = Prefs::setUnits,
-                    )
-                }
-                ItemDivider()
-                SettingRow(
-                    title = "Material expressive",
-                    subtitle = if (expressiveSupported) {
-                        "Colours from your wallpaper through Android's Monet engine, with rounder shapes and springier motion"
-                    } else {
-                        "Needs Android 12 or later for wallpaper colours"
-                    },
-                ) {
-                    Switch(
-                        checked = dynamicColor && expressiveSupported,
-                        enabled = expressiveSupported,
-                        onCheckedChange = Prefs::setDynamicColor,
-                    )
-                }
-            }
-
             if (shows(SettingsPage.MAP)) Section("Map & routes") {
                 Column(Modifier.padding(16.dp)) {
                     Text("Show", style = MaterialTheme.typography.labelLarge)
@@ -335,6 +310,64 @@ fun SettingsScreen(
             }
 
             if (shows(SettingsPage.MODES)) TravelModesSection()
+
+            if (shows(SettingsPage.GENERAL)) Section("General") {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Units", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "Used for every distance, height and speed in the app",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SegmentedChoice(
+                        options = listOf(UnitSystem.METRIC to "Metric (km, m)", UnitSystem.IMPERIAL to "Imperial (mi, ft)"),
+                        selected = units,
+                        onSelect = Prefs::setUnits,
+                    )
+                }
+                ItemDivider()
+                Column(Modifier.padding(16.dp)) {
+                    Text("Show settings as", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    SegmentedChoice(
+                        options = listOf(true to "A page per section", false to "One list"),
+                        selected = asPages,
+                        onSelect = {
+                            Prefs.setSettingsAsPages(it)
+                            page = null
+                        },
+                    )
+                }
+            }
+
+            if (shows(SettingsPage.APPEARANCE)) Section("Appearance") {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Theme", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    SegmentedChoice(
+                        options = listOf(MapTheme.LIGHT to "Light", MapTheme.DARK to "Dark", MapTheme.SYSTEM to "System"),
+                        selected = mapTheme,
+                        onSelect = Prefs::setMapTheme,
+                    )
+                }
+                ItemDivider()
+                SettingRow(
+                    title = "Material expressive",
+                    subtitle = if (expressiveSupported) {
+                        "Colours from your wallpaper through Android's Monet engine, with rounder shapes and springier motion"
+                    } else {
+                        "Needs Android 12 or later for wallpaper colours"
+                    },
+                ) {
+                    Switch(
+                        checked = dynamicColor && expressiveSupported,
+                        enabled = expressiveSupported,
+                        onCheckedChange = Prefs::setDynamicColor,
+                    )
+                }
+            }
+
 
             if (shows(SettingsPage.INSIGHTS)) Section("Insights") {
                 SettingRow(title = "Who writes your insights", subtitle = engineLabel(aiEngine)) {
@@ -370,6 +403,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
                 textAlign = TextAlign.Center,
             )
+        }
         }
     }
 

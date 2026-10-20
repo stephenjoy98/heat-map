@@ -12,6 +12,18 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.30.1] - 2026-10-20
+
+### Changed
+- Settings are grouped under Recording, Map and trips, App and System. Units moved out of Appearance into a
+  new General page, along with the choice between a page per section and one list.
+- The colour picker has many more presets: twelve hues round the rainbow in a vivid, a light and a deep tone,
+  plus greys and browns, in a wider dialog.
+
+### Fixed
+- Going back from a page no longer flashes the map before the previous page appears.
+- Opening a Settings section, and going back from it, slides smoothly instead of jumping.
+
 ## [2.30.0] - 2026-10-20
 
 ### Added

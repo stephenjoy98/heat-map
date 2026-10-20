@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,12 +49,37 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
-// A spread of Material colours to start from.
-internal val SWATCHES = listOf(
-    0xFFE53935, 0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1, 0xFF3949AB, 0xFF1E88E5,
-    0xFF039BE5, 0xFF00ACC1, 0xFF00897B, 0xFF43A047, 0xFF7CB342, 0xFFC0CA33,
-    0xFFFDD835, 0xFFFFB300, 0xFFFB8C00, 0xFFF4511E, 0xFF6D4C41, 0xFF757575,
+/** An opaque ARGB colour from hue (degrees), saturation and value (0–1). */
+private fun hsv(h: Float, sat: Float, v: Float): Long {
+    val c = v * sat
+    val x = c * (1 - kotlin.math.abs((h / 60f) % 2 - 1))
+    val m = v - c
+    val (r, g, b) = when ((h / 60f).toInt() % 6) {
+        0 -> Triple(c, x, 0f)
+        1 -> Triple(x, c, 0f)
+        2 -> Triple(0f, c, x)
+        3 -> Triple(0f, x, c)
+        4 -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x)
+    }
+    fun ch(f: Float) = ((f + m) * 255 + 0.5f).toLong().coerceIn(0, 255)
+    return 0xFF000000L or (ch(r) shl 16) or (ch(g) shl 8) or ch(b)
+}
+
+// Preset colours: twelve hues round the rainbow (red, orange, yellow … magenta, rose) in a vivid, a light and a
+// deep tone, then greys and browns. Each row is one line of the grid in the picker.
+internal val SWATCH_ROWS: List<List<Long>> = listOf(
+    List(12) { hsv(it * 30f, 0.80f, 0.92f) },
+    List(12) { hsv(it * 30f, 0.38f, 0.98f) },
+    List(12) { hsv(it * 30f, 0.85f, 0.58f) },
+    listOf(
+        0xFFFFFFFF, 0xFFE0E0E0, 0xFFBDBDBD, 0xFF9E9E9E, 0xFF757575, 0xFF616161,
+        0xFF424242, 0xFF212121, 0xFFD7CCC8, 0xFFA1887F, 0xFF795548, 0xFF4E342E,
+    ),
 )
+
+/** Every preset, vivid ones first (new travel modes take the first one not in use). */
+internal val SWATCHES: List<Long> = SWATCH_ROWS.flatten()
 
 /** "#RRGGBB" for an ARGB colour. */
 fun hexOf(color: Long): String = String.format(Locale.US, "#%06X", color and 0xFFFFFF)
@@ -97,6 +124,9 @@ fun ColorPickerDialog(
     }
 
     AlertDialog(
+        // As wide as the other full-width cards, so the colour grid has room.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -127,8 +157,20 @@ fun ColorPickerDialog(
                     hex = hexOf(android.graphics.Color.HSVToColor(floatArrayOf(h, sat, value)).toLong())
                 }
                 Spacer(Modifier.height(16.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SWATCHES.forEach { c -> Swatch(Color(c), selected = c == current, onClick = { set(c) }) }
+                // A grid that fits the dialog's width: hues across, tones down.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SWATCH_ROWS.forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            row.forEach { c ->
+                                Swatch(
+                                    Color(c),
+                                    selected = c == current,
+                                    onClick = { set(c) },
+                                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                                )
+                            }
+                        }
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 val valid = parseHex(hex) != null
@@ -160,15 +202,19 @@ fun ColorPickerDialog(
 }
 
 @Composable
-private fun Swatch(color: Color, big: Boolean = false, selected: Boolean = false, onClick: (() -> Unit)? = null) {
-    val size = if (big) 48.dp else 32.dp
+private fun Swatch(
+    color: Color,
+    big: Boolean = false,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier.size(if (big) 48.dp else 32.dp),
+) {
     Box(
-        Modifier
-            .size(size)
+        modifier
             .clip(CircleShape)
             .background(color)
             .border(
-                width = if (selected) 3.dp else 1.dp,
+                width = if (selected) 2.5.dp else 1.dp,
                 color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
                 shape = CircleShape,
             )
