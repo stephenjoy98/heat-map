@@ -360,11 +360,63 @@ object Prefs {
         sp.edit().putBoolean("buildings_3d", on).apply()
     }
 
-    /** Whether the backup has had trips and road answers added to every day (they were added in 2.26.0). */
-    val backupHasTrips: Boolean get() = sp.getBoolean("backup_has_trips", false)
+    // Everything the user chooses or sets up, kept in the backup so a new phone is set up the same way.
+    // (Not state like "recording now", sync bookkeeping or caches.)
+    private val BACKED_UP_KEYS = listOf(
+        "interval_sec", "auto_interval", "high_accuracy", "display_mode", "map_theme", "units", "dynamic_color",
+        "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
+        "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
+        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1",
+    )
 
-    fun setBackupHasTrips() {
-        sp.edit().putBoolean("backup_has_trips", true).apply()
+    /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */
+    fun exportSettings(): String {
+        val out = org.json.JSONObject()
+        val all = sp.all
+        for (key in BACKED_UP_KEYS) {
+            val v = all[key] ?: continue
+            val tagged = org.json.JSONObject()
+            when (v) {
+                is Boolean -> tagged.put("b", v)
+                is Int -> tagged.put("i", v)
+                is Long -> tagged.put("l", v)
+                is Float -> tagged.put("f", v.toDouble())
+                is String -> tagged.put("s", v)
+                is Set<*> -> tagged.put("set", org.json.JSONArray(v.filterIsInstance<String>()))
+                else -> continue
+            }
+            out.put(key, tagged)
+        }
+        return out.toString()
+    }
+
+    /** Applies settings from a backup and reloads them, so every screen picks them up. */
+    fun importSettings(context: Context, json: String) {
+        val o = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return
+        val e = sp.edit()
+        for (key in BACKED_UP_KEYS) {
+            val t = o.optJSONObject(key) ?: continue
+            when {
+                t.has("b") -> e.putBoolean(key, t.getBoolean("b"))
+                t.has("i") -> e.putInt(key, t.getInt("i"))
+                t.has("l") -> e.putLong(key, t.getLong("l"))
+                t.has("f") -> e.putFloat(key, t.getDouble("f").toFloat())
+                t.has("s") -> e.putString(key, t.getString("s"))
+                t.has("set") -> t.getJSONArray("set").let { a -> e.putStringSet(key, (0 until a.length()).map { a.getString(it) }.toSet()) }
+            }
+        }
+        e.commit()
+        init(context)
+    }
+
+    /**
+     * Whether every day has been backed up with everything the backup now holds (trips, road answers and deleted dots,
+     * added in 2.26.0). Bump the key when the backup gains something per day.
+     */
+    val backupComplete: Boolean get() = sp.getBoolean("backup_complete_v2", false)
+
+    fun setBackupComplete() {
+        sp.edit().putBoolean("backup_complete_v2", true).apply()
     }
 
     fun addDirtyBackupDays(days: Collection<String>) {

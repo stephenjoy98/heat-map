@@ -19,6 +19,10 @@ The app shows the entries since your last version as "What's new" after an updat
   road-snapped shapes and your "which road?" answers, and your "different heights here?" answers. Restoring
   on another phone brings them back as they were instead of working them out again. The first backup after
   updating uploads every day once more to add them.
+- Backups also include everything you've set up: recording interval and accuracy, theme, units, map type and
+  3D, route display, saved places, travel mode names, colours and deletions, map filters, who writes your
+  insights, sharing and backup choices, and how Settings is laid out. Restoring sets the new phone up the same.
+- Dots you deleted stay deleted after a restore, and are still in the Deleted list to bring back.
 - Restored trips keep their shared route, so friends don't see a second copy.
 
 ## [2.25.0] - 2026-10-20

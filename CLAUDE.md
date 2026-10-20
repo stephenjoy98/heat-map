@@ -137,10 +137,12 @@ travel stats, Insights (AI write-ups), backup and friends.
   sizes + StatFs; cloud: estimated from Firestore's document size rules, since the client can't query usage;
   shown in `StorageCard` on the Backup page). Backup docs: `yyyy-MM-dd[_n]` dots (t, la, lo, ac, iv, at, md, al
   arrays, ≤7000 per doc); `trips_yyyy-MM-dd` (since 2.26.0: trips starting that day as maps s, e, m, im, c, r, ps,
-  bp, p, q (road questions JSON), id (remote route id); null fields omitted); `levels` (height answers);
-  `modes`. Restore: modes, levels, then dots + `restoreTrips` inside `synchronized(TripDetector)`, then the
-  detector for leftovers. `createTrip`/`saveTripPath` mark the trip's day dirty; Prefs "backup_has_trips" makes
-  the first 2.26 backup re-upload every day. 3D ribbons and heatmaps are always drawn on the phone. Shared routes (`users/{uid}/routes`) hold mode + polyline + distance, no times or heights. Friend profile page
+  bp, p, q (road questions JSON), id (remote route id); null fields omitted); `deleted_yyyy-MM-dd` (soft-deleted dots); `levels` (height
+  answers); `modes`; `settings` (JSON of the user's prefs, whitelist `Prefs.BACKED_UP_KEYS`; add new user-facing
+  pref keys there). Restore: settings (`Prefs.importSettings` → re-`init`), modes, levels, then deleted dots, dots
+  and `restoreTrips` inside `synchronized(TripDetector)`, then the detector for leftovers. `createTrip`/
+  `saveTripPath` mark the trip's day dirty; Prefs "backup_complete_v2" makes the first 2.26 backup re-upload every
+  day (bump the key when per-day backup content grows). 3D ribbons and heatmaps are always drawn on the phone. Shared routes (`users/{uid}/routes`) hold mode + polyline + distance, no times or heights. Friend profile page
   `FriendProfileScreen` (`Page.FRIEND`): stats + heatmap of `friend_routes` framed by `PointStore.friendBounds`.
 - `ui/Breakdowns.kt`: `ModeBreakdownRows` (top-level modes with children summed, tap to expand; used on Insights
   and Profile), `ListDialog`, `AREA_EXPLANATION`. `PointStore.kmByArea` / `cellsByArea` + `ReviewRepository.byCity`

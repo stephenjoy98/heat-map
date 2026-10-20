@@ -442,6 +442,35 @@ class PointStore private constructor(context: Context) :
     /** The day (yyyy-MM-dd, local) a time falls on. */
     private fun dayOf(time: Long): String = java.time.Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate().toString()
 
+    /** Local days (yyyy-MM-dd) that have deleted dots. */
+    fun daysWithDeleted(): List<String> =
+        readableDatabase.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM deleted_points", null)
+            .use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
+
+    /** Deleted dots in the period with everything about them, for the backup (so they stay deleted, and restorable). */
+    fun deletedForBackup(from: Long, to: Long): List<LocationPoint> =
+        readableDatabase.rawQuery(
+            "SELECT $POINT_COLS FROM deleted_points WHERE time >= $from AND time < $to ORDER BY time", null
+        ).use { c -> buildList { while (c.moveToNext()) add(c.toPoint()) } }
+
+    /** Brings back the list of deleted dots from a backup; ones already here, deleted or not, are skipped. */
+    fun restoreDeleted(points: List<LocationPoint>) {
+        if (points.isEmpty()) return
+        val db = writableDatabase
+        val now = System.currentTimeMillis()
+        db.beginTransaction()
+        try {
+            for (p in points) {
+                val exists = long("SELECT (SELECT COUNT(*) FROM points WHERE time = ${p.time}) + (SELECT COUNT(*) FROM deleted_points WHERE time = ${p.time})")
+                if (exists > 0) continue
+                db.insert("deleted_points", null, p.toValues().apply { put("deleted_at", now) })
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     /** Trips that start in the period, with their road shapes and answers, for the backup. */
     fun tripBackups(from: Long, to: Long): List<TripBackup> =
         trips("WHERE start_time >= $from AND start_time < $to ORDER BY start_time").map { t ->
