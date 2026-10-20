@@ -82,6 +82,7 @@ private val FEATURES = listOf(
     R.drawable.ic_battery_charging_full to "Battery use per recording interval",
     R.drawable.ic_cloud to "Automatic backups of your dots, trips, answers and settings, with storage used on the phone and in the cloud",
     R.drawable.ic_group to "Friends: their profiles, a map of where they've been, and comparisons with yours",
+    R.drawable.ic_system_update to "Updates itself from its GitHub releases, automatically or when you choose",
 )
 
 /** The app's launcher icon, as installed. */

@@ -54,7 +54,11 @@ import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import io.github.stephenjoy98.heatmap.update.UpdateWorker
+import io.github.stephenjoy98.heatmap.update.Updater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
@@ -77,6 +81,25 @@ class MainActivity : ComponentActivity() {
                 val onboarded by Prefs.onboarded.collectAsStateWithLifecycle()
                 if (onboarded) AppScaffold(invite, requestedTab, openFriends) else OnboardingScreen()
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Updater.inForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Updater.inForeground = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // An update downloaded while you were using the app installs once you leave it.
+        if (Prefs.autoUpdate.value) {
+            val app = applicationContext
+            CoroutineScope(Dispatchers.IO).launch { Updater.installIfWaiting(app) }
         }
     }
 
@@ -173,6 +196,7 @@ private fun AppScaffold(
             store.updateExplored()
         }
         RoadSnapWorker.runNow(context)
+        UpdateWorker.runNow(context)
         if (user != null) SyncWorker.runNow(context, appOpen = true)
     }
 

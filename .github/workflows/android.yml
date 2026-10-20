@@ -63,12 +63,16 @@ jobs:
             on { print }
           ' CHANGELOG.md > notes.md
           printf '\n---\nInstall **location-ticker-%s.apk** (signed release build). The debug build is for testing.\n' "$VERSION" >> notes.md
+          # Lets the app's updater spot a rebuild of the same version (hidden when the notes are shown).
+          printf '\n<!-- build: %s -->\n' "$GITHUB_SHA" >> notes.md
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/location-ticker-$VERSION.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "dist/location-ticker-$VERSION-debug.apk"
           if gh release view "$tag" > /dev/null 2>&1; then
-            gh release edit "$tag" --title "Location Ticker $VERSION" --notes-file notes.md
+            # APKs first, then the notes (with the build marker), so the app never sees a marker for APKs
+            # that didn't upload.
             gh release upload "$tag" dist/*.apk --clobber
+            gh release edit "$tag" --title "Location Ticker $VERSION" --notes-file notes.md
           else
             gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --title "Location Ticker $VERSION" --notes-file notes.md --latest
           fi

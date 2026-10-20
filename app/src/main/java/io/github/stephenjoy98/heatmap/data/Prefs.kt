@@ -106,6 +106,12 @@ object Prefs {
     private val _dynamicColor = MutableStateFlow(true)
     val dynamicColor: StateFlow<Boolean> = _dynamicColor
 
+    /** Download new versions from GitHub releases and install them, on Wi-Fi only if [updateWifiOnly]. */
+    private val _autoUpdate = MutableStateFlow(true)
+    val autoUpdate: StateFlow<Boolean> = _autoUpdate
+    private val _updateWifiOnly = MutableStateFlow(true)
+    val updateWifiOnly: StateFlow<Boolean> = _updateWifiOnly
+
     /** Draw unsnapped routes as smooth curves rather than straight hops between fixes. */
     private val _smoothRoutes = MutableStateFlow(true)
     val smoothRoutes: StateFlow<Boolean> = _smoothRoutes
@@ -154,6 +160,8 @@ object Prefs {
         _lastBackup.value = sp.getLong("last_backup", 0L)
         _dynamicColor.value = sp.getBoolean("dynamic_color", true)
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
+        _autoUpdate.value = sp.getBoolean("auto_update", true)
+        _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
         _autoInterval.value = sp.getBoolean("auto_interval", false)
         _liveIntervalSec.value = _intervalSec.value
         _savedPlaces.value = SavedPlace.decode(sp.getString("saved_places", null))
@@ -366,7 +374,7 @@ object Prefs {
         "interval_sec", "auto_interval", "high_accuracy", "display_mode", "map_theme", "units", "dynamic_color",
         "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
-        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1",
+        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */
@@ -436,6 +444,21 @@ object Prefs {
 
     fun setPendingRouteDeletes(ids: Set<String>) {
         sp.edit().putStringSet("pending_route_deletes", ids).apply()
+    }
+
+    /** The release last announced in a notification, so each one is announced once. */
+    var lastUpdateNotified: String?
+        get() = sp.getString("last_update_notified", null)
+        set(value) = sp.edit().putString("last_update_notified", value).apply()
+
+    fun setAutoUpdate(on: Boolean) {
+        _autoUpdate.value = on
+        sp.edit().putBoolean("auto_update", on).apply()
+    }
+
+    fun setUpdateWifiOnly(on: Boolean) {
+        _updateWifiOnly.value = on
+        sp.edit().putBoolean("update_wifi_only", on).apply()
     }
 
     fun setSmoothRoutes(on: Boolean) {

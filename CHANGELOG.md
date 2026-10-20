@@ -12,6 +12,17 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.30.0] - 2026-10-20
+
+### Added
+- Settings › Updates: see your version, check for a new one, read what's new in it and install it with one
+  tap. Location Ticker gets its updates from its GitHub releases.
+- Automatic updates (on by default): the app checks when it opens and every 6 hours, downloads a new version
+  (on Wi-Fi only, unless you turn that off) and installs it once you've left the app, then lets you know it
+  updated. Recording carries on afterwards. Android asks you to confirm the first update; after that,
+  Android 12 and later install updates without asking. The first time, Android may also ask you to allow
+  Location Ticker to install apps.
+
 ## [2.29.1] - 2026-10-20
 
 ### Changed

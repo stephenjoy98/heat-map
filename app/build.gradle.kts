@@ -46,7 +46,8 @@ android {
         targetSdk = 35
         versionCode = verMajor * 10_000 + verMinor * 100 + verPatch
         versionName = appVersion
-
+        // The commit this was built from (set by CI), so the updater can tell a rebuilt release apart.
+        buildConfigField("String", "BUILD_COMMIT", "\"${System.getenv("GITHUB_SHA").orEmpty()}\"")
     }
 
     signingConfigs {

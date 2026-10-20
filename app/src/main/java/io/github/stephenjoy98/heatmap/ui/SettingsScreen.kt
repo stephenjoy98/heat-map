@@ -101,6 +101,7 @@ private enum class SettingsPage(val title: String, val summary: String, @Drawabl
     INSIGHTS("Insights", "Who writes your insights", R.drawable.ic_auto_awesome),
     PERMISSIONS("Permissions", "Location, activity, notifications, battery and Health Connect", R.drawable.ic_lock),
     DATA("Data", "Export to GPX, or delete your history", R.drawable.ic_storage),
+    UPDATES("Updates", "Check for new versions and install them automatically", R.drawable.ic_system_update),
 }
 
 private enum class IntervalUnit(val label: String, val seconds: Int) {
@@ -359,6 +360,8 @@ fun SettingsScreen(
                     onClick = { confirmClear = true },
                 )
             }
+
+            if (shows(SettingsPage.UPDATES)) UpdatesSection(resumeTick)
 
             Text(
                 "Location Ticker ${BuildConfig.VERSION_NAME}",
