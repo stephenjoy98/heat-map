@@ -12,6 +12,21 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-10-20
+
+### Added
+- Fix route on the Timeline: long-press a trip and choose "Fix route on the map" (or "Join parts and fix
+  route" on grouped trips). Pick the stretch with the slider, across gaps and several trips, and it's
+  joined into one trip and snapped to roads. Or tap "Find roads" to see the ways between its ends and pick
+  one, and tap the map where you went to make the road pass through there.
+- Friend profiles: tap a friend to see their totals, how they get around, their cities and a heatmap of
+  everywhere they've shared, zoomed out to fit. The map pans, zooms, rotates and tilts. "Compare with
+  you" opens the side-by-side comparison.
+- Your friends list is saved on the phone, so it shows straight away and without a connection.
+
+### Changed
+- The About page lists everything the app can do now.
+
 ## [2.21.0] - 2026-10-20
 
 ### Added

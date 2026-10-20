@@ -62,14 +62,23 @@ private const val GITHUB_PROFILE = "https://github.com/$GITHUB_USER"
 private const val REPO_URL = "https://github.com/$GITHUB_USER/heat-map"
 
 /** What the app does, in a few lines for the About page. */
+// What the app can do today. Keep this up to date with every release (see CLAUDE.md).
 private val FEATURES = listOf(
-    "🗺️" to "A heatmap of everywhere you've been, on OpenStreetMap",
-    "⏱️" to "Automatic recording that adapts to how you're moving",
-    "🚲" to "Travel modes, trips and a Timeline by day, week, month or year",
-    "⛰️" to "Terrain, 3D buildings and 3D routes at the heights you recorded",
+    "🗺️" to "A heatmap of everywhere you've been, on OpenStreetMap, with terrain and 3D buildings",
+    "⏱️" to "Automatic recording, from every second on the move to every minute when still",
+    "🏠" to "Saved places like home and work, where recording slows down to save battery",
+    "🎯" to "Say what trip you're on from the recording tile, or let the app work it out",
+    "🚲" to "Travel modes and sub-modes you can add, rename, recolour and delete",
+    "📅" to "A Timeline by day, week, month or year, with back-to-back trips grouped",
+    "✏️" to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
+    "🛣️" to "Join sections and snap them to the road you took, or pick a road on the map",
+    "❓" to "Quick questions about unclear trips and roads, with a map you can zoom",
+    "⛰️" to "3D routes at the heights you recorded",
     "🌍" to "Your profile: places explored, distance explored and time captured",
     "✨" to "Insights from on-device AI, with steps from Health Connect",
-    "☁️" to "Backups, and friends to compare routes and explored areas with",
+    "🔋" to "Battery use per recording interval",
+    "☁️" to "Automatic backups and restore",
+    "👥" to "Friends: their profiles, a map of where they've been, and comparisons with yours",
 )
 
 /** The app's launcher icon, as installed. */

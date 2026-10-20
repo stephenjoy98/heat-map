@@ -118,6 +118,19 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.key
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import io.github.stephenjoy98.heatmap.data.Polyline
+import io.github.stephenjoy98.heatmap.data.TrackRules
+import io.github.stephenjoy98.heatmap.data.Units
+import io.github.stephenjoy98.heatmap.roads.RoadPath
+import io.github.stephenjoy98.heatmap.roads.Valhalla
 import kotlin.math.ln
 import kotlin.math.min
 
@@ -173,7 +186,23 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     var retimeLoading by remember { mutableStateOf(false) }
     // Adding a trip: the same slider over the day's dots, starting from this stretch (start to end times).
     var adding by remember { mutableStateOf<LongRange?>(null) }
-    val rangeEditing = retiming != null || adding != null
+    // Fixing a route: a stretch of dots joined into one trip, matched to roads or to a road you pick.
+    var fixing by remember { mutableStateOf<LongRange?>(null) }
+    var fixMode by remember { mutableStateOf(TravelMode.UNKNOWN) }
+    val vias = remember { mutableStateListOf<Pair<Double, Double>>() }
+    var roads by remember { mutableStateOf<List<RoadPath>>(emptyList()) }
+    var chosenRoad by remember { mutableIntStateOf(-1) }
+    var roadsLoading by remember { mutableStateOf(false) }
+    var roadsError by remember { mutableStateOf<String?>(null) }
+    val startFix = { from: Long, to: Long, mode: TravelMode ->
+        vias.clear()
+        roads = emptyList()
+        chosenRoad = -1
+        roadsError = null
+        fixMode = mode
+        fixing = from..to
+    }
+    val rangeEditing = retiming != null || adding != null || fixing != null
     val mapEditing = editing || rangeEditing
     // Picking several trips to change their mode together; null when not picking.
     var picked by remember { mutableStateOf<Set<Long>?>(null) }
@@ -188,8 +217,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         listOf(MapLayer("timeline-${d.period}-$colors", TimelineTiles(d.routes, tilePx, casing.toArgb()), alpha = if (mapEditing) 0.35f else 1f))
     }
 
-    LaunchedEffect(retiming, adding) {
-        val window = retiming?.let { it.startTime..it.endTime } ?: adding ?: return@LaunchedEffect
+    LaunchedEffect(retiming, adding, fixing) {
+        val window = retiming?.let { it.startTime..it.endTime } ?: adding ?: fixing ?: return@LaunchedEffect
         retimeLoading = true
         val from = minOf(period.fromMs, window.first)
         val to = maxOf(period.toMs, window.last + 1)
@@ -211,6 +240,34 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     BackHandler(enabled = rangeEditing && !LocalCovered.current) {
         retiming = null
         adding = null
+        fixing = null
+    }
+    // Ways between the first and last dot picked, through any points tapped on the map.
+    fun findRoads() {
+        val pts = retime.points
+        if (pts.isEmpty()) return
+        val a = pts[retime.range.first]
+        val b = pts[retime.range.last]
+        val costing = Valhalla.costing(fixMode) ?: "auto"
+        val stops = listOf(a.lat to a.lon) + vias + (b.lat to b.lon)
+        roadsLoading = true
+        roadsError = null
+        scope.launch {
+            val found = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (vias.isEmpty()) Valhalla.routes(a.lat, a.lon, b.lat, b.lon, costing)
+                    else listOfNotNull(Valhalla.routeThrough(stops, costing))
+                }
+            }
+            roads = found.getOrDefault(emptyList())
+            chosenRoad = if (roads.isNotEmpty()) 0 else -1
+            roadsError = when {
+                found.isFailure -> "Couldn't reach the routing service. Check your connection and try again."
+                roads.isEmpty() -> "No road found between these points."
+                else -> null
+            }
+            roadsLoading = false
+        }
     }
     BackHandler(enabled = picked != null && !LocalCovered.current) { picked = null }
     val changeMode = { trip: Trip, mode: TravelMode ->
@@ -275,6 +332,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     when {
                         retiming != null -> "Change times"
                         adding != null -> "Add a trip"
+                        fixing != null -> "Fix route"
                         picked != null -> "${picked!!.size} selected"
                         editing -> "Edit dots"
                         else -> "Timeline"
@@ -343,6 +401,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 onMapClick = when {
                     editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
                     // Tapping a dot moves whichever end of the trip is nearer to it.
+                    // Fixing a route: a tap says the route went through there.
+                    fixing != null -> { lat, lon ->
+                        if (vias.size < MAX_VIAS) {
+                            vias += lat to lon
+                            findRoads()
+                        }
+                    }
                     rangeEditing -> { lat, lon ->
                         nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
                             val r = retime.range
@@ -360,6 +425,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
             } else if (rangeEditing) {
                 DotsOverlay(camera, retime, Modifier.fillMaxSize())
+                if (fixing != null) RouteLinesOverlay(camera, roads, chosenRoad, vias, Modifier.fillMaxSize())
                 LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
             } else if (data == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -397,6 +463,46 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         }
                     },
                     onClose = stopEditing,
+                )
+            }
+        } else if (fixing != null) {
+            Box(Modifier.padding(12.dp)) {
+                RouteFixPanel(
+                    state = retime,
+                    loading = retimeLoading,
+                    mode = fixMode,
+                    onMode = { fixMode = it },
+                    roads = roads,
+                    chosen = chosenRoad,
+                    onChoose = { chosenRoad = it },
+                    roadsLoading = roadsLoading,
+                    error = roadsError,
+                    vias = vias.size,
+                    onFindRoads = ::findRoads,
+                    onClearVias = {
+                        vias.clear()
+                        roads = emptyList()
+                        chosenRoad = -1
+                    },
+                    onCancel = { fixing = null },
+                    onSave = { start, end ->
+                        val road = roads.getOrNull(chosenRoad)
+                        val mode = fixMode
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                store.addTrip(start, end, mode).also { r ->
+                                    // The road picked becomes the trip's shape; otherwise it's matched to roads as usual.
+                                    if (road != null && r.createdTripId > 0) {
+                                        val n = road.points.size / 2
+                                        val poly = Polyline.encode(DoubleArray(n) { road.points[it * 2] }, DoubleArray(n) { road.points[it * 2 + 1] })
+                                        store.saveTripPath(r.createdTripId, RoadSnapper.STATUS_SNAPPED, poly, poly)
+                                    }
+                                }
+                            }
+                            afterDotEdit(context, result)
+                            fixing = null
+                        }
+                    },
                 )
             }
         } else if (rangeEditing) {
@@ -472,6 +578,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                     onClick = { entry.box?.let { frame(camera, it) } },
                                     onMode = { changeMode(entry.trip, it) },
                                     onRetime = { retiming = entry.trip },
+                                    onFix = { startFix(entry.trip.startTime, entry.trip.endTime, entry.trip.mode) },
                                     selection = picked,
                                     onSelect = select,
                                 )
@@ -489,6 +596,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                     onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
                                     onSectionMode = { mv, m -> changeMode(mv.trip, m) },
                                     onSectionRetime = { mv -> retiming = mv.trip },
+                                    onFix = { mv -> startFix(mv?.trip?.startTime ?: entry.start, mv?.trip?.endTime ?: entry.end, mv?.trip?.mode ?: entry.mode) },
                                     selection = picked,
                                     onSelect = select,
                                 )
@@ -655,6 +763,7 @@ private fun GroupRow(
     onSectionClick: (DayEntry.Move) -> Unit,
     onSectionMode: (DayEntry.Move, TravelMode) -> Unit,
     onSectionRetime: (DayEntry.Move) -> Unit,
+    onFix: (DayEntry.Move?) -> Unit,
     selection: Set<Long>?,
     onSelect: (List<Long>, Boolean) -> Unit,
 ) {
@@ -711,6 +820,14 @@ private fun GroupRow(
                 }
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 DropdownMenuItem(
+                    text = { Text("Join parts and fix route") },
+                    leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                    onClick = {
+                        menu = false
+                        onFix(null)
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text("Select parts…") },
                     leadingIcon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
                     onClick = {
@@ -729,6 +846,7 @@ private fun GroupRow(
                         onClick = { onSectionClick(mv) },
                         onMode = { onSectionMode(mv, it) },
                         onRetime = { onSectionRetime(mv) },
+                        onFix = { onFix(mv) },
                         selection = selection,
                         onSelect = onSelect,
                     )
@@ -748,6 +866,7 @@ private fun MoveRow(
     onClick: () -> Unit,
     onMode: (TravelMode) -> Unit,
     onRetime: () -> Unit,
+    onFix: () -> Unit,
     selection: Set<Long>?,
     onSelect: (List<Long>, Boolean) -> Unit,
 ) {
@@ -795,6 +914,14 @@ private fun MoveRow(
                 onClick = {
                     menu = false
                     onRetime()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Fix route on the map") },
+                leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                onClick = {
+                    menu = false
+                    onFix()
                 },
             )
             DropdownMenuItem(
@@ -964,6 +1091,145 @@ private fun SelectionBar(count: Int, onMode: (TravelMode) -> Unit, onCancel: () 
             }
         }
     }
+}
+
+private const val MAX_VIAS = 5
+private val roadColors = listOf(Color(0xFF3D9BFF), Color(0xFFFF7A1A), Color(0xFF66BB6A))
+
+/** Candidate roads (the picked one bold, others faint) and the points tapped to route through. */
+@Composable
+private fun RouteLinesOverlay(camera: MapCamera, roads: List<RoadPath>, chosen: Int, vias: List<Pair<Double, Double>>, modifier: Modifier) {
+    val pin = MaterialTheme.colorScheme.tertiary
+    Canvas(modifier) {
+        camera.cameraTick // Redraw whenever the camera moves.
+        // The picked road last, so it's on top.
+        val order = roads.indices.sortedBy { if (it == chosen) 1 else 0 }
+        for (i in order) {
+            val pts = roads[i].points
+            val path = Path()
+            var started = false
+            for (k in 0 until pts.size / 2) {
+                val o = camera.toScreen(pts[k * 2], pts[k * 2 + 1]) ?: return@Canvas
+                if (started) path.lineTo(o.x, o.y) else path.moveTo(o.x, o.y)
+                started = true
+            }
+            val color = roadColors[i % roadColors.size]
+            drawPath(path, if (i == chosen) color else color.copy(alpha = 0.45f), style = Stroke(width = (if (i == chosen) 6 else 3).dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        vias.forEach { (lat, lon) ->
+            val o = camera.toScreen(lat, lon) ?: return@forEach
+            drawCircle(Color.White, radius = 9.dp.toPx(), center = o)
+            drawCircle(pin, radius = 6.dp.toPx(), center = o)
+        }
+    }
+}
+
+/**
+ * Fix route: pick a stretch of dots with the slider (it can run across several trips and the gaps between
+ * them), and it's joined into one trip. Either let it be matched to roads as usual, or find the roads between
+ * its ends and pick one; tapping the map adds points the road must go through.
+ */
+@Composable
+private fun RouteFixPanel(
+    state: DotEditState,
+    loading: Boolean,
+    mode: TravelMode,
+    onMode: (TravelMode) -> Unit,
+    roads: List<RoadPath>,
+    chosen: Int,
+    onChoose: (Int) -> Unit,
+    roadsLoading: Boolean,
+    error: String?,
+    vias: Int,
+    onFindRoads: () -> Unit,
+    onClearVias: () -> Unit,
+    onCancel: () -> Unit,
+    onSave: (Long, Long) -> Unit,
+) {
+    val pts = state.points
+    var saving by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Tip("Cancel") { IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Cancel") } }
+                Text("Join and fix the route", style = MaterialTheme.typography.titleMedium)
+            }
+            if (loading || pts.size < 2) {
+                Hint(if (loading) "Loading dots…" else "Not enough dots here.")
+            } else {
+                val first = pts[state.range.first]
+                val last = pts[state.range.last]
+                Text(
+                    "${timeFormat.format(Date(first.time))} – ${timeFormat.format(Date(last.time))} · ${state.range.last - state.range.first + 1} dots, joined into one trip",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                RangeSlider(
+                    value = state.range.first.toFloat()..state.range.last.toFloat(),
+                    onValueChange = { v -> state.range = v.start.roundToInt()..v.endInclusive.roundToInt() },
+                    valueRange = 0f..(pts.size - 1).toFloat(),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                ModeChips(selected = mode, onPick = onMode, modifier = Modifier.padding(horizontal = 12.dp))
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = onFindRoads, enabled = !roadsLoading) {
+                        Text(if (roadsLoading) "Finding roads…" else if (roads.isEmpty()) "Find roads" else "Find again")
+                    }
+                    if (vias > 0) {
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(onClick = onClearVias) { Text(if (vias == 1) "Clear point" else "Clear $vias points") }
+                    }
+                }
+                error?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                }
+                if (roads.isNotEmpty()) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        roads.forEachIndexed { i, r ->
+                            FilterChip(
+                                selected = i == chosen,
+                                onClick = { onChoose(if (i == chosen) -1 else i) },
+                                label = { Text((r.streetName?.let { "Via $it" } ?: "Road ${i + 1}") + " · " + Units.distance(polylineKm(r.points))) },
+                                leadingIcon = { Box(Modifier.size(10.dp).background(roadColors[i % roadColors.size], CircleShape)) },
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "Tap the map where you went to make the road pass there (up to $MAX_VIAS points). " +
+                        "Without a road picked, the joined trip is matched to roads automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                    Spacer(Modifier.width(4.dp))
+                    Button(
+                        onClick = {
+                            saving = true
+                            onSave(first.time, last.time)
+                        },
+                        enabled = !saving,
+                    ) { Text(if (chosen >= 0) "Save with this road" else "Join and snap") }
+                }
+            }
+        }
+    }
+}
+
+/** Length of an interleaved [lat, lon, …] line in kilometres. */
+private fun polylineKm(pts: DoubleArray): Double {
+    var m = 0.0
+    for (k in 1 until pts.size / 2) m += TrackRules.distanceMeters(pts[k * 2 - 2], pts[k * 2 - 1], pts[k * 2], pts[k * 2 + 1])
+    return m / 1000
 }
 
 /** A stay between trips. Long-press it to add a trip in its place (if you were moving after all). */

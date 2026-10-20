@@ -321,6 +321,12 @@ object Prefs {
         sp.edit().putBoolean("auto_interval", on).apply()
     }
 
+    fun friendsCache(): String? = sp.getString("friends_cache", null)
+
+    fun setFriendsCache(json: String) {
+        sp.edit().putString("friends_cache", json).apply()
+    }
+
     fun setSavedPlaces(places: List<SavedPlace>) {
         _savedPlaces.value = places
         sp.edit().putString("saved_places", SavedPlace.encode(places)).apply()

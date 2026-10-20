@@ -15,6 +15,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class Friend(
     val uid: String,
@@ -39,7 +41,42 @@ object Friends {
     suspend fun list(): List<Friend> = coroutineScope {
         val uids = user(me()).collection("friends").get().await().documents.map { it.id }
         uids.map { uid -> async { runCatching { profile(uid) }.getOrNull() } }.awaitAll().filterNotNull()
+            .also { Prefs.setFriendsCache(encode(it)) }
     }
+
+    /** The friends list as last loaded, so it shows straight away and without a connection. */
+    fun saved(): List<Friend> = decode(Prefs.friendsCache())
+
+    private fun encode(friends: List<Friend>): String = JSONArray().apply {
+        friends.forEach { f ->
+            put(
+                JSONObject()
+                    .put("uid", f.uid)
+                    .put("name", f.name)
+                    .put("km", JSONObject().apply { f.kmByMode.forEach { (m, km) -> put(m.name, km) } })
+                    .put("cells", f.cells)
+                    .put("cities", JSONArray(f.cities))
+            )
+        }
+    }.toString()
+
+    private fun decode(json: String?): List<Friend> = runCatching {
+        val a = JSONArray(json ?: "[]")
+        List(a.length()) { i ->
+            val o = a.getJSONObject(i)
+            val km = o.optJSONObject("km")
+            val cities = o.optJSONArray("cities")
+            Friend(
+                uid = o.getString("uid"),
+                name = o.optString("name", "Friend"),
+                kmByMode = km?.keys()?.asSequence()?.mapNotNull { k ->
+                    TravelMode.entries.firstOrNull { it.name == k }?.let { it to km.getDouble(k) }
+                }?.toMap().orEmpty(),
+                cells = o.optLong("cells"),
+                cities = List(cities?.length() ?: 0) { cities!!.getString(it) },
+            )
+        }
+    }.getOrDefault(emptyList())
 
     private suspend fun profile(uid: String): Friend {
         val doc = user(uid).get().await()

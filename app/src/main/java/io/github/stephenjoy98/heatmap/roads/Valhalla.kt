@@ -69,6 +69,25 @@ object Valhalla {
         return trips.mapNotNull { trip -> toPath(trip) }
     }
 
+    /**
+     * The best way from the first stop to the last that passes through the ones between, in order (where you
+     * tapped on the map to say which road you took). Null if there's no route.
+     */
+    fun routeThrough(stops: List<Pair<Double, Double>>, costing: String): RoadPath? {
+        if (stops.size < 2) return null
+        val locations = JSONArray()
+        stops.forEachIndexed { i, (lat, lon) ->
+            val end = i == 0 || i == stops.lastIndex
+            locations.put(JSONObject().put("lat", lat).put("lon", lon).put("type", if (end) "break" else "through"))
+        }
+        val body = JSONObject()
+            .put("locations", locations)
+            .put("costing", costing)
+            .put("directions_options", JSONObject().put("units", "kilometers"))
+        val trip = post("/route", body)?.optJSONObject("trip") ?: return null
+        return toPath(trip)
+    }
+
     private fun toPath(trip: JSONObject): RoadPath? {
         val legs = trip.optJSONArray("legs") ?: return null
         val pts = ArrayList<Double>()

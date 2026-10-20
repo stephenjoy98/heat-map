@@ -87,7 +87,7 @@ class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
 class EditablePoint(val id: Long, val time: Long, val lat: Double, val lon: Double, val accuracy: Float)
 
-class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>)
+class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>, val createdTripId: Long = 0)
 
 /** A spot where a lot of time was recorded. */
 class Spot(val lat: Double, val lon: Double, val hours: Double)
@@ -756,6 +756,7 @@ class PointStore private constructor(context: Context) :
      */
     fun addTrip(start: Long, end: Long, mode: TravelMode): DeleteResult {
         if (end <= start) return DeleteResult(emptySet(), emptyList())
+        var newId = 0L
         val db = writableDatabase
         val days = HashSet<String>()
         val remoteIds = mutableListOf<String>()
@@ -780,12 +781,13 @@ class PointStore private constructor(context: Context) :
             db.execSQL("UPDATE points SET trip_id = $created, mode = ${mode.id} WHERE time >= $start AND time <= $end")
             refresh += created
             for (id in refresh) refreshTrip(db, id, remoteIds)
+            newId = created
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
         }
         changed()
-        return DeleteResult(days, remoteIds)
+        return DeleteResult(days, remoteIds, newId)
     }
 
     /** A new, empty trip row; [refreshTrip] fills in its times and ends once it has dots. */
@@ -1364,6 +1366,13 @@ class PointStore private constructor(context: Context) :
     }
 
     /** A friend's routes that overlap [box] (or all of them when [box] is null). */
+    /** The area a friend's shared routes cover; null if none are stored. */
+    fun friendBounds(friendUid: String): GeoBox? =
+        readableDatabase.rawQuery(
+            "SELECT MAX(max_lat), MIN(min_lat), MAX(max_lon), MIN(min_lon), COUNT(*) FROM friend_routes WHERE friend_uid = ?",
+            arrayOf(friendUid),
+        ).use { c -> if (c.moveToFirst() && c.getLong(4) > 0) GeoBox(c.getDouble(0), c.getDouble(1), c.getDouble(2), c.getDouble(3)) else null }
+
     fun friendRoutes(friendUid: String, box: GeoBox?, modes: Set<TravelMode>): List<FriendRoute> {
         val boxClause = box?.let {
             " AND min_lat <= ${it.north} AND max_lat >= ${it.south} AND min_lon <= ${it.east} AND max_lon >= ${it.west}"

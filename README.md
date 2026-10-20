@@ -94,6 +94,9 @@ up to your Google account, and lets you compare explored areas with friends.
   them.
 - **Grouped trips**: back-to-back trips in the same mode show as one entry; long-press it (or tap the arrow)
   to see and edit each part, or change the mode of all parts from its menu.
+- **Fix route** (long-press › Fix route on the map): pick a stretch of dots across gaps and trips; it's
+  joined into one trip and snapped to roads, or to a road you pick from "Find roads". Tap the map to make
+  the road pass through a spot.
 - **Select several trips** (long-press › Select) and change their mode together.
 - **Add a trip** (+ on a day, or long-press a stay › Add a trip here): pick its first and last dot with a
   slider and its mode; overlapping trips are trimmed or split around it.

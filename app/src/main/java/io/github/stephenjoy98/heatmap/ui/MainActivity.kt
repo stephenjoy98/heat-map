@@ -120,6 +120,7 @@ private fun AppScaffold(
     val stack = rememberPageStack()
     val tabState = rememberSaveableStateHolder()
     var comparing by remember { mutableStateOf<Friend?>(null) }
+    var viewingFriend by remember { mutableStateOf<Friend?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
     // After an update, the changes since the version the user last saw.
@@ -278,9 +279,9 @@ private fun AppScaffold(
                             snackbar = snackbar,
                             pendingInvite = pendingInvite,
                             onInviteHandled = { invite.value = null },
-                            onCompare = {
-                                comparing = it
-                                stack.push(Page.COMPARE)
+                            onOpenFriend = {
+                                viewingFriend = it
+                                stack.push(Page.FRIEND)
                             },
                             onBack = back,
                         )
@@ -292,6 +293,21 @@ private fun AppScaffold(
                     Page.ABOUT -> AboutScreen(onBack = back, onChangelog = { stack.push(Page.CHANGELOG) })
                     Page.CHANGELOG -> ChangelogScreen(onBack = back)
                     Page.REVIEW -> ReviewScreen(WindowInsets.navigationBars.asPaddingValues(), resumeTick, onBack = back)
+                    Page.FRIEND -> {
+                        val friend = viewingFriend
+                        if (friend != null) {
+                            FriendProfileScreen(
+                                friend = friend,
+                                onBack = back,
+                                onCompare = {
+                                    comparing = friend
+                                    stack.push(Page.COMPARE)
+                                },
+                            )
+                        } else {
+                            LaunchedEffect(Unit) { stack.pop() }
+                        }
+                    }
                     Page.COMPARE -> {
                         val friend = comparing
                         if (friend != null) {

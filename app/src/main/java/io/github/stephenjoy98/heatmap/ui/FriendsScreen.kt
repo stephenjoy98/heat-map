@@ -89,7 +89,7 @@ fun FriendsScreen(
     snackbar: SnackbarHostState,
     pendingInvite: String?,
     onInviteHandled: () -> Unit,
-    onCompare: (Friend) -> Unit,
+    onOpenFriend: (Friend) -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -103,7 +103,7 @@ fun FriendsScreen(
             else -> {
                 item { ProfileCard(snackbar) }
                 item { SharingCard() }
-                item { FriendsList(snackbar, onCompare) }
+                item { FriendsList(snackbar, onOpenFriend) }
             }
         }
     }
@@ -406,16 +406,18 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChang
 }
 
 @Composable
-private fun FriendsList(snackbar: SnackbarHostState, onCompare: (Friend) -> Unit) {
+private fun FriendsList(snackbar: SnackbarHostState, onOpenFriend: (Friend) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var reload by remember { mutableIntStateOf(0) }
     var showEnter by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf<Friend?>(null) }
-    val friends by produceState<List<Friend>?>(null, reload) {
+    // The list saved last time shows straight away (and offline); then it's refreshed.
+    val saved = remember { Friends.saved() }
+    val friends by produceState<List<Friend>?>(saved.takeIf { it.isNotEmpty() }, reload) {
         value = runCatching { Friends.list() }.getOrElse {
-            snackbar.showSnackbar("Couldn't load friends: ${it.message}")
-            emptyList()
+            snackbar.showSnackbar(if (saved.isNotEmpty()) "Offline: showing your saved friends" else "Couldn't load friends: ${it.message}")
+            value ?: emptyList()
         }
     }
 
@@ -460,7 +462,7 @@ private fun FriendsList(snackbar: SnackbarHostState, onCompare: (Friend) -> Unit
                 } else {
                     list.forEach { f ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { onCompare(f) }.padding(vertical = 10.dp),
+                            Modifier.fillMaxWidth().clickable { onOpenFriend(f) }.padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(Modifier.size(36.dp).background(FriendBlue, CircleShape), contentAlignment = Alignment.Center) {
