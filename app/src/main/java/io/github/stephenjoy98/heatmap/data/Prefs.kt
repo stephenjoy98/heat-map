@@ -35,6 +35,14 @@ object Prefs {
     private val _liveIntervalSec = MutableStateFlow(60)
     val liveIntervalSec: StateFlow<Int> = _liveIntervalSec
 
+    /** Home, work and other places where recording slows down while you're there. */
+    private val _savedPlaces = MutableStateFlow<List<SavedPlace>>(emptyList())
+    val savedPlaces: StateFlow<List<SavedPlace>> = _savedPlaces
+
+    /** The saved place you're at right now while recording, if any (not saved). */
+    private val _atPlace = MutableStateFlow<SavedPlace?>(null)
+    val atPlace: StateFlow<SavedPlace?> = _atPlace
+
     private val _mapLayer = MutableStateFlow(MapLayerType.DEFAULT)
     val mapLayer: StateFlow<MapLayerType> = _mapLayer
 
@@ -144,6 +152,7 @@ object Prefs {
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
         _autoInterval.value = sp.getBoolean("auto_interval", false)
         _liveIntervalSec.value = _intervalSec.value
+        _savedPlaces.value = SavedPlace.decode(sp.getString("saved_places", null))
         _mapLayer.value = MapLayerType.entries.byName(sp.getString("map_layer", null)) ?: MapLayerType.DEFAULT
         _buildings3d.value = sp.getBoolean("buildings_3d", false)
         _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
@@ -310,6 +319,15 @@ object Prefs {
     fun setAutoInterval(on: Boolean) {
         _autoInterval.value = on
         sp.edit().putBoolean("auto_interval", on).apply()
+    }
+
+    fun setSavedPlaces(places: List<SavedPlace>) {
+        _savedPlaces.value = places
+        sp.edit().putString("saved_places", SavedPlace.encode(places)).apply()
+    }
+
+    fun setAtPlace(place: SavedPlace?) {
+        _atPlace.value = place
     }
 
     fun setLiveIntervalSec(seconds: Int) {

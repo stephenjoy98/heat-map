@@ -182,7 +182,10 @@ object TimelineRepository {
         val lastPoint = span[1].toLong()
         val geocoder = if (Geocoder.isPresent()) Geocoder(context, Locale.getDefault()) else null
         var lookups = 0
+        val saved = Prefs.savedPlaces.value
         fun name(lat: Double, lon: Double): String? {
+            // A saved place (Home, Work…) names a stay inside it.
+            saved.filter { it.distanceTo(lat, lon) <= it.radiusM }.minByOrNull { it.distanceTo(lat, lon) }?.let { return it.name }
             val key = "s:${(lat * 1000).roundToLong()}:${(lon * 1000).roundToLong()}"
             store.place(key)?.let { return it.city }
             if (geocoder == null || lookups >= MAX_GEOCODES) return null

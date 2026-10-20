@@ -104,6 +104,10 @@ up to your Google account, and lets you compare explored areas with friends.
   under it until you stop recording) and switch between automatic and a set interval.
 - **Sub-modes**: CarPool, RideShare › Bike and Car, PublicTransit › SkyTrain, Bus and SeaBus come
   suggested; add your own with "Part of". Train and boat modes aren't snapped to roads.
+- **Places** in Settings: home, work, school and others, each a circle with its own slower interval while
+  you're settled there (1–30 min, Wi-Fi/cell positioning). Moving speeds it to ~20 s until you're out of the
+  circle, then the usual pace; Android geofencing also reports leaving. Suggested from where you spend the
+  most time; stays at them are named on the Timeline.
 - **Battery** in Settings: battery used per hour at each recording interval (last 7 or 30 days, screen off
   or all), measured on battery power while recording.
 - **Travel modes** in Settings: pick each mode's colour with a colour picker or a hex code (reset one or all

@@ -207,6 +207,8 @@ fun SettingsScreen(
                 }
             }
 
+            PlacesSection()
+
             BatterySection()
 
             Section("Appearance") {

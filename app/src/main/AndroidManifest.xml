@@ -88,5 +88,9 @@
         <receiver
             android:name=".tracking.ActivityReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".tracking.PlaceFenceReceiver"
+            android:exported="false" />
     </application>
 </manifest>

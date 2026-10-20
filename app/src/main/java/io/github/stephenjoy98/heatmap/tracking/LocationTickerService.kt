@@ -31,6 +31,9 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import com.google.android.gms.location.DetectedActivity
+import io.github.stephenjoy98.heatmap.data.SavedPlace
+import io.github.stephenjoy98.heatmap.data.PlaceZones
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Units
 import io.github.stephenjoy98.heatmap.ui.MainActivity
@@ -100,7 +103,10 @@ class LocationTickerService : Service() {
 
         Prefs.setTracking(true)
         ActivityTracker.start(this)
-        ActivityTracker.onChange = { activity -> if (Prefs.autoInterval.value) handler.post { reconsider(activity, null) } }
+        // Activity changes matter in a fixed interval too: setting off from a saved place speeds recording up.
+        ActivityTracker.onChange = { activity -> handler.post { reconsider(activity, null) } }
+        PlaceFences.onExit = { handler.post { leavePlace() } }
+        PlaceFences.register(this, Prefs.savedPlaces.value)
         requestUpdates()
         return START_STICKY
     }
@@ -109,6 +115,9 @@ class LocationTickerService : Service() {
         fused.removeLocationUpdates(callback)
         ActivityTracker.stop(this)
         ActivityTracker.onChange = null
+        PlaceFences.unregister(this)
+        PlaceFences.onExit = null
+        Prefs.setAtPlace(null)
         val app = applicationContext
         handler.post { TripDetector.process(app) }
         worker.quitSafely()
@@ -120,11 +129,20 @@ class LocationTickerService : Service() {
     @Volatile
     private var autoSec = AutoInterval.UNKNOWN_SEC
 
+    /** At a saved place: the interval to use there instead (slower when settled, quicker once moving). */
+    @Volatile
+    private var placeSec: Int? = null
+
+    /** The saved place the latest fix was in. */
+    private var currentPlace: SavedPlace? = null
+
     private fun requestUpdates() {
-        val seconds = if (Prefs.autoInterval.value) autoSec else Prefs.intervalSec.value
+        val seconds = placeSec ?: if (Prefs.autoInterval.value) autoSec else Prefs.intervalSec.value
         Prefs.setLiveIntervalSec(seconds)
         val interval = seconds * 1000L
-        val highAccuracy = Prefs.highAccuracy.value
+        // Settled at a saved place, Wi-Fi and cell positioning are plenty and use much less battery.
+        val settled = placeSec != null && placeSec!! >= PLACE_WATCH_SEC * 2
+        val highAccuracy = Prefs.highAccuracy.value && !settled
         handler.post {
             intervalMs = interval
             maxAccuracyM = accuracyLimitM(highAccuracy)
@@ -179,7 +197,12 @@ class LocationTickerService : Service() {
             runCatching { sampleBattery(now) }
         }
 
-        if (Prefs.autoInterval.value) reconsider(ActivityTracker.current, location)
+        val place = PlaceZones.find(Prefs.savedPlaces.value, location.latitude, location.longitude, currentPlace)
+        if (place?.id != currentPlace?.id) {
+            currentPlace = place
+            Prefs.setAtPlace(place)
+        }
+        reconsider(ActivityTracker.current, location)
 
         // Look for finished trips every couple of minutes rather than on every fix.
         if (location.time - lastDetectedAt > 2 * 60_000L) {
@@ -211,11 +234,31 @@ class LocationTickerService : Service() {
             else -> null
         }
         val stillFor = if (stillSince > 0L && last != null) last.time - stillSince else 0L
-        val chosen = AutoInterval.choose(activity, speed, stillFor)
-        if (chosen != autoSec) {
+        val auto = Prefs.autoInterval.value
+        val chosen = if (auto) AutoInterval.choose(activity, speed, stillFor) else autoSec
+        // At a saved place: its slow interval while settled; once moving, often enough to notice leaving
+        // (about every 20 s) without tracing every step around the house. Outside, the usual interval.
+        val base = if (auto) chosen else Prefs.intervalSec.value
+        val place = currentPlace
+        val moving = activity in MOVING_ACTIVITIES || (speed ?: 0f) > 0.7f
+        val atPlace = when {
+            place == null -> null
+            moving -> if (auto) maxOf(base, PLACE_WATCH_SEC) else null
+            else -> maxOf(base, place.intervalSec)
+        }
+        if (chosen != autoSec || atPlace != placeSec) {
             autoSec = chosen
+            placeSec = atPlace
             ContextCompat.getMainExecutor(this).execute { if (Prefs.tracking.value) requestUpdates() }
         }
+    }
+
+    /** Android says you've left a saved place: record at the usual pace straight away. */
+    private fun leavePlace() {
+        if (currentPlace == null && placeSec == null) return
+        currentPlace = null
+        Prefs.setAtPlace(null)
+        reconsider(ActivityTracker.current, null)
     }
 
     private fun buildNotification(last: Location?): Notification {
@@ -249,6 +292,13 @@ class LocationTickerService : Service() {
     }
 
     companion object {
+        // How often to record at a saved place once you start moving, to catch leaving it.
+        private const val PLACE_WATCH_SEC = 20
+        private val MOVING_ACTIVITIES = setOf(
+            DetectedActivity.IN_VEHICLE, DetectedActivity.ON_BICYCLE, DetectedActivity.WALKING,
+            DetectedActivity.RUNNING, DetectedActivity.ON_FOOT,
+        )
+
         private const val STILL_WINDOW_MS = 60_000L
 
         /** Height above sea level where Android provides it (14+), otherwise GPS height; null if neither. */

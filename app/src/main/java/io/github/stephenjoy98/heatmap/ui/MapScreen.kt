@@ -386,6 +386,7 @@ private fun ControlPanel(
 ) {
     val currentId by Prefs.currentMode.collectAsStateWithLifecycle()
     val current = currentId?.let { TravelMode.fromId(it) }
+    val atPlace by Prefs.atPlace.collectAsStateWithLifecycle()
     // Tapping the tile (anywhere but the button) picks the kind of trip and the recording interval.
     Surface(
         onClick = onOpen,
@@ -437,9 +438,17 @@ private fun ControlPanel(
                 val auto by Prefs.autoInterval.collectAsStateWithLifecycle()
                 val live by Prefs.liveIntervalSec.collectAsStateWithLifecycle()
                 Text(
-                    if (auto) "Auto · ${if (tracking) "every ${formatInterval(live)}" else "adapts to you"}" else "Every ${formatInterval(intervalSec)}",
+                    if (auto) "Auto · ${if (tracking) "every ${formatInterval(live)}" else "adapts to you"}" else "Every ${formatInterval(if (tracking) live else intervalSec)}",
                     style = MaterialTheme.typography.titleLarge,
                 )
+                // At a saved place recording slows down; say why.
+                if (tracking) atPlace?.let { p ->
+                    Text(
+                        "At ${p.name} · slower while you're settled",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Tip("Trip type and interval") {
                 Icon(

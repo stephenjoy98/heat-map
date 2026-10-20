@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.20.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.21.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -61,6 +61,12 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Architecture (app/src/main/java/io/github/stephenjoy98/heatmap)
 
+- Saved places (2.21.0): `data/SavedPlaces.kt` (`SavedPlace`, `PlaceKind`, `PlaceZones.find` with a 30 m leave
+  margin; Prefs "saved_places", `Prefs.atPlace` runtime), `tracking/PlaceFences` (Play geofences, EXIT only,
+  needs background location; `PlaceFenceReceiver` in manifest), service `placeSec` override: settled →
+  max(base, place interval) + balanced accuracy; moving (activity or >0.7 m/s) → auto: max(base, 20 s), fixed:
+  base. UI `PlacesSection` (Settings) with full-screen `PlaceEditor` (pin at map centre via `MapCamera.center`),
+  suggestions from `PointStore.frequentSpots`.
 - `tracking/`: `LocationTickerService` (foreground service, fused location, records altitude via
   `altitudeOf` — MSL on API 34+), `AutoInterval` (vehicle 1 s, cycle 2 s, walk 3 s, unknown 5 s, still 15 s,
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,

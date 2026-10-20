@@ -89,6 +89,9 @@ class EditablePoint(val id: Long, val time: Long, val lat: Double, val lon: Doub
 
 class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>)
 
+/** A spot where a lot of time was recorded. */
+class Spot(val lat: Double, val lon: Double, val hours: Double)
+
 /** Battery used while recording at one interval: [hours] spent at it and [percent] of the battery used. */
 class BatteryUse(val intervalSec: Int, val hours: Double, val percent: Double) {
     val percentPerHour: Double get() = if (hours > 0) percent / hours else 0.0
@@ -1275,6 +1278,18 @@ class PointStore private constructor(context: Context) :
         readableDatabase.rawQuery("SELECT DISTINCT ${Cells.SQL_ROW}, ${Cells.SQL_COL} FROM points", null).use { c ->
             HashSet<Long>(c.count * 2).apply { while (c.moveToNext()) add(Cells.pack(c.getInt(0), c.getInt(1))) }
         }
+
+    /**
+     * Where you spend the most time: ~300 m squares ranked by time recorded in them (each dot counts for its
+     * interval, capped at 15 minutes), with the average position and hours. For suggesting saved places.
+     */
+    fun frequentSpots(limit: Int = 20): List<Spot> =
+        readableDatabase.rawQuery(
+            """SELECT AVG(lat), AVG(lon), SUM(MIN(interval_ms, 900000)) t FROM points
+               GROUP BY CAST((lat + 90) * 370 AS INTEGER), CAST((lon + 180) * 370 AS INTEGER)
+               ORDER BY t DESC LIMIT $limit""",
+            null,
+        ).use { c -> buildList { while (c.moveToNext()) add(Spot(c.getDouble(0), c.getDouble(1), c.getLong(2) / 3_600_000.0)) } }
 
     /** ~5 km areas visited in the period with a representative coordinate, busiest first. */
     fun coarseAreas(from: Long, to: Long, limit: Int = 300): List<CoarseArea> =

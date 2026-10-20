@@ -12,6 +12,18 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-10-20
+
+### Added
+- Places in Settings: save home, work, school and other places you spend time, with a size (50–500 m) and
+  how often to record while you're there (every 1, 5, 10, 15 or 30 minutes). Set one by moving a map under
+  a pin, from where you are now, or from suggestions of where you've spent the most time.
+- While you're settled at a place, recording slows to its interval and uses Wi-Fi and cell positioning,
+  saving battery. As soon as activity recognition sees you walking or driving, it checks about every
+  20 seconds, and once you're out of the circle it goes back to its usual pace. Android's geofencing also
+  reports leaving a place when location is allowed all the time.
+- The recording tile says when you're at a saved place, and the Timeline names stays at them (Home, Work…).
+
 ## [2.20.0] - 2026-10-20
 
 ### Added

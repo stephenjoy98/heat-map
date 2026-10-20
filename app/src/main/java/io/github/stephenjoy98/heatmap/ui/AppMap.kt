@@ -107,6 +107,10 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
     var metersPerPixel by mutableFloatStateOf(0f)
         internal set
 
+    /** The coordinate at the middle of the map (latitude, longitude); null until the map is ready. */
+    var center by mutableStateOf<Pair<Double, Double>?>(null)
+        internal set
+
     /** True while the map is being moved or zoomed, by a gesture or an animation. */
     var moving by mutableStateOf(false)
         internal set
@@ -341,6 +345,7 @@ private fun VectorAppMap(
                         it.bearing = m.cameraPosition.bearing.toFloat()
                         it.cameraTick++
                         it.metersPerPixel = metersPerPixel(m, holder.mapView)
+                        it.center = m.cameraPosition.target?.let { t -> t.latitude to t.longitude }
                     }
                 }
                 m.addOnCameraMoveStartedListener { reason ->
