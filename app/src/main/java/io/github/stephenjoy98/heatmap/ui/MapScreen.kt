@@ -184,14 +184,11 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
                 StatsBar(stats, Modifier.align(Alignment.Center))
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                    shadowElevation = 3.dp,
+                ProfileButton(
+                    onClick = onOpenProfile,
+                    background = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
                     modifier = Modifier.align(Alignment.CenterEnd),
-                ) {
-                    ProfileButton(onClick = onOpenProfile, modifier = Modifier.size(48.dp))
-                }
+                )
             }
             // The travel-mode chips slide out from the filter button, and tuck back into it.
             AnimatedVisibility(

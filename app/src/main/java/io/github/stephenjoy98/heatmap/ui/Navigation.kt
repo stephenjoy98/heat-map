@@ -41,7 +41,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Full-screen pages opened over the tabs. Back walks back through them like breadcrumbs. */
-enum class Page { PROFILE, FRIENDS, BACKUP, SETTINGS, ABOUT, CHANGELOG, REVIEW, COMPARE, FRIEND }
+enum class Page { ACCOUNT, PROFILE, FRIENDS, BACKUP, SETTINGS, ABOUT, CHANGELOG, REVIEW, COMPARE, FRIEND }
 
 /** True while a page covers the tabs, so the screens underneath can pause live work such as GPS. */
 val LocalCovered = compositionLocalOf { false }

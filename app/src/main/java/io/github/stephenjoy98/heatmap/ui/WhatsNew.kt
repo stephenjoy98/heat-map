@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.R
+
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -60,7 +62,7 @@ fun WhatsNewDialog(releases: List<Release>, onDismiss: () -> Unit, onFullChangel
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDismiss,
-        icon = { JoyEmoji("🎉", size = 32) },
+        icon = { MaterialIcon(R.drawable.ic_celebration, size = 32) },
         title = {
             Text(if (releases.size == 1) "What's new in ${releases[0].version}" else "What's new since your last update")
         },

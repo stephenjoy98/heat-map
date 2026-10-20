@@ -1,6 +1,15 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -123,23 +132,28 @@ fun Avatar(size: Int = 32) {
     }
 }
 
-/** Where the account button is on screen, so the account menu can grow out of it. */
-private var avatarBounds by mutableStateOf<Rect?>(null)
-
 /**
  * The account button for the top-right corner of every tab, like Google's apps. A badge shows how many
  * trips and roads are waiting for an answer on the Timeline.
  */
 @Composable
-fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier, background: Color? = null) {
     val pending = LocalReviewCount.current
     val tip = if (pending > 0) "Your account · $pending waiting for your answer on the Timeline" else "Your account: profile, friends, insights, backup and settings"
     Tip(tip, modifier) {
-        // The badge sits over the button rather than inside it, so the button's round clip can't cut it off.
+        // The badge sits beside the button, not inside it, so neither the button's nor its background's round
+        // clip can cut it off.
         Box {
-            IconButton(onClick = onClick, modifier = Modifier.trackBounds { avatarBounds = it }) { Avatar(32) }
+            val button: @Composable () -> Unit = {
+                IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Avatar(32) }
+            }
+            if (background != null) {
+                Surface(shape = CircleShape, color = background, shadowElevation = 3.dp) { button() }
+            } else {
+                button()
+            }
             if (pending > 0) {
-                Badge(Modifier.align(Alignment.TopEnd).offset(x = (-2).dp, y = 2.dp)) {
+                Badge(Modifier.align(Alignment.TopEnd)) {
                     Text(if (pending > 99) "99+" else pending.toString())
                 }
             }
@@ -148,12 +162,14 @@ fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * Google-style account menu: who's signed in, then Profile, Friends, Backup, Settings, About and
- * signing in or out.
+ * The account page, opened from the account button: who's signed in, any questions waiting, then Profile,
+ * Friends, Backup, Insights, Settings, About and signing in or out. It's a page like the others, so going back
+ * from one of them returns here.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountMenu(
-    onDismiss: () -> Unit,
+fun AccountScreen(
+    onBack: () -> Unit,
     onProfile: () -> Unit,
     onFriends: () -> Unit,
     onBackup: () -> Unit,
@@ -170,125 +186,123 @@ fun AccountMenu(
     val configured = remember { FirebaseGate.isConfigured(context) }
     var signingIn by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    // Grows out of the account button, and shrinks back into it when closed.
-    GrowFromSource(
-        source = avatarBounds,
-        onDismiss = onDismiss,
-        alignment = Alignment.TopCenter,
-        modifier = Modifier.statusBarsPadding().padding(top = 8.dp),
-    ) { close ->
-        // Opens the page, while the menu shrinks back into the account button.
-        fun go(action: () -> Unit) {
-            action()
-            close()
-        }
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Account") },
+                navigationIcon = { BackButton(onBack) },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { inner ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(inner)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(Modifier.padding(vertical = 12.dp)) {
-                Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                    Tip("Close", Modifier.align(Alignment.CenterStart)) {
-                        IconButton(onClick = close) { Icon(Icons.Filled.Close, contentDescription = "Close") }
-                    }
-                    Text("Location Ticker", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Center))
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    // An inset panel: darker than the menu in the dark theme, light grey in the light one.
-                    color = MaterialTheme.colorScheme.background,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Avatar(64)
-                        Spacer(Modifier.height(10.dp))
-                        if (user != null) {
-                            Text(user?.displayName ?: "Signed in", style = MaterialTheme.typography.titleMedium)
-                            user?.email?.let {
-                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            code?.let {
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    "Your ID  ${Account.formatCode(it)}",
-                                    fontFamily = FontFamily.Monospace,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        } else {
-                            Text("Not signed in", style = MaterialTheme.typography.titleMedium)
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Avatar(72)
+                    Spacer(Modifier.height(12.dp))
+                    if (user != null) {
+                        Text(user?.displayName ?: "Signed in", style = MaterialTheme.typography.titleLarge)
+                        user?.email?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        code?.let {
+                            Spacer(Modifier.height(6.dp))
                             Text(
-                                if (configured) "Sign in to back up your history and add friends."
-                                else "Sign-in isn't set up in this build. Everything else works on this phone.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
+                                "Your ID  ${Account.formatCode(it)}",
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
                             )
-                            if (configured) {
-                                Spacer(Modifier.height(12.dp))
-                                Button(enabled = !signingIn, onClick = {
-                                    val activity = context.findActivity() ?: return@Button
-                                    signingIn = true
-                                    error = null
-                                    scope.launch {
-                                        runCatching { Account.signIn(activity) }
-                                            .onSuccess { SyncWorker.runNow(context) }
-                                            .onFailure { error = it.message }
-                                        signingIn = false
-                                    }
-                                }) { Text(if (signingIn) "Signing in…" else "Sign in with Google") }
-                                error?.let {
-                                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        Text("Not signed in", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            if (configured) "Sign in to back up your history and add friends."
+                            else "Sign-in isn't set up in this build. Everything else works on this phone.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (configured) {
+                            Spacer(Modifier.height(12.dp))
+                            Button(enabled = !signingIn, onClick = {
+                                val activity = context.findActivity() ?: return@Button
+                                signingIn = true
+                                error = null
+                                scope.launch {
+                                    runCatching { Account.signIn(activity) }
+                                        .onSuccess { SyncWorker.runNow(context) }
+                                        .onFailure { error = it.message }
+                                    signingIn = false
                                 }
+                            }) { Text(if (signingIn) "Signing in…" else "Sign in with Google") }
+                            error?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
                 }
+            }
 
-                // What the badge on the account button is about, highlighted, and a tap away.
-                if (reviewCount > 0) {
-                    Surface(
-                        onClick = { go(onQuestions) },
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Badge { Text(if (reviewCount > 99) "99+" else reviewCount.toString()) }
-                            Spacer(Modifier.width(16.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    if (reviewCount == 1) "1 trip question waiting" else "$reviewCount trip questions waiting",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                                Text(
-                                    "How you travelled, which road you took and heights · answer them on the Timeline",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                            }
+            // What the badge on the account button is about, highlighted, and a tap away.
+            if (reviewCount > 0) {
+                Surface(
+                    onClick = onQuestions,
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Badge { Text(if (reviewCount > 99) "99+" else reviewCount.toString()) }
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (reviewCount == 1) "1 question waiting" else "$reviewCount questions waiting",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                "How you travelled, which road you took and heights · on the Timeline's Questions tab",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
                         }
                     }
                 }
-                MenuRow(Icons.Filled.AccountCircle, "Profile", "Your stats and the places you've explored") { go(onProfile) }
-                MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas") { go(onFriends) }
-                MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history") { go(onBackup) }
-                MenuRow(
-                    Icons.Filled.Star,
-                    "Insights",
-                    "Your stats, steps and write-ups about your travels",
-                ) { go(onReview) }
-                MenuRow(Icons.Filled.Settings, "Settings", null) { go(onSettings) }
-                MenuRow(Icons.Filled.Info, "About", "Who made it, open source and licences") { go(onAbout) }
-                if (user != null) {
-                    HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-                    MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign out", null) {
-                        scope.launch { Account.signOut(context) }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(vertical = 6.dp)) {
+                    MenuRow(Icons.Filled.AccountCircle, "Profile", "Your stats and the places you've explored", onProfile)
+                    MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas", onFriends)
+                    MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history", onBackup)
+                    MenuRow(Icons.Filled.Star, "Insights", "Your stats, steps and write-ups about your travels", onReview)
+                    MenuRow(Icons.Filled.Settings, "Settings", "Recording, places, appearance, map and more", onSettings)
+                    MenuRow(Icons.Filled.Info, "About", "Who made it, open source and licences", onAbout)
+                    if (user != null) {
+                        HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                        MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign out", null) {
+                            scope.launch { Account.signOut(context) }
+                        }
                     }
                 }
             }

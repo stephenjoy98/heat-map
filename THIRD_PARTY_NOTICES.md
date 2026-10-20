@@ -2,11 +2,11 @@
 
 Location Ticker's own source code is licensed under the [GNU General Public License v3.0 or later](LICENSE),
 with an additional permission for linking Google's proprietary libraries (see [NOTICE](NOTICE)). It builds on the
-libraries, services and data below, each under its own terms. None of their code or artwork is copied
-into this repository; libraries are fetched by Gradle at build time and map data, elevation and emoji
-are downloaded by the app at runtime.
+libraries, services and data below, each under its own terms. Libraries are fetched by Gradle at build time
+and map data and elevation are downloaded by the app at runtime. The only artwork copied into this repository
+is a set of Google's Material icons (`app/src/main/res/drawable/ic_*.xml`, Apache License 2.0).
 
-The app shows the same list under **Profile menu → About**.
+The app shows the same list under **Account → About**.
 
 ## Libraries
 
@@ -18,6 +18,7 @@ The app shows the same list under **Profile menu → About**.
 | [Firebase Android SDK](https://github.com/firebase/firebase-android-sdk) (Auth, Firestore, AI Logic) | Apache License 2.0 |
 | [MapLibre Native](https://github.com/maplibre/maplibre-native) | [BSD 2-Clause](https://github.com/maplibre/maplibre-native/blob/main/LICENSE.md) |
 | [Coil](https://github.com/coil-kt/coil) | Apache License 2.0 |
+| [Material icons](https://github.com/google/material-design-icons) (vector drawables in `res/drawable/ic_*.xml`) | Apache License 2.0 |
 | [ZXing](https://github.com/zxing/zxing) | Apache License 2.0 |
 | Gradle wrapper | Apache License 2.0 |
 | Google Play services (Location, Code Scanner), Google ID, ML Kit GenAI Prompt API | Proprietary: [Android SDK License](https://developer.android.com/studio/terms) and [Google APIs Terms](https://developers.google.com/terms). Free to use, but **not** open source. Combining them with this GPL program is allowed by the section 7 permission in [NOTICE](NOTICE) |
@@ -33,7 +34,6 @@ them in the APK.
 | [OpenFreeMap](https://openfreemap.org/) tiles, [OpenMapTiles](https://openmaptiles.org/) schema | "OpenFreeMap © OpenMapTiles". Credit shown on the map. |
 | [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Elevation from Mapzen, USGS, NASA SRTM, EU-DEM and others; see the [full attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). |
 | [Valhalla](https://github.com/valhalla/valhalla) map matching on the FOSSGIS server | Valhalla is MIT-licensed; the public server has a [fair-use policy](https://valhalla.openstreetmap.de/). Only coordinates are sent. |
-| [JoyPixels](https://www.joypixels.com/) emoji artwork | [JoyPixels Free License](https://www.joypixels.com/licenses), which requires attribution (shown in Settings and About). The artwork is **not** covered by this project's GPL licence. |
 
 ## Trademarks
 

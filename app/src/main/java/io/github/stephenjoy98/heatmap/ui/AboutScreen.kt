@@ -53,6 +53,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import io.github.stephenjoy98.heatmap.BuildConfig
+import io.github.stephenjoy98.heatmap.R
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -64,23 +65,23 @@ private const val REPO_URL = "https://github.com/$GITHUB_USER/heat-map"
 /** What the app does, in a few lines for the About page. */
 // What the app can do today. Keep this up to date with every release (see CLAUDE.md).
 private val FEATURES = listOf(
-    "🗺️" to "A heatmap of everywhere you've been, on OpenStreetMap, with terrain and 3D buildings",
-    "⏱️" to "Automatic recording, from every second on the move to every minute when still",
-    "🏠" to "Saved places like home and work, where recording slows down to save battery",
-    "🎯" to "Say what trip you're on from the recording tile, or let the app work it out",
-    "🚲" to "Travel modes and sub-modes you can add, rename, recolour and delete",
-    "📅" to "A Timeline by day, week, month or year, with back-to-back trips grouped",
-    "✏️" to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
-    "🛣️" to "Join sections and snap them to the road you took, or pick a road on the map",
-    "❓" to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",
-    "⛰️" to "Smooth 3D routes at their true height above the ground, to scale with the 3D buildings",
-    "🌍" to "Your profile: places explored, distance explored and time captured",
-    "🏙️" to "Distance in each city, and the new areas you've explored and where",
-    "⚙️" to "Settings as a page per section, or all in one list",
-    "✨" to "Insights from on-device AI, with steps from Health Connect",
-    "🔋" to "Battery use per recording interval",
-    "☁️" to "Automatic backups of your dots, trips, answers and settings, with storage used on the phone and in the cloud",
-    "👥" to "Friends: their profiles, a map of where they've been, and comparisons with yours",
+    R.drawable.ic_map to "A heatmap of everywhere you've been, on OpenStreetMap, with terrain and 3D buildings",
+    R.drawable.ic_timer to "Automatic recording, from every second on the move to every minute when still",
+    R.drawable.ic_home to "Saved places like home and work, where recording slows down to save battery",
+    R.drawable.ic_track_changes to "Say what trip you're on from the recording tile, or let the app work it out",
+    R.drawable.ic_directions_bike to "Travel modes and sub-modes you can add, rename, recolour and delete",
+    R.drawable.ic_calendar_month to "A Timeline by day, week, month or year, with back-to-back trips grouped",
+    R.drawable.ic_edit to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
+    R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",
+    R.drawable.ic_help_outline to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",
+    R.drawable.ic_terrain to "Smooth 3D routes at their true height above the ground, to scale with the 3D buildings",
+    R.drawable.ic_public to "Your profile: places explored, distance explored and time captured",
+    R.drawable.ic_location_city to "Distance in each city, and the new areas you've explored and where",
+    R.drawable.ic_settings to "Settings as a page per section, or all in one list",
+    R.drawable.ic_auto_awesome to "Insights from on-device AI, with steps from Health Connect",
+    R.drawable.ic_battery_charging_full to "Battery use per recording interval",
+    R.drawable.ic_cloud to "Automatic backups of your dots, trips, answers and settings, with storage used on the phone and in the cloud",
+    R.drawable.ic_group to "Friends: their profiles, a map of where they've been, and comparisons with yours",
 )
 
 /** The app's launcher icon, as installed. */
@@ -105,6 +106,7 @@ private val libraries = listOf(
     Credit("Firebase Android SDK", "Apache License 2.0", "https://github.com/firebase/firebase-android-sdk"),
     Credit("Health Connect client", "Apache License 2.0", "https://developer.android.com/health-and-fitness/guides/health-connect"),
     Credit("Coil", "Apache License 2.0", "https://github.com/coil-kt/coil"),
+    Credit("Material icons", "Apache License 2.0", "https://github.com/google/material-design-icons"),
     Credit("ZXing", "Apache License 2.0", "https://github.com/zxing/zxing"),
     Credit(
         "Google Play services (location, code scanner, sign-in) and ML Kit GenAI",
@@ -118,7 +120,6 @@ private val dataSources = listOf(
     Credit("OpenFreeMap map tiles and OpenMapTiles schema", "© OpenMapTiles, OpenFreeMap", "https://openfreemap.org/"),
     Credit("Terrain Tiles (elevation)", "Mapzen, USGS, NASA SRTM, EU-DEM and others", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"),
     Credit("Valhalla map matching (FOSSGIS server)", "MIT License; FOSSGIS usage policy", "https://valhalla.openstreetmap.de/"),
-    Credit("JoyPixels emoji artwork", "JoyPixels Free License, with attribution", "https://www.joypixels.com/licenses"),
 )
 
 /** Who made the app, its open-source licence, and the licences of everything it builds on. */
@@ -167,9 +168,9 @@ fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
                     )
                     Spacer(Modifier.height(12.dp))
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FEATURES.forEach { (emoji, text) ->
+                        FEATURES.forEach { (icon, text) ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                JoyEmoji(emoji, size = 20)
+                                MaterialIcon(icon, size = 20, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(10.dp))
                                 Text(text, style = MaterialTheme.typography.bodyMedium)
                             }
@@ -232,27 +233,24 @@ private fun Card(content: @Composable () -> Unit) {
     )
 }
 
-/** "Made with ❤️ by @stephenjoy98 with the help of ✳ Claude by Anthropic in 🇨🇦 Canada", with JoyPixels emoji. */
+/** "Made with ♥ by @stephenjoy98 with the help of ✳ Claude by Anthropic in Canada". */
 @Composable
 private fun MadeWith(onProfile: () -> Unit) {
     val inline = mapOf(
-        "heart" to inlineIcon { JoyEmoji("❤️", size = 20) },
+        "heart" to inlineIcon { MaterialIcon(R.drawable.ic_favorite, size = 20, tint = Color(0xFFE53935)) },
         "claude" to inlineIcon { ClaudeMark(Modifier.size(20.dp)) },
-        "canada" to inlineIcon { JoyEmoji("🇨🇦", size = 20) },
     )
     val accent = MaterialTheme.colorScheme.primary
     val text = buildAnnotatedString {
         append("Made with ")
-        appendInlineContent("heart", "❤️")
+        appendInlineContent("heart", "love")
         append(" by ")
         withStyle(SpanStyle(color = accent, fontWeight = FontWeight.SemiBold)) { append("@$GITHUB_USER") }
         append("\nwith the help of ")
         appendInlineContent("claude", "Claude logo")
         append(" ")
         withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("Claude") }
-        append(" by Anthropic\nin ")
-        appendInlineContent("canada", "🇨🇦")
-        append(" Canada")
+        append(" by Anthropic\nin Canada")
     }
     Text(
         text,

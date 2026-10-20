@@ -326,6 +326,8 @@ private fun VectorAppMap(
 ) {
     val holder = rememberVectorMap(cacheKey)
     val loadRoute3d by rememberUpdatedState(route3d)
+    // 3D routes in the app's accent colour.
+    val routeColor = MaterialTheme.colorScheme.primary.toArgb()
     val overlay = holder.overlay
     SideEffect { holder.onClick = onMapClick }
 
@@ -414,7 +416,7 @@ private fun VectorAppMap(
 
     // 3D route: while 3D buildings are on, load the routes in view whenever the camera settles (or the style
     // reloads, or new dots arrive) and draw them at their recorded heights.
-    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey) {
+    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey, routeColor) {
         if (!look.buildings || route3d == null) {
             holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
             return@LaunchedEffect
@@ -433,7 +435,7 @@ private fun VectorAppMap(
                     // Heights come back above the ground, like the 3D buildings'.
                     Route3d.build(load(box), 0.0)
                 }
-                m.style?.let { VectorMaps.showRoute3d(it, segments) }
+                m.style?.let { VectorMaps.showRoute3d(it, segments, routeColor) }
             }
     }
 

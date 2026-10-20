@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.28.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.29.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -126,11 +126,12 @@ travel stats, Insights (AI write-ups), backup and friends.
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
   then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked); trip, road and
   level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt: one queue,
-  answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the account menu);
+  answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton, ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
   pictures + 3D buildings), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
-  `ProfileMenu` (account menu; badge for pending questions), `SettingsScreen` (+ `PermissionsSection`),
+  `ProfileMenu` (`ProfileButton` with badge outside its clip — pass `background` instead of wrapping it in a
+  clipping Surface; `AccountScreen` = `Page.ACCOUNT`, a page since 2.29.0 so back from nested pages returns to it), `SettingsScreen` (+ `PermissionsSection`),
   `AboutScreen`, `WhatsNew`, `Tooltips` (`Tip`, `BackButton`), `Theme` (Light/Dark/System + Material
   expressive = Monet dynamic colour + shapes/type/springs; light schemes get white cards on grey page).
 - `cloud/`: Firebase optional (only if `app/google-services.json` exists; CI writes it from the
@@ -178,7 +179,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   UI polish. Follow Google/Material guidance (Material 3, predictive back, source-origin popups, collapsing
   large titles). Prefers OSM, low friction, no API keys.
 - Keep: blue location marker, compass always visible (under the profile button, below open chips), filter
-  chips hidden behind the filter button, Review named **Insights**, JoyPixels emoji everywhere (with
-  attribution), units setting respected everywhere (`Units`), long-press tooltips on icon buttons.
+  chips hidden behind the filter button, Review named **Insights**, **Google Material icons, never emoji** (since 2.29.0;
+  `MaterialIcon(R.drawable.ic_*)` in ui/MaterialIcon.kt; add icons as vector drawables generated from the npm package
+  `@material-design-icons/svg` outlined SVGs — material-icons-extended isn't used, it would bloat the unminified APK),
+  neutral near-white accent in the default dark theme (no orange; 3D ribbon uses `colorScheme.primary`), text a size up
+  from Material defaults with no letter spacing (`baseTypography` in Theme.kt, user compares with Gmail/Claude apps), units setting respected everywhere (`Units`), long-press tooltips on icon buttons.
 - When something can't be done exactly (e.g. no system dialog for revoking permissions), do the closest
   sensible thing and say so plainly in the reply.

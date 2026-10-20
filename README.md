@@ -13,8 +13,9 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Material Design 3** throughout: large collapsing top app bars, segmented buttons, M3 navigation bar,
   cards and sheets. **Light**, **Dark** or **System** theme, plus a separate **Material expressive**
   switch (Android 12+): colours from your wallpaper through Android's Monet engine, rounder shapes,
-  emphasised headings and springier motion. Otherwise the orange heat palette. The heat colours
-  themselves never change.
+  emphasised headings and springier motion. Otherwise a neutral dark theme (near-white accent, like Google's own
+  dark apps) or an orange light one. Text is set a size up from Material's defaults, like Gmail. Icons are
+  Google's Material icons throughout. The heat colours themselves never change.
 - **Motion and navigation** follow Android's guidance: predictive back (the page shrinks and follows
   your swipe, revealing the one underneath), menus and popups that grow out of what you tapped, and
   large page titles that collapse into the top bar as you scroll. Back walks back through the pages
@@ -126,15 +127,14 @@ up to your Google account, and lets you compare explored areas with friends.
 
 ### Profile
 - The account button in the top-right corner of every tab shows your Google profile picture and opens
-  an account menu: **Profile**, **Friends**, **Backup**, **Settings**, and sign in or out.
+  the **Account** page: **Profile**, **Friends**, **Backup**, **Insights**, **Settings**, **About**, and sign in or out.
+  Going back from any of them returns to the Account page.
 - **Profile** is a "travel passport": name, joining date and friend ID; your **home base** (the city
   where you spend the most days); **dots captured** with kilometres, trips and areas; **time captured**
   as a total (e.g. 1 day 15 hours, each dot counting for its interval); your most visited city;
   **locations explored** (**km explored**, which counts only ground you're covering for the first time
-  on a ~60 m grid, unlike km travelled; and countries, cities and continents, each tappable for the full list with flags);
+  on a ~60 m grid, unlike km travelled; and countries, cities and continents, each tappable for the full list);
   and an estimated **carbon footprint**.
-- Emoji throughout the app use [JoyPixels](https://www.joypixels.com) artwork (free licence, attribution in
-  Settings), loaded from the JoyPixels CDN and cached, with the system emoji as a fallback.
   Filter by all time or by year.
 
 ### Insights page
@@ -258,7 +258,7 @@ Location Ticker is free software under the [GNU General Public License v3.0 or l
 (GPL-3.0-or-later): you can use, study, share and change it, and anything you distribute that's based on
 it must be shared under the same licence, with its source code. [NOTICE](NOTICE) has the copyright notice
 and an additional permission (GPL section 7) for linking Google's proprietary libraries (Play services,
-Maps, Firebase, ML Kit), which the app needs. Third-party libraries, map data and emoji artwork stay under
+Maps, Firebase, ML Kit), which the app needs. Third-party libraries, icons and map data stay under
 their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) or **About** in the app.
 
 Made with ❤️ by [@stephenjoy98](https://github.com/stephenjoy98) with the help of Claude by Anthropic,

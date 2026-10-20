@@ -121,7 +121,6 @@ private fun AppScaffold(
     val tabState = rememberSaveableStateHolder()
     var comparing by remember { mutableStateOf<Friend?>(null) }
     var viewingFriend by remember { mutableStateOf<Friend?>(null) }
-    var menuOpen by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
     // After an update, the changes since the version the user last saw.
     var whatsNew by remember {
@@ -209,23 +208,7 @@ private fun AppScaffold(
         )
     }
 
-    val openMenu = { menuOpen = true }
-    if (menuOpen) {
-        AccountMenu(
-            reviewCount = questions,
-            onDismiss = { menuOpen = false },
-            onProfile = { stack.push(Page.PROFILE) },
-            onFriends = { stack.push(Page.FRIENDS) },
-            onBackup = { stack.push(Page.BACKUP) },
-            onReview = { stack.push(Page.REVIEW) },
-            onSettings = { stack.push(Page.SETTINGS) },
-            onAbout = { stack.push(Page.ABOUT) },
-            onQuestions = {
-                TimelineTabs.questions = true
-                tab = MainActivity.TAB_TIMELINE
-            },
-        )
-    }
+    val openMenu = { stack.push(Page.ACCOUNT) }
 
     CompositionLocalProvider(LocalReviewCount provides questions) {
         PageHost(
@@ -271,6 +254,21 @@ private fun AppScaffold(
             page = { p ->
                 val back = { stack.pop() }
                 when (p) {
+                    Page.ACCOUNT -> AccountScreen(
+                        reviewCount = questions,
+                        onBack = back,
+                        onProfile = { stack.push(Page.PROFILE) },
+                        onFriends = { stack.push(Page.FRIENDS) },
+                        onBackup = { stack.push(Page.BACKUP) },
+                        onReview = { stack.push(Page.REVIEW) },
+                        onSettings = { stack.push(Page.SETTINGS) },
+                        onAbout = { stack.push(Page.ABOUT) },
+                        onQuestions = {
+                            TimelineTabs.questions = true
+                            tab = MainActivity.TAB_TIMELINE
+                            stack.pop()
+                        },
+                    )
                     Page.PROFILE -> ProfileScreen(
                         resumeTick = resumeTick,
                         onBack = back,

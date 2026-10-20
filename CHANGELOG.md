@@ -12,6 +12,25 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-10-20
+
+### Added
+- Tapping your account picture opens an Account page instead of a popup. Going back from Profile, Friends,
+  Backup, Insights, Settings or About returns to it rather than jumping straight to the map.
+
+### Changed
+- The dark theme's accent is a soft near-white, like Google's own dark apps, instead of orange. 3D routes
+  use the accent colour too (or your wallpaper's colour with Material expressive).
+- Google's Material icons replace the emoji everywhere: Settings, About, Profile, stamps, the restore preview
+  and What's new.
+- Text is a size larger throughout, without the extra letter spacing, closer to Gmail.
+
+### Fixed
+- The question count on the account button is no longer cut off on the map.
+
+### Removed
+- JoyPixels emoji artwork (and its attribution), now that the app uses Material icons.
+
 ## [2.28.0] - 2026-10-20
 
 ### Added

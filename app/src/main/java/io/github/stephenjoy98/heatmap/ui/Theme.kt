@@ -19,6 +19,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
@@ -30,19 +31,34 @@ val HeatOrange = Color(0xFFFF7A1A)
 val RecordRed = Color(0xFFE53935)
 val FriendBlue = Color(0xFF3D9BFF)
 
-// Google-style dark: near-black background, slightly lifted surfaces, orange accent.
+// Google-style dark: near-black background, slightly lifted surfaces, and a neutral near-white accent (like
+// Android's own dark apps) rather than a coloured one.
 private val darkColors = darkColorScheme(
-    primary = HeatOrange,
-    onPrimary = Color(0xFF1A0E00),
-    secondary = Color(0xFFFFC266),
+    primary = Color(0xFFE3E3E3),
+    onPrimary = Color(0xFF1B1B1B),
+    primaryContainer = Color(0xFF474747),
+    onPrimaryContainer = Color(0xFFE3E3E3),
+    inversePrimary = Color(0xFF5E5E5E),
+    secondary = Color(0xFFC7C7C7),
+    onSecondary = Color(0xFF2F2F2F),
+    secondaryContainer = Color(0xFF474747),
+    onSecondaryContainer = Color(0xFFE3E3E3),
+    tertiary = Color(0xFFC7C7C7),
+    onTertiary = Color(0xFF2F2F2F),
+    tertiaryContainer = Color(0xFF474747),
+    onTertiaryContainer = Color(0xFFE3E3E3),
     background = Color(0xFF121212),
     surface = Color(0xFF121212),
+    onSurface = Color(0xFFE3E3E3),
+    onSurfaceVariant = Color(0xFFC4C7C5),
     surfaceVariant = Color(0xFF2A2A2A),
     surfaceContainerLowest = Color(0xFF0E0E0E),
     surfaceContainerLow = Color(0xFF1A1A1A),
     surfaceContainer = Color(0xFF1E1F20),
     surfaceContainerHigh = Color(0xFF282A2C),
     surfaceContainerHighest = Color(0xFF333537),
+    outline = Color(0xFF8E918F),
+    outlineVariant = Color(0xFF444746),
 )
 
 // Clean white surfaces with soft greys, in the style of an in-car navigation screen.
@@ -107,8 +123,24 @@ private val expressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(36.dp),
 )
 
+// Type a size up from Material's defaults, without the extra letter spacing, closer to how Gmail and other
+// Google apps set their text: easier to read at arm's length.
+private val baseTypography = Typography().run {
+    copy(
+        titleLarge = titleLarge.copy(fontSize = 23.sp, lineHeight = 30.sp),
+        titleMedium = titleMedium.copy(fontSize = 18.sp, lineHeight = 25.sp, letterSpacing = 0.sp),
+        titleSmall = titleSmall.copy(fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = 0.sp),
+        bodyLarge = bodyLarge.copy(fontSize = 17.sp, lineHeight = 25.sp, letterSpacing = 0.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 16.sp, lineHeight = 23.sp, letterSpacing = 0.sp),
+        bodySmall = bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp),
+        labelLarge = labelLarge.copy(fontSize = 15.sp, lineHeight = 21.sp, letterSpacing = 0.sp),
+        labelMedium = labelMedium.copy(fontSize = 13.5.sp, lineHeight = 19.sp, letterSpacing = 0.sp),
+        labelSmall = labelSmall.copy(fontSize = 12.5.sp, lineHeight = 17.sp, letterSpacing = 0.1.sp),
+    )
+}
+
 // Emphasised type for headings when expressive is on.
-private val expressiveTypography = Typography().run {
+private val expressiveTypography = baseTypography.run {
     copy(
         displaySmall = displaySmall.copy(fontWeight = FontWeight.SemiBold),
         headlineLarge = headlineLarge.copy(fontWeight = FontWeight.SemiBold),
@@ -130,7 +162,7 @@ fun <T> spatialSpring(): FiniteAnimationSpec<T> =
 /**
  * Material 3 theme. Light, dark or following the system; with Material expressive on (Android 12+), colours
  * come from the wallpaper through Android's Monet engine, with expressive shapes, type and motion. Otherwise
- * the heatmap's orange palette. The heat ramps themselves never change.
+ * a neutral dark theme or the orange light one. The heat ramps themselves never change.
  */
 @Composable
 fun TickerTheme(dark: Boolean = isDarkTheme(), content: @Composable () -> Unit) {
@@ -147,7 +179,7 @@ fun TickerTheme(dark: Boolean = isDarkTheme(), content: @Composable () -> Unit) 
         MaterialTheme(
             colorScheme = scheme,
             shapes = if (expressive) expressiveShapes else MaterialTheme.shapes,
-            typography = if (expressive) expressiveTypography else MaterialTheme.typography,
+            typography = if (expressive) expressiveTypography else baseTypography,
             content = content,
         )
     }

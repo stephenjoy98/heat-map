@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.R
+
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -164,17 +166,17 @@ private fun RestorePreviewDialog(preview: Backup.Preview, onDismiss: () -> Unit,
     val rows = buildList {
         if (p.dots > 0) {
             add(
-                "📍" to "${formatCount(p.dots.toLong())} dots over ${p.days} ${if (p.days == 1) "day" else "days"}, ${day(p.firstDay)} to ${day(p.lastDay)}. " +
+                R.drawable.ic_place to "${formatCount(p.dots.toLong())} dots over ${p.days} ${if (p.days == 1) "day" else "days"}, ${day(p.firstDay)} to ${day(p.lastDay)}. " +
                     if (p.newDots == 0) "This phone has them all already." else "${formatCount(p.newDots.toLong())} aren't on this phone yet."
             )
         }
-        if (p.trips > 0) add("🚲" to "${formatCount(p.trips.toLong())} trips with their travel modes, times and road shapes")
-        if (p.roadAnswers > 0) add("🛣️" to "${p.roadAnswers} \"which road?\" ${if (p.roadAnswers == 1) "answer" else "answers"}")
-        if (p.heightAnswers > 0) add("⛰️" to "${p.heightAnswers} \"different heights\" ${if (p.heightAnswers == 1) "answer" else "answers"}")
-        if (p.deletedDots > 0) add("🗑️" to "${formatCount(p.deletedDots.toLong())} deleted dots, kept deleted (and still restorable)")
-        if (p.customModes.isNotEmpty()) add("🏷️" to "Travel modes you added: ${p.customModes.joinToString()}")
-        if (p.places.isNotEmpty()) add("🏠" to "Saved places: ${p.places.joinToString()}")
-        if (p.hasSettings) add("⚙️" to "Your settings: recording, map, theme, units, travel mode names and colours, filters and backup choices")
+        if (p.trips > 0) add(R.drawable.ic_directions_bike to "${formatCount(p.trips.toLong())} trips with their travel modes, times and road shapes")
+        if (p.roadAnswers > 0) add(R.drawable.ic_add_road to "${p.roadAnswers} \"which road?\" ${if (p.roadAnswers == 1) "answer" else "answers"}")
+        if (p.heightAnswers > 0) add(R.drawable.ic_terrain to "${p.heightAnswers} \"different heights\" ${if (p.heightAnswers == 1) "answer" else "answers"}")
+        if (p.deletedDots > 0) add(R.drawable.ic_delete to "${formatCount(p.deletedDots.toLong())} deleted dots, kept deleted (and still restorable)")
+        if (p.customModes.isNotEmpty()) add(R.drawable.ic_label to "Travel modes you added: ${p.customModes.joinToString()}")
+        if (p.places.isNotEmpty()) add(R.drawable.ic_home to "Saved places: ${p.places.joinToString()}")
+        if (p.hasSettings) add(R.drawable.ic_settings to "Your settings: recording, map, theme, units, travel mode names and colours, filters and backup choices")
     }
     AlertDialog(
         // As wide as the other full-width cards, rather than the platform's narrow dialog width.
@@ -185,9 +187,9 @@ private fun RestorePreviewDialog(preview: Backup.Preview, onDismiss: () -> Unit,
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Your backup holds:", style = MaterialTheme.typography.bodyMedium)
-                rows.forEach { (emoji, text) ->
+                rows.forEach { (icon, text) ->
                     Row(verticalAlignment = Alignment.Top) {
-                        JoyEmoji(emoji, size = 20)
+                        MaterialIcon(icon, size = 20, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(10.dp))
                         Text(text, style = MaterialTheme.typography.bodyMedium)
                     }

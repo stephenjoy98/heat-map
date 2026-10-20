@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import io.github.stephenjoy98.heatmap.data.Units
@@ -362,12 +364,6 @@ private fun MostVisitedTile(s: ProfileStats, modifier: Modifier) {
 
 private enum class PlaceKind(val title: String) { COUNTRIES("Countries"), CITIES("Cities"), CONTINENTS("Continents") }
 
-private fun continentEmoji(continent: String) = when (continent) {
-    "North America", "South America" -> "🌎"
-    "Asia", "Oceania" -> "🌏"
-    "Antarctica" -> "🐧"
-    else -> "🌍"
-}
 
 @Composable
 private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
@@ -390,10 +386,10 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
-                    Triple(PlaceKind.COUNTRIES, s.countries.size, s.countries.firstOrNull()?.let { JoyPixels.flag(it.code) } ?: "🏳️"),
-                    Triple(PlaceKind.CITIES, s.cities.size, "🏙️"),
-                    Triple(PlaceKind.CONTINENTS, s.continents.size, s.continents.firstOrNull()?.let(::continentEmoji) ?: "🌍"),
-                ).forEach { (kind, count, emoji) ->
+                    Triple(PlaceKind.COUNTRIES, s.countries.size, R.drawable.ic_flag),
+                    Triple(PlaceKind.CITIES, s.cities.size, R.drawable.ic_location_city),
+                    Triple(PlaceKind.CONTINENTS, s.continents.size, R.drawable.ic_public),
+                ).forEach { (kind, count, icon) ->
                     Surface(
                         onClick = { showing = kind },
                         enabled = count > 0,
@@ -402,7 +398,7 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
                         modifier = Modifier.weight(1f).trackBounds { tileBounds[kind] = it },
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            JoyEmoji(emoji, 26)
+                            MaterialIcon(icon, 26, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.height(6.dp))
                             Text(count.toString(), color = fg, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                             Text(kind.title.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = capsLabel.copy(fontSize = 10.sp, letterSpacing = 1.sp), maxLines = 1)
@@ -413,7 +409,7 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    JoyEmoji("🧭", 26)
+                    MaterialIcon(R.drawable.ic_explore, 26, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -452,18 +448,19 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
 /** A popup listing every country, city or continent visited in the selected period. */
 @Composable
 private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDismiss: () -> Unit) {
-    val rows: List<Triple<String, String, String?>> = when (kind) {
-        PlaceKind.COUNTRIES -> s.countries.map { Triple(JoyPixels.flag(it.code), it.name, Places.continentOf(it.code)) }
+    val icon = when (kind) {
+        PlaceKind.COUNTRIES -> R.drawable.ic_flag
+        PlaceKind.CITIES -> R.drawable.ic_location_city
+        PlaceKind.CONTINENTS -> R.drawable.ic_public
+    }
+    val rows: List<Pair<String, String?>> = when (kind) {
+        PlaceKind.COUNTRIES -> s.countries.map { it.name to Places.continentOf(it.code) }
         PlaceKind.CITIES -> s.cities.map { c ->
-            Triple(
-                c.countryCode?.let(JoyPixels::flag) ?: "🏙️",
-                c.name,
-                listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}", Insights.km(c.km)).joinToString(" · "),
-            )
+            c.name to listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}", Insights.km(c.km)).joinToString(" · ")
         }
         PlaceKind.CONTINENTS -> s.continents.map { continent ->
             val n = s.countries.count { Places.continentOf(it.code) == continent }
-            Triple(continentEmoji(continent), continent, "$n ${if (n == 1) "country" else "countries"}")
+            continent to "$n ${if (n == 1) "country" else "countries"}"
         }
     }
     // Grows out of the tile that was tapped, and shrinks back into it.
@@ -473,9 +470,9 @@ private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDism
                 Text("${kind.title} · ${rows.size}", style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(12.dp))
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(rows) { (emoji, name, detail) ->
+                    items(rows) { (name, detail) ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            JoyEmoji(emoji, 28)
+                            MaterialIcon(icon, 24, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(14.dp))
                             Column {
                                 Text(name, style = MaterialTheme.typography.bodyLarge)
@@ -530,16 +527,16 @@ private fun CarbonCard(s: ProfileStats) {
     }
 }
 
-private fun StampIcon.emoji() = when (this) {
-    StampIcon.DOTS -> "📍"
-    StampIcon.DISTANCE -> "🛣️"
-    StampIcon.WALK -> "🚶"
-    StampIcon.CYCLE -> "🚴"
-    StampIcon.CITY -> "🏙️"
-    StampIcon.GLOBE -> "🌍"
-    StampIcon.CONTINENT -> "🗺️"
-    StampIcon.AREA -> "🧭"
-    StampIcon.CALENDAR -> "📅"
+private fun StampIcon.drawable() = when (this) {
+    StampIcon.DOTS -> R.drawable.ic_place
+    StampIcon.DISTANCE -> R.drawable.ic_route
+    StampIcon.WALK -> R.drawable.ic_directions_walk
+    StampIcon.CYCLE -> R.drawable.ic_directions_bike
+    StampIcon.CITY -> R.drawable.ic_location_city
+    StampIcon.GLOBE -> R.drawable.ic_public
+    StampIcon.CONTINENT -> R.drawable.ic_map
+    StampIcon.AREA -> R.drawable.ic_explore
+    StampIcon.CALENDAR -> R.drawable.ic_calendar_month
 }
 
 @Composable
@@ -564,7 +561,7 @@ private fun StampsSection(stamps: List<Stamp>) {
                         Box(
                             Modifier.size(48.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
                             contentAlignment = Alignment.Center,
-                        ) { JoyEmoji(stamp.icon.emoji(), 26) }
+                        ) { MaterialIcon(stamp.icon.drawable(), 26) }
                         Spacer(Modifier.height(14.dp))
                         Text(stamp.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(stamp.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)

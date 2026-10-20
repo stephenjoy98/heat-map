@@ -86,19 +86,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import kotlin.math.abs
+import androidx.annotation.DrawableRes
+import io.github.stephenjoy98.heatmap.R
 import kotlin.math.roundToInt
 
 /** The sections of Settings, each its own page when settings are shown as pages. */
-private enum class SettingsPage(val title: String, val summary: String, val emoji: String) {
-    RECORDING("Recording", "Automatic or set interval, GPS accuracy", "🎯"),
-    PLACES("Places", "Home, work and other places where recording slows down", "🏠"),
-    BATTERY("Battery", "Battery used at each recording interval", "🔋"),
-    APPEARANCE("Appearance", "Theme, units and Material expressive colours", "🎨"),
-    MAP("Map & routes", "Routes or points, smoothing and road snapping", "🗺️"),
-    MODES("Travel modes", "Add, rename, recolour and delete modes and sub-modes", "🚲"),
-    INSIGHTS("Insights", "Who writes your insights", "✨"),
-    PERMISSIONS("Permissions", "Location, activity, notifications, battery and Health Connect", "🔐"),
-    DATA("Data", "Export to GPX, or delete your history", "💾"),
+private enum class SettingsPage(val title: String, val summary: String, @DrawableRes val icon: Int) {
+    RECORDING("Recording", "Automatic or set interval, GPS accuracy", R.drawable.ic_my_location),
+    PLACES("Places", "Home, work and other places where recording slows down", R.drawable.ic_home),
+    BATTERY("Battery", "Battery used at each recording interval", R.drawable.ic_battery_charging_full),
+    APPEARANCE("Appearance", "Theme, units and Material expressive colours", R.drawable.ic_palette),
+    MAP("Map & routes", "Routes or points, smoothing and road snapping", R.drawable.ic_map),
+    MODES("Travel modes", "Add, rename, recolour and delete modes and sub-modes", R.drawable.ic_directions_bike),
+    INSIGHTS("Insights", "Who writes your insights", R.drawable.ic_auto_awesome),
+    PERMISSIONS("Permissions", "Location, activity, notifications, battery and Health Connect", R.drawable.ic_lock),
+    DATA("Data", "Export to GPX, or delete your history", R.drawable.ic_storage),
 }
 
 private enum class IntervalUnit(val label: String, val seconds: Int) {
@@ -203,7 +205,7 @@ fun SettingsScreen(
                             Modifier.fillMaxWidth().clickable { page = p }.padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            JoyEmoji(p.emoji, size = 28)
+                            MaterialIcon(p.icon, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(16.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(p.title, style = MaterialTheme.typography.bodyLarge)
@@ -359,7 +361,7 @@ fun SettingsScreen(
             }
 
             Text(
-                "Location Ticker ${BuildConfig.VERSION_NAME}\nEmoji artwork provided by JoyPixels",
+                "Location Ticker ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
