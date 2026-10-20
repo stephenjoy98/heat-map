@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.16.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.17.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -69,6 +69,8 @@ travel stats, Insights (AI write-ups), backup and friends.
 - `data/`: `PointStore` (SQLite, **schema v7**: points incl. altitude, trips, places, friend_routes,
   trip_paths, road_questions, deleted_points (soft delete), explored_cells/explored_days/explored_state
   (km-explored cache)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,
+  `TravelMode` (`defaultColor`; `color` reads `ModeColors`, Compose-state overrides saved as Prefs
+  "mode_colors"; Settings → Travel mode colours via `ModeColorsSection` + `ColorPickerDialog`),
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
   `Route3d` (3D route geometry), `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
 - `map/`: `VectorMapSupport.kt` (`VectorMaps`: OpenFreeMap Positron style, dark recolour, terrain hillshade
@@ -83,7 +85,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   alive via `cacheKey`; tilt >8° by hand turns 3D on, <2° turns it off; 3D route loader), `MapScreen`
   (filter button + chips, stats, profile button, scale bar + compass under the top row, accuracy button
   bottom-left, location/zoom/layers bottom-right, record panel), `TimelineScreen` (also hosts **Edit dots**
-  with range slider, soft delete/restore, undo snackbar over the map, layers button), `MapEditor`,
+  with range slider, soft delete/restore, undo snackbar over the map, layers button; long-press a trip row
+  for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
+  dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
+  the map is framed only when the period changes, not on every reload), `MapEditor`,
   `MapControls` (CompassButton, ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
   pictures + 3D buildings), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
   `ProfileMenu` (account menu; badge for pending questions), `SettingsScreen` (+ `PermissionsSection`),

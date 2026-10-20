@@ -274,6 +274,8 @@ fun SettingsScreen(
                 }
             }
 
+            ModeColorsSection()
+
             Section("Insights") {
                 SettingRow(title = "Who writes your insights", subtitle = engineLabel(aiEngine)) {
                     OutlinedButton(onClick = { showAiChoice = true }) { Text("Change") }

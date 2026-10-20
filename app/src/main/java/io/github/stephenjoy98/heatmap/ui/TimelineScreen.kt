@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.stephenjoy98.heatmap.data.GeoBox
+import io.github.stephenjoy98.heatmap.data.ModeColors
 import io.github.stephenjoy98.heatmap.data.PeriodStat
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
@@ -87,6 +88,23 @@ import java.time.YearMonth
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Date
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.Surface
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.DpOffset
+import io.github.stephenjoy98.heatmap.data.DeleteResult
+import io.github.stephenjoy98.heatmap.data.Trip
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.ln
 import kotlin.math.min
 
@@ -103,7 +121,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val period = TimelinePeriod(scale, anchor)
     val changes by store.changes.collectAsStateWithLifecycle()
 
-    val data by produceState<TimelineData?>(null, period, changes, resumeTick) {
+    // Routes are drawn in their travel mode's colour, so they're reloaded when a colour changes.
+    val colors = ModeColors.version
+    val data by produceState<TimelineData?>(null, period, changes, resumeTick, colors) {
         value = withContext(Dispatchers.IO) { TimelineRepository.load(context, period) }
     }
 
@@ -122,11 +142,39 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val tapRadiusPx = 32 * context.resources.displayMetrics.density
     var layersOpen by remember { mutableStateOf(false) }
     val route3d = remember { { box: GeoBox -> store.elevationTracksIn(box, TravelMode.entries.toSet()) } }
+    // Changing a trip's times: the day's dots with the trip's stretch picked out, adjusted with a slider.
+    var retiming by remember { mutableStateOf<Trip?>(null) }
+    val retime = remember { DotEditState(anchor) }
+    var retimeLoading by remember { mutableStateOf(false) }
+    val mapEditing = editing || retiming != null
 
-    val layers = remember(data, dark, editing) {
+    val layers = remember(data, dark, mapEditing) {
         val d = data ?: return@remember emptyList()
         // While editing, the routes fade back so the dots stand out.
-        listOf(MapLayer("timeline-${d.period}", TimelineTiles(d.routes, tilePx, casing.toArgb()), alpha = if (editing) 0.35f else 1f))
+        listOf(MapLayer("timeline-${d.period}-$colors", TimelineTiles(d.routes, tilePx, casing.toArgb()), alpha = if (mapEditing) 0.35f else 1f))
+    }
+
+    LaunchedEffect(retiming) {
+        val trip = retiming ?: return@LaunchedEffect
+        retimeLoading = true
+        val from = minOf(period.fromMs, trip.startTime)
+        val to = maxOf(period.toMs, trip.endTime + 1)
+        val pts = withContext(Dispatchers.IO) { store.editablePoints(from, to) }
+        retime.load(pts)
+        val first = pts.indexOfFirst { it.time >= trip.startTime }.coerceAtLeast(0)
+        val last = pts.indexOfLast { it.time <= trip.endTime }.coerceAtLeast(first)
+        if (pts.isNotEmpty()) retime.range = first..last.coerceAtMost(pts.size - 1)
+        retimeLoading = false
+        frameDots(camera, retime.target)
+    }
+    BackHandler(enabled = retiming != null && !LocalCovered.current) { retiming = null }
+    val changeMode = { trip: Trip, mode: TravelMode ->
+        scope.launch {
+            withContext(Dispatchers.IO) { store.setTripMode(trip.id, mode) }
+            val day = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+            afterDotEdit(context, DeleteResult(setOf(day), emptyList()))
+        }
+        Unit
     }
 
     LaunchedEffect(editing, edit.day, edit.showingDeleted, editReload) {
@@ -157,16 +205,31 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         editing = false
     }
     BackHandler(enabled = editing && !LocalCovered.current) { stopEditing() }
-    // Frame the period's travels whenever a new period loads.
-    LaunchedEffect(data?.period, data?.bounds) {
-        data?.bounds?.let { frame(camera, it) }
+    // Frame the period's travels once when a new period loads. Reloads of the same period (every new dot
+    // while recording) leave the camera alone, so a section you tapped stays in view.
+    var framedPeriod by remember { mutableStateOf<TimelinePeriod?>(null) }
+    LaunchedEffect(data) {
+        val d = data ?: return@LaunchedEffect
+        val box = d.bounds ?: return@LaunchedEffect
+        if (d.period != framedPeriod) {
+            framedPeriod = d.period
+            frame(camera, box)
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding())) {
         TopAppBar(
-            title = { Text(if (editing) "Edit dots" else "Timeline") },
+            title = {
+                Text(
+                    when {
+                        retiming != null -> "Change times"
+                        editing -> "Edit dots"
+                        else -> "Timeline"
+                    }
+                )
+            },
             actions = {
-                if (!editing) {
+                if (!mapEditing) {
                     Tip("Edit or delete dots for this day") {
                         IconButton(onClick = {
                             edit.day = anchor
@@ -178,7 +241,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 ProfileButton(onClick = onProfile)
             },
         )
-        if (!editing) {
+        if (!mapEditing) {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 TimelineScale.entries.forEachIndexed { i, s ->
                     SegmentedButton(
@@ -208,7 +271,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         Box(
             Modifier
                 .fillMaxWidth()
-                .then(if (editing) Modifier.weight(1f) else Modifier.height(260.dp))
+                .then(if (mapEditing) Modifier.weight(1f) else Modifier.height(260.dp))
                 .padding(horizontal = 12.dp)
                 .clip(RoundedCornerShape(20.dp)),
         ) {
@@ -219,10 +282,16 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 refreshKey = data,
                 cacheKey = "timeline",
                 route3d = route3d,
-                onMapClick = if (editing) {
-                    { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
-                } else {
-                    null
+                onMapClick = when {
+                    editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
+                    // Tapping a dot moves whichever end of the trip is nearer to it.
+                    retiming != null -> { lat, lon ->
+                        nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
+                            val r = retime.range
+                            retime.range = if (abs(i - r.first) <= abs(i - r.last)) i..r.last else r.first..i
+                        }
+                    }
+                    else -> null
                 },
             )
             ScaleBar(camera, Modifier.align(Alignment.BottomStart).padding(8.dp))
@@ -231,6 +300,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 // Map type and 3D buildings, right where you're editing.
                 LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
                 SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
+            } else if (retiming != null) {
+                DotsOverlay(camera, retime, Modifier.fillMaxSize())
+                LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
             } else if (data == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             }
@@ -269,6 +341,23 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     onClose = stopEditing,
                 )
             }
+        } else if (retiming != null) {
+            val trip = retiming!!
+            Box(Modifier.padding(12.dp)) {
+                RetimePanel(
+                    trip = trip,
+                    state = retime,
+                    loading = retimeLoading,
+                    entries = data?.entries.orEmpty(),
+                    onCancel = { retiming = null },
+                    onSave = { start, end ->
+                        scope.launch {
+                            afterDotEdit(context, withContext(Dispatchers.IO) { store.retimeTrip(trip.id, start, end) })
+                            retiming = null
+                        }
+                    },
+                )
+            }
         } else {
             val d = data
             LazyColumn(
@@ -283,9 +372,17 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         if (d.entries.isEmpty()) item { Empty("Nothing recorded on this day.") }
                         items(d.entries, key = { "${it.javaClass.simpleName}-${it.start}" }) { entry ->
                             when (entry) {
-                                is DayEntry.Move -> MoveRow(entry) { entry.box?.let { frame(camera, it) } }
+                                is DayEntry.Move -> MoveRow(
+                                    entry = entry,
+                                    onClick = { entry.box?.let { frame(camera, it) } },
+                                    onMode = { changeMode(entry.trip, it) },
+                                    onRetime = { retiming = entry.trip },
+                                )
                                 is DayEntry.Stay -> StayRow(entry) { camera.animateTo(entry.lat, entry.lon, 16f) }
                             }
+                        }
+                        if (d.entries.any { it is DayEntry.Move }) {
+                            item { Hint("Long-press a trip to change how you travelled or when it started and ended.") }
                         }
                     }
                     else -> {
@@ -379,13 +476,14 @@ private fun duration(ms: Long): String {
 }
 
 /** One step of the day: a coloured rail on the left, details on the right. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TimelineRow(color: Color, onClick: () -> Unit, content: @Composable () -> Unit) {
+private fun TimelineRow(color: Color, onClick: () -> Unit, onLongClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
@@ -398,17 +496,159 @@ private fun TimelineRow(color: Color, onClick: () -> Unit, content: @Composable 
     }
 }
 
+/** A trip. Long-press it to change how it was travelled, or its start and end. */
 @Composable
-private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit) {
+private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit, onMode: (TravelMode) -> Unit, onRetime: () -> Unit) {
     val t = entry.trip
-    TimelineRow(Color(t.mode.color), onClick) {
-        Text("${t.mode.label} · ${Insights.km(t.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "${timeFormat.format(Date(t.startTime))} – ${timeFormat.format(Date(t.endTime))} · ${duration(t.endTime - t.startTime)}" +
-                (if (t.needsReview) " · needs your answer in Insights" else ""),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box {
+        TimelineRow(
+            color = Color(t.mode.color),
+            onClick = onClick,
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                menu = true
+            },
+        ) {
+            Text("${t.mode.label} · ${Insights.km(t.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "${timeFormat.format(Date(t.startTime))} – ${timeFormat.format(Date(t.endTime))} · ${duration(t.endTime - t.startTime)}" +
+                    (if (t.needsReview) " · needs your answer in Insights" else ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, offset = DpOffset(48.dp, 0.dp)) {
+            Text(
+                "How did you travel?",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            TravelMode.choosable.forEach { m ->
+                DropdownMenuItem(
+                    text = { Text(m.label) },
+                    leadingIcon = { Box(Modifier.size(12.dp).background(Color(m.color), CircleShape)) },
+                    trailingIcon = { if (m == t.mode) Icon(Icons.Filled.Check, contentDescription = "Current") },
+                    onClick = {
+                        menu = false
+                        if (m != t.mode || t.needsReview) onMode(m)
+                    },
+                )
+            }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            DropdownMenuItem(
+                text = { Text("Change times") },
+                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                onClick = {
+                    menu = false
+                    onRetime()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun Hint(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+    )
+}
+
+/** What an entry is called in the change-times panel. */
+private fun entryLabel(e: DayEntry): String = when (e) {
+    is DayEntry.Move -> e.trip.mode.label
+    is DayEntry.Stay -> e.place ?: "Stay"
+}
+
+/**
+ * Changes when a trip started and ended, in the style of Edit dots: the slider picks the first and last dot
+ * of the trip. The sections before and after it grow or shrink to match.
+ */
+@Composable
+private fun RetimePanel(
+    trip: Trip,
+    state: DotEditState,
+    loading: Boolean,
+    entries: List<DayEntry>,
+    onCancel: () -> Unit,
+    onSave: (Long, Long) -> Unit,
+) {
+    val pts = state.points
+    var saving by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Tip("Cancel") { IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Cancel") } }
+                Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
+                Spacer(Modifier.width(8.dp))
+                Text("${trip.mode.label} trip", style = MaterialTheme.typography.titleMedium)
+            }
+            if (loading || pts.isEmpty()) {
+                Hint(if (loading) "Loading dots…" else "No dots for this trip.")
+            } else {
+                val first = pts[state.range.first]
+                val last = pts[state.range.last]
+                val count = state.range.last - state.range.first + 1
+                Text(
+                    "${timeFormat.format(Date(first.time))} – ${timeFormat.format(Date(last.time))} · " +
+                        "${duration(last.time - first.time)} · $count dots",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                if (pts.size > 1) {
+                    RangeSlider(
+                        value = state.range.first.toFloat()..state.range.last.toFloat(),
+                        onValueChange = { v -> state.range = v.start.roundToInt()..v.endInclusive.roundToInt() },
+                        valueRange = 0f..(pts.size - 1).toFloat(),
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                }
+                val i = entries.indexOfFirst { it is DayEntry.Move && it.trip.id == trip.id }
+                val before = entries.getOrNull(i - 1)?.takeIf { i > 0 }
+                val after = entries.getOrNull(i + 1)?.takeIf { i >= 0 }
+                val changes = buildList {
+                    if (before != null) add("${entryLabel(before)} now ends at ${timeFormat.format(Date(first.time))}")
+                    if (after != null) add("${entryLabel(after)} now starts at ${timeFormat.format(Date(last.time))}")
+                }
+                if (changes.isNotEmpty()) {
+                    Text(
+                        changes.joinToString("\n"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+                Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Tap a dot to move the nearer end",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                    Spacer(Modifier.width(4.dp))
+                    Button(
+                        onClick = {
+                            saving = true
+                            onSave(first.time, last.time)
+                        },
+                        enabled = !saving && count >= 2 && (first.time != trip.startTime || last.time != trip.endTime),
+                    ) { Text("Save") }
+                }
+            }
+        }
     }
 }
 

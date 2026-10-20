@@ -110,6 +110,7 @@ object Prefs {
         _mapTheme.value = MapTheme.entries.byName(sp.getString("map_theme", null)) ?: MapTheme.DARK
         _units.value = UnitSystem.entries.byName(sp.getString("units", null)) ?: Units.defaultFor(Locale.getDefault())
         Units.system = _units.value
+        ModeColors.replace(ModeColors.decode(sp.getString("mode_colors", null)))
         _modeFilter.value = sp.getStringSet("mode_filter", null)
             ?.mapNotNull { it.toIntOrNull()?.let(TravelMode::fromId) }?.toSet()
             ?: TravelMode.entries.toSet()
@@ -149,6 +150,19 @@ object Prefs {
     fun setDisplayMode(mode: DisplayMode) {
         _displayMode.value = mode
         sp.edit().putString("display_mode", mode.name).apply()
+    }
+
+    /** Sets a travel mode's colour; null goes back to its default. */
+    fun setModeColor(mode: TravelMode, color: Long?) {
+        val colors = ModeColors.custom.toMutableMap()
+        if (color == null || color == mode.defaultColor) colors.remove(mode) else colors[mode] = color
+        ModeColors.replace(colors)
+        sp.edit().putString("mode_colors", ModeColors.encode(colors)).apply()
+    }
+
+    fun resetModeColors() {
+        ModeColors.replace(emptyMap())
+        sp.edit().remove("mode_colors").apply()
     }
 
     fun setUnits(units: UnitSystem) {

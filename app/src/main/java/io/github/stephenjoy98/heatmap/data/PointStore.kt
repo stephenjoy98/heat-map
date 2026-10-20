@@ -623,6 +623,86 @@ class PointStore private constructor(context: Context) :
         changed()
     }
 
+    /**
+     * Changes when a trip started and ended, as picked on the Timeline. Dots inside the new times join the trip
+     * (taken from neighbouring trips or stays); dots left outside go to the trip right before or after it when
+     * there was no stop in between, or otherwise become part of the stay. Neighbouring trips are trimmed to
+     * match, and removed if nothing is left of them. Returns the edited days and the remote ids of shared
+     * routes that no longer exist.
+     */
+    fun retimeTrip(tripId: Long, newStart: Long, newEnd: Long): DeleteResult {
+        val trip = trip(tripId) ?: return DeleteResult(emptySet(), emptyList())
+        if (newEnd <= newStart) return DeleteResult(emptySet(), emptyList())
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        val touched = linkedSetOf(tripId)
+        db.beginTransaction()
+        try {
+            val lo = minOf(newStart, trip.startTime)
+            val hi = maxOf(newEnd, trip.endTime)
+            db.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM points WHERE time >= $lo AND time <= $hi", null)
+                .use { c -> while (c.moveToNext()) days += c.getString(0) }
+
+            // Neighbours it can hand dots back to: only when the trips run straight into each other.
+            val before = trips("WHERE id != $tripId AND end_time <= ${trip.startTime} ORDER BY end_time DESC LIMIT 1").firstOrNull()
+                ?.takeIf { trip.startTime - it.endTime < ADJACENT_MS }
+            val after = trips("WHERE id != $tripId AND start_time >= ${trip.endTime} ORDER BY start_time LIMIT 1").firstOrNull()
+                ?.takeIf { it.startTime - trip.endTime < ADJACENT_MS }
+
+            // Dots inside the new times join the trip.
+            db.rawQuery("SELECT DISTINCT trip_id FROM points WHERE time >= $newStart AND time <= $newEnd AND trip_id > 0 AND trip_id != $tripId", null)
+                .use { c -> while (c.moveToNext()) touched += c.getLong(0) }
+            db.execSQL("UPDATE points SET trip_id = $tripId, mode = ${trip.mode.id} WHERE time >= $newStart AND time <= $newEnd")
+
+            // Dots left outside go to the neighbour they now touch, or to the stay.
+            fun release(clause: String, to: Trip?) {
+                if (to != null) {
+                    touched += to.id
+                    db.execSQL("UPDATE points SET trip_id = ${to.id}, mode = ${to.mode.id} WHERE trip_id = $tripId AND $clause")
+                } else {
+                    db.execSQL("UPDATE points SET trip_id = -1, mode = ${TravelMode.UNKNOWN.id} WHERE trip_id = $tripId AND $clause")
+                }
+            }
+            release("time < $newStart", before)
+            release("time > $newEnd", after)
+
+            for (id in touched) refreshTrip(db, id, remoteIds)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
+
+    /** Recomputes a trip's times, distance and ends from its dots, or removes it if fewer than two are left. */
+    private fun refreshTrip(db: SQLiteDatabase, tripId: Long, remoteIds: MutableList<String>) {
+        val pts = db.rawQuery("SELECT time, lat, lon FROM points WHERE trip_id = $tripId ORDER BY time", null).use { c ->
+            buildList { while (c.moveToNext()) add(Triple(c.getLong(0), c.getDouble(1), c.getDouble(2))) }
+        }
+        if (pts.size < 2) {
+            // A last dot left over belongs to the stay now, not back with the trip detector.
+            db.execSQL("UPDATE points SET trip_id = -1, mode = ${TravelMode.UNKNOWN.id} WHERE trip_id = $tripId")
+            dissolveTrips(db, listOf(tripId), remoteIds)
+            return
+        }
+        var meters = 0.0
+        for (i in 1 until pts.size) {
+            meters += TrackRules.distanceMeters(pts[i - 1].second, pts[i - 1].third, pts[i].second, pts[i].third)
+        }
+        val first = pts.first()
+        val last = pts.last()
+        db.execSQL(
+            """UPDATE trips SET start_time = ${first.first}, end_time = ${last.first}, distance_m = $meters,
+               start_lat = ${first.second}, start_lon = ${first.third}, end_lat = ${last.second}, end_lon = ${last.third},
+               uploaded = 0 WHERE id = $tripId"""
+        )
+        // The shape changed, so match it to roads again.
+        db.execSQL("DELETE FROM trip_paths WHERE trip_id = $tripId")
+        db.execSQL("DELETE FROM road_questions WHERE trip_id = $tripId")
+    }
+
     fun tripsNeedingReview(): List<Trip> = trips("WHERE needs_review = 1 ORDER BY start_time DESC")
 
     fun tripsNotUploaded(limit: Int = 400): List<Trip> = trips("WHERE uploaded = 0 ORDER BY start_time LIMIT $limit")
@@ -1135,6 +1215,9 @@ class PointStore private constructor(context: Context) :
         if (modes.size >= TravelMode.entries.size) "" else " AND mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
 
     companion object {
+        // Trips closer together than this have no stay between them (the Timeline shows stays from 5 min).
+        private const val ADJACENT_MS = 5 * 60_000L
+
         private const val POINT_COLS = "time, lat, lon, accuracy, interval_ms, activity, mode, altitude"
 
         @Volatile

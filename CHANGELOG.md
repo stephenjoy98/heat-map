@@ -12,6 +12,19 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-10-20
+
+### Added
+- Long-press a trip on the Timeline to change how you travelled.
+- Change a trip's times from the same menu: a start and end slider over the day's dots, as in Edit dots,
+  or tap a dot to move the nearer end. The trips or stays before and after it adjust to match.
+- Travel mode colours in Settings: choose each mode's colour with a colour picker or a hex code, and go back
+  to the default for one mode or all of them.
+
+### Fixed
+- Tapping a trip or stay on the Timeline zooms the map to it and stays there, instead of jumping back to
+  the whole day a moment later while recording.
+
 ## [2.16.1] - 2026-10-19
 
 ### Changed

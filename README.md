@@ -89,6 +89,11 @@ up to your Google account, and lets you compare explored areas with friends.
 - A map of the period's routes, drawn as solid lines in each travel mode's colour, framed to fit.
 - **Day**: a vertical timeline of trips (mode, distance, times) and the stays between them, named by
   street and town. Tap a trip or stay to zoom the map to it.
+- **Long-press a trip** to change how you travelled (walking, cycling, driving, car share, transit) or
+  **Change times**: a start–end slider over the day's dots, like Edit dots, picks the trip's first and last
+  dot. The trips or stays before and after it grow or shrink to match.
+- **Travel mode colours** in Settings: pick each mode's colour with a colour picker or a hex code, and reset
+  one or all to the defaults.
 - **Week / Month**: a row per day; **Year**: a row per month, each with distance, trips and a bar split by
   travel mode. Tap a row to drill in.
 
