@@ -12,6 +12,25 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-10-20
+
+### Added
+- Questions have their own tab on the Timeline. They come one after another in a queue: answer one and the
+  next appears, or Skip it to the back of the queue. The question's map fills the screen, and no longer
+  shows through the Timeline's map when you scroll. "Questions" in the account menu opens this tab.
+
+### Changed
+- 3D routes are drawn at their real height above the ground, at the same scale as the 3D buildings, rather
+  than above the lowest place you've ever recorded (and stretched 1.5×). An elevated SkyTrain line now sits
+  a few storeys up beside the buildings, and a 15th-floor home about halfway up its tower. The ground's
+  height comes from the same free terrain tiles as hill shading and is saved on the phone; offline, routes
+  fall back to the old way.
+
+### Fixed
+- 3D routes no longer flicker where pieces meet or where several trips cover the same street: a street
+  travelled many times at the same height is drawn once.
+- No more spikes and jagged teeth on 3D routes where GPS wobbles back and forth (at home, say).
+
 ## [2.27.1] - 2026-10-20
 
 ### Changed

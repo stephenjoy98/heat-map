@@ -430,8 +430,8 @@ private fun VectorAppMap(
                 val box = GeoBox(b.latitudeNorth + padLat, b.latitudeSouth - padLat, b.longitudeEast + padLon, b.longitudeWest - padLon)
                 val load = loadRoute3d ?: return@collectLatest
                 val segments = withContext(Dispatchers.IO) {
-                    // One fixed baseline, so heights don't change as the map moves.
-                    Route3d.build(load(box), PointStore.get(holder.mapView.context).altitudeBaseline())
+                    // Heights come back above the ground, like the 3D buildings'.
+                    Route3d.build(load(box), 0.0)
                 }
                 m.style?.let { VectorMaps.showRoute3d(it, segments) }
             }

@@ -37,8 +37,9 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type
   (hill shading from the keyless [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)), and **3D buildings** under Map details, which tilts
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
-  routes are drawn as a ribbon at their recorded height (relative to the lowest point in view,
-  exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
+  routes are drawn as a ribbon at their true height above the ground (the ground's height comes from the
+  same AWS Terrain Tiles, cached on the phone), at the same scale as the 3D buildings, smoothed over
+  neighbouring dots, over a translucent curtain. A street travelled many times is drawn once.
   Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off.
 - A **scale bar** shows while you pan or zoom, in round distances.
 - **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed
@@ -89,9 +90,9 @@ up to your Google account, and lets you compare explored areas with friends.
 - A map of the period's routes, drawn as solid lines in each travel mode's colour, framed to fit.
 - **Day**: a vertical timeline of trips (mode, distance, times) and the stays between them, named by
   street and town. Tap a trip or stay to zoom the map to it.
-- **Questions at the top**: "How did you travel?" and "Which road did you take?" one at a time, on a map you
-  can pinch-zoom (green start, red end), with ‹ › to step through them. A badge on the Timeline tab counts
-  them.
+- **Questions tab**: "How did you travel?", "Which road did you take?" and "Different heights here?" wait in
+  their own tab on the Timeline, queued one after another, on a map you can pinch-zoom (green start, red
+  end). Answer one and the next comes up; Skip sends it to the back. A badge on the Timeline tab counts them.
 - **Grouped trips**: back-to-back trips in the same mode show as one entry; long-press it (or tap the arrow)
   to see and edit each part, or change the mode of all parts from its menu.
 - **Fix route** (long-press › Fix route on the map): pick a stretch of dots across gaps and trips; it's

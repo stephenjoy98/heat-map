@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.27.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.28.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -95,13 +95,15 @@ travel stats, Insights (AI write-ups), backup and friends.
   `Prefs.currentMode` (set from `RecordingSheet`, opened by tapping the record tile) tags new dots' `mode`;
   cleared when tracking stops; TripDetector follows a majority of tagged dots.
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
-  `Route3d` (3D route geometry: continuous mitred ribbon, median + 120 m distance smoothing, heights above a
-  fixed `PointStore.altitudeBaseline()` (5th percentile, cached 10 min) so they don't change with the view;
+  `Route3d` (3D route geometry: continuous mitred ribbon, median + 120 m distance smoothing, 3D-simplified, split at
+  U-turns, pieces inset 6 cm so walls never touch (flicker); `densify` + `withoutOverlaps` draw a street once; since 2.28.0
+  heights are above the ground (`map/GroundHeights`: Terrarium z13 tiles cached in cacheDir/ground, ≤16 downloads per
+  load; fallback `PointStore.altitudeBaseline()`), true scale like the 3D buildings;
   `drape` lays dot heights along a display line; loader `map/Route3dTracks` uses snapped polys / smoothed
   lines like the 2D map; curtain stops 0.4 m under the ribbon to avoid z-fighting). Since 2.24.0 heights come
   from `data/HeightGrid` (~55×36 m patches; per-pass medians, pass = trip or day for stays; patch height =
   median of passes). Patches whose passes split by >15 m become `height_levels` rows (schema v9; decision
-  ASK/SAME/DIFFERENT) shown as `LevelQuestionsCard` on the Timeline; DIFFERENT keeps per-pass heights, `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
+  ASK/SAME/DIFFERENT) asked in the Timeline's Questions tab; DIFFERENT keeps per-pass heights, `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
 - `map/`: `VectorMapSupport.kt` (`VectorMaps`: OpenFreeMap Positron style, dark recolour, terrain hillshade
   from AWS Terrarium DEM declared at tileSize 128 for sharpness, 3D buildings fill-extrusion, 3D route
   layers; `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix,
@@ -122,8 +124,9 @@ travel stats, Insights (AI write-ups), backup and friends.
   `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null →
   `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`,
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
-  then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked); `TripQuestionsCard` and
-  `RoadQuestionsCard` (TripQuestions.kt) sit at the top of the list — questions moved off Insights in 2.19.0;
+  then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked); trip, road and
+  level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt: one queue,
+  answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the account menu);
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton, ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
   pictures + 3D buildings), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,

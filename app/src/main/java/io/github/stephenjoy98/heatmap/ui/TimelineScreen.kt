@@ -38,6 +38,10 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.rememberDatePickerState
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.filled.Edit
@@ -70,6 +74,7 @@ import io.github.stephenjoy98.heatmap.data.ModeColors
 import io.github.stephenjoy98.heatmap.data.PeriodStat
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
+import io.github.stephenjoy98.heatmap.map.GroundHeights
 import io.github.stephenjoy98.heatmap.map.Route3dTracks
 import io.github.stephenjoy98.heatmap.map.TileMath
 import io.github.stephenjoy98.heatmap.map.heatTilePx
@@ -185,7 +190,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val scope = rememberCoroutineScope()
     val tapRadiusPx = 32 * context.resources.displayMetrics.density
     var layersOpen by remember { mutableStateOf(false) }
-    val route3d = remember { { box: GeoBox -> Route3dTracks.load(store, box, TravelMode.entries.toSet()) } }
+    val route3d = remember { { box: GeoBox -> Route3dTracks.load(store, GroundHeights.get(context), box, TravelMode.entries.toSet()) } }
     // Changing a trip's times: the day's dots with the trip's stretch picked out, adjusted with a slider.
     var retiming by remember { mutableStateOf<Trip?>(null) }
     val retime = remember { DotEditState(anchor) }
@@ -363,304 +368,305 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 ProfileButton(onClick = onProfile)
             },
         )
-        if (!mapEditing) {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                TimelineScale.entries.forEachIndexed { i, s ->
-                    SegmentedButton(
-                        selected = s == scale,
-                        onClick = { scale = s },
-                        shape = SegmentedButtonDefaults.itemShape(index = i, count = TimelineScale.entries.size),
-                    ) { Text(s.label, maxLines = 1) }
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tip("Previous ${scale.label.lowercase()}") {
-                    IconButton(onClick = { anchor = period.previous().anchor }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
-                    }
-                }
-                TextButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
-                    Text(period.label, style = MaterialTheme.typography.titleMedium)
-                }
-                Tip("Next ${scale.label.lowercase()}") {
-                    IconButton(onClick = { anchor = period.next().anchor }, enabled = !period.isCurrent) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
-                    }
-                }
-            }
-        }
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .then(if (mapEditing) Modifier.weight(1f) else Modifier.height(260.dp))
-                .padding(horizontal = 12.dp)
-                .clip(RoundedCornerShape(20.dp)),
-        ) {
-            AppMap(
-                camera = camera,
-                layers = layers,
-                modifier = Modifier.fillMaxSize(),
-                refreshKey = data,
-                cacheKey = "timeline",
-                route3d = route3d,
-                onMapClick = when {
-                    editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
-                    // Tapping a dot moves whichever end of the trip is nearer to it.
-                    // Fixing a route: a tap says the route went through there.
-                    fixing != null -> { lat, lon ->
-                        if (vias.size < MAX_VIAS) {
-                            vias += lat to lon
-                            findRoads()
-                        }
-                    }
-                    rangeEditing -> { lat, lon ->
-                        nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
-                            val r = retime.range
-                            retime.range = if (abs(i - r.first) <= abs(i - r.last)) i..r.last else r.first..i
-                        }
-                    }
-                    else -> null
-                },
-            )
-            ScaleBar(camera, Modifier.align(Alignment.BottomStart).padding(8.dp))
-            if (editing) {
-                DotsOverlay(camera, edit, Modifier.fillMaxSize())
-                // Map type and 3D buildings, right where you're editing.
-                LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
-                SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
-            } else if (rangeEditing) {
-                DotsOverlay(camera, retime, Modifier.fillMaxSize())
-                if (fixing != null) RouteLinesOverlay(camera, roads, chosenRoad, vias, Modifier.fillMaxSize())
-                LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
-            } else if (data == null) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
-            }
-        }
-
-        if (editing) {
-            Box(Modifier.padding(12.dp)) {
-                EditPanel(
-                    state = edit,
-                    loading = editLoading,
-                    onDay = { edit.day = it },
-                    onFocus = { camera.animateTo(it.lat, it.lon, 17f) },
-                    onShow = { frameDots(camera, it) },
-                    onDelete = { doomed ->
-                        scope.launch {
-                            afterDotEdit(context, withContext(Dispatchers.IO) { store.deletePoints(doomed.map { it.id }) })
-                            editReload++
-                            val undo = editSnackbar.showSnackbar(
-                                if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted",
-                                actionLabel = "Undo",
-                                duration = SnackbarDuration.Long,
-                            )
-                            if (undo == SnackbarResult.ActionPerformed) {
-                                afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(doomed.map { it.id }) })
-                                editReload++
-                            }
+        if (!mapEditing && picked == null) {
+            val waiting = questions.size + roadQuestions.size + levelQuestions.size
+            SecondaryTabRow(selectedTabIndex = if (TimelineTabs.questions) 1 else 0) {
+                Tab(selected = !TimelineTabs.questions, onClick = { TimelineTabs.questions = false }, text = { Text("Trips") })
+                Tab(
+                    selected = TimelineTabs.questions,
+                    onClick = { TimelineTabs.questions = true },
+                    text = {
+                        BadgedBox(badge = { if (waiting > 0) Badge { Text(if (waiting > 99) "99+" else waiting.toString()) } }) {
+                            Text("Questions")
                         }
                     },
-                    onRestore = { back ->
-                        scope.launch {
-                            afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(back.map { it.id }) })
-                            editReload++
-                            editSnackbar.showSnackbar(if (back.size == 1) "Dot restored" else "${back.size} dots restored")
-                        }
-                    },
-                    onClose = stopEditing,
                 )
             }
-        } else if (fixing != null) {
-            Box(Modifier.padding(12.dp)) {
-                RouteFixPanel(
-                    state = retime,
-                    loading = retimeLoading,
-                    mode = fixMode,
-                    onMode = { fixMode = it },
-                    roads = roads,
-                    chosen = chosenRoad,
-                    onChoose = { chosenRoad = it },
-                    roadsLoading = roadsLoading,
-                    error = roadsError,
-                    vias = vias.size,
-                    onFindRoads = ::findRoads,
-                    onClearVias = {
-                        vias.clear()
-                        roads = emptyList()
-                        chosenRoad = -1
+        }
+        if (TimelineTabs.questions && !mapEditing && picked == null) {
+            QuestionsPane(
+                trips = questions,
+                roads = roadQuestions,
+                levels = levelQuestions,
+                onTrip = { trip, mode -> changeMode(trip, mode) },
+                onShowDay = { trip ->
+                    anchor = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate()
+                    scale = TimelineScale.DAY
+                    focusTrip = trip.id
+                    TimelineTabs.questions = false
+                },
+                onRoad = { q, choice ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) { RoadSnapper.answer(context, q, choice) }
+                    }
+                },
+                onLevel = { q, different ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) { store.answerLevel(q.area, if (different) HeightGrid.DIFFERENT else HeightGrid.SAME) }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            if (!mapEditing) {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    TimelineScale.entries.forEachIndexed { i, s ->
+                        SegmentedButton(
+                            selected = s == scale,
+                            onClick = { scale = s },
+                            shape = SegmentedButtonDefaults.itemShape(index = i, count = TimelineScale.entries.size),
+                        ) { Text(s.label, maxLines = 1) }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Tip("Previous ${scale.label.lowercase()}") {
+                        IconButton(onClick = { anchor = period.previous().anchor }) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
+                        }
+                    }
+                    TextButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
+                        Text(period.label, style = MaterialTheme.typography.titleMedium)
+                    }
+                    Tip("Next ${scale.label.lowercase()}") {
+                        IconButton(onClick = { anchor = period.next().anchor }, enabled = !period.isCurrent) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
+                        }
+                    }
+                }
+            }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (mapEditing) Modifier.weight(1f) else Modifier.height(260.dp))
+                    .padding(horizontal = 12.dp)
+                    .clip(RoundedCornerShape(20.dp)),
+            ) {
+                AppMap(
+                    camera = camera,
+                    layers = layers,
+                    modifier = Modifier.fillMaxSize(),
+                    refreshKey = data,
+                    cacheKey = "timeline",
+                    route3d = route3d,
+                    onMapClick = when {
+                        editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
+                        // Tapping a dot moves whichever end of the trip is nearer to it.
+                        // Fixing a route: a tap says the route went through there.
+                        fixing != null -> { lat, lon ->
+                            if (vias.size < MAX_VIAS) {
+                                vias += lat to lon
+                                findRoads()
+                            }
+                        }
+                        rangeEditing -> { lat, lon ->
+                            nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
+                                val r = retime.range
+                                retime.range = if (abs(i - r.first) <= abs(i - r.last)) i..r.last else r.first..i
+                            }
+                        }
+                        else -> null
                     },
-                    onCancel = { fixing = null },
-                    onSave = { start, end ->
-                        val road = roads.getOrNull(chosenRoad)
-                        val mode = fixMode
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                store.addTrip(start, end, mode).also { r ->
-                                    // The road picked becomes the trip's shape; otherwise it's matched to roads as usual.
-                                    if (road != null && r.createdTripId > 0) {
-                                        val n = road.points.size / 2
-                                        val poly = Polyline.encode(DoubleArray(n) { road.points[it * 2] }, DoubleArray(n) { road.points[it * 2 + 1] })
-                                        store.saveTripPath(r.createdTripId, RoadSnapper.STATUS_SNAPPED, poly, poly)
-                                    }
+                )
+                ScaleBar(camera, Modifier.align(Alignment.BottomStart).padding(8.dp))
+                if (editing) {
+                    DotsOverlay(camera, edit, Modifier.fillMaxSize())
+                    // Map type and 3D buildings, right where you're editing.
+                    LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                    SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
+                } else if (rangeEditing) {
+                    DotsOverlay(camera, retime, Modifier.fillMaxSize())
+                    if (fixing != null) RouteLinesOverlay(camera, roads, chosenRoad, vias, Modifier.fillMaxSize())
+                    LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                } else if (data == null) {
+                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                }
+            }
+
+            if (editing) {
+                Box(Modifier.padding(12.dp)) {
+                    EditPanel(
+                        state = edit,
+                        loading = editLoading,
+                        onDay = { edit.day = it },
+                        onFocus = { camera.animateTo(it.lat, it.lon, 17f) },
+                        onShow = { frameDots(camera, it) },
+                        onDelete = { doomed ->
+                            scope.launch {
+                                afterDotEdit(context, withContext(Dispatchers.IO) { store.deletePoints(doomed.map { it.id }) })
+                                editReload++
+                                val undo = editSnackbar.showSnackbar(
+                                    if (doomed.size == 1) "Dot deleted" else "${doomed.size} dots deleted",
+                                    actionLabel = "Undo",
+                                    duration = SnackbarDuration.Long,
+                                )
+                                if (undo == SnackbarResult.ActionPerformed) {
+                                    afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(doomed.map { it.id }) })
+                                    editReload++
                                 }
                             }
-                            afterDotEdit(context, result)
-                            fixing = null
-                        }
-                    },
-                )
-            }
-        } else if (rangeEditing) {
-            val trip = retiming
-            Box(Modifier.padding(12.dp)) {
-                key(trip?.id, adding) {
-                    RetimePanel(
-                        trip = trip,
+                        },
+                        onRestore = { back ->
+                            scope.launch {
+                                afterDotEdit(context, withContext(Dispatchers.IO) { store.restorePoints(back.map { it.id }) })
+                                editReload++
+                                editSnackbar.showSnackbar(if (back.size == 1) "Dot restored" else "${back.size} dots restored")
+                            }
+                        },
+                        onClose = stopEditing,
+                    )
+                }
+            } else if (fixing != null) {
+                Box(Modifier.padding(12.dp)) {
+                    RouteFixPanel(
                         state = retime,
                         loading = retimeLoading,
-                        entries = data?.entries.orEmpty(),
-                        onCancel = {
-                            retiming = null
-                            adding = null
+                        mode = fixMode,
+                        onMode = { fixMode = it },
+                        roads = roads,
+                        chosen = chosenRoad,
+                        onChoose = { chosenRoad = it },
+                        roadsLoading = roadsLoading,
+                        error = roadsError,
+                        vias = vias.size,
+                        onFindRoads = ::findRoads,
+                        onClearVias = {
+                            vias.clear()
+                            roads = emptyList()
+                            chosenRoad = -1
                         },
-                        onSave = { start, end, mode ->
+                        onCancel = { fixing = null },
+                        onSave = { start, end ->
+                            val road = roads.getOrNull(chosenRoad)
+                            val mode = fixMode
                             scope.launch {
                                 val result = withContext(Dispatchers.IO) {
-                                    if (trip != null) store.retimeTrip(trip.id, start, end)
-                                    else store.addTrip(start, end, mode ?: TravelMode.UNKNOWN)
+                                    store.addTrip(start, end, mode).also { r ->
+                                        // The road picked becomes the trip's shape; otherwise it's matched to roads as usual.
+                                        if (road != null && r.createdTripId > 0) {
+                                            val n = road.points.size / 2
+                                            val poly = Polyline.encode(DoubleArray(n) { road.points[it * 2] }, DoubleArray(n) { road.points[it * 2 + 1] })
+                                            store.saveTripPath(r.createdTripId, RoadSnapper.STATUS_SNAPPED, poly, poly)
+                                        }
+                                    }
                                 }
                                 afterDotEdit(context, result)
-                                retiming = null
-                                adding = null
+                                fixing = null
                             }
                         },
                     )
                 }
-            }
-        } else {
-            val d = data
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (d == null) return@LazyColumn
-                if (questions.isNotEmpty()) {
-                    item(key = "questions") {
-                        TripQuestionsCard(
-                            questions = questions,
-                            onAnswer = { trip, mode -> changeMode(trip, mode) },
-                            onShowDay = { trip ->
-                                anchor = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate()
-                                scale = TimelineScale.DAY
-                                focusTrip = trip.id
+            } else if (rangeEditing) {
+                val trip = retiming
+                Box(Modifier.padding(12.dp)) {
+                    key(trip?.id, adding) {
+                        RetimePanel(
+                            trip = trip,
+                            state = retime,
+                            loading = retimeLoading,
+                            entries = data?.entries.orEmpty(),
+                            onCancel = {
+                                retiming = null
+                                adding = null
                             },
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
-                    }
-                }
-                if (roadQuestions.isNotEmpty()) {
-                    item(key = "roads") {
-                        RoadQuestionsCard(
-                            questions = roadQuestions,
-                            onAnswer = { q, choice ->
+                            onSave = { start, end, mode ->
                                 scope.launch {
-                                    withContext(Dispatchers.IO) { RoadSnapper.answer(context, q, choice) }
+                                    val result = withContext(Dispatchers.IO) {
+                                        if (trip != null) store.retimeTrip(trip.id, start, end)
+                                        else store.addTrip(start, end, mode ?: TravelMode.UNKNOWN)
+                                    }
+                                    afterDotEdit(context, result)
+                                    retiming = null
+                                    adding = null
                                 }
                             },
-                            modifier = Modifier.padding(bottom = 12.dp),
                         )
                     }
                 }
-                if (levelQuestions.isNotEmpty()) {
-                    item(key = "levels") {
-                        LevelQuestionsCard(
-                            questions = levelQuestions,
-                            onAnswer = { q, different ->
-                                scope.launch {
-                                    withContext(Dispatchers.IO) { store.answerLevel(q.area, if (different) HeightGrid.DIFFERENT else HeightGrid.SAME) }
+            } else {
+                val d = data
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (d == null) return@LazyColumn
+                    item { Summary(d) }
+                    when (scale) {
+                        TimelineScale.DAY -> {
+                            if (d.entries.isEmpty()) item { Empty("Nothing recorded on this day.") }
+                            items(d.entries, key = { "${it.javaClass.simpleName}-${it.start}" }) { entry ->
+                                when (entry) {
+                                    is DayEntry.Move -> MoveRow(
+                                        entry = entry,
+                                        onClick = { entry.box?.let { frame(camera, it) } },
+                                        onMode = { changeMode(entry.trip, it) },
+                                        onRetime = { retiming = entry.trip },
+                                        onFix = { startFix(entry.trip.startTime, entry.trip.endTime, entry.trip.mode) },
+                                        selection = picked,
+                                        onSelect = select,
+                                    )
+                                    is DayEntry.Stay -> StayRow(
+                                        entry = entry,
+                                        onClick = { camera.animateTo(entry.lat, entry.lon, 16f) },
+                                        onAddTrip = { adding = (entry.start + 1)..(entry.end - 1) },
+                                    )
+                                    is DayEntry.Group -> GroupRow(
+                                        group = entry,
+                                        expanded = expanded[entry.start] == true,
+                                        onToggle = { expanded[entry.start] = expanded[entry.start] != true },
+                                        onClick = { entry.box?.let { frame(camera, it) } },
+                                        onModeAll = { m -> entry.moves.forEach { changeMode(it.trip, m) } },
+                                        onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
+                                        onSectionMode = { mv, m -> changeMode(mv.trip, m) },
+                                        onSectionRetime = { mv -> retiming = mv.trip },
+                                        onFix = { mv -> startFix(mv?.trip?.startTime ?: entry.start, mv?.trip?.endTime ?: entry.end, mv?.trip?.mode ?: entry.mode) },
+                                        selection = picked,
+                                        onSelect = select,
+                                    )
                                 }
-                            },
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
-                    }
-                }
-                item { Summary(d) }
-                when (scale) {
-                    TimelineScale.DAY -> {
-                        if (d.entries.isEmpty()) item { Empty("Nothing recorded on this day.") }
-                        items(d.entries, key = { "${it.javaClass.simpleName}-${it.start}" }) { entry ->
-                            when (entry) {
-                                is DayEntry.Move -> MoveRow(
-                                    entry = entry,
-                                    onClick = { entry.box?.let { frame(camera, it) } },
-                                    onMode = { changeMode(entry.trip, it) },
-                                    onRetime = { retiming = entry.trip },
-                                    onFix = { startFix(entry.trip.startTime, entry.trip.endTime, entry.trip.mode) },
-                                    selection = picked,
-                                    onSelect = select,
-                                )
-                                is DayEntry.Stay -> StayRow(
-                                    entry = entry,
-                                    onClick = { camera.animateTo(entry.lat, entry.lon, 16f) },
-                                    onAddTrip = { adding = (entry.start + 1)..(entry.end - 1) },
-                                )
-                                is DayEntry.Group -> GroupRow(
-                                    group = entry,
-                                    expanded = expanded[entry.start] == true,
-                                    onToggle = { expanded[entry.start] = expanded[entry.start] != true },
-                                    onClick = { entry.box?.let { frame(camera, it) } },
-                                    onModeAll = { m -> entry.moves.forEach { changeMode(it.trip, m) } },
-                                    onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
-                                    onSectionMode = { mv, m -> changeMode(mv.trip, m) },
-                                    onSectionRetime = { mv -> retiming = mv.trip },
-                                    onFix = { mv -> startFix(mv?.trip?.startTime ?: entry.start, mv?.trip?.endTime ?: entry.end, mv?.trip?.mode ?: entry.mode) },
-                                    selection = picked,
-                                    onSelect = select,
-                                )
+                            }
+                            if (d.entries.any { it is DayEntry.Move || it is DayEntry.Group }) {
+                                item {
+                                    Hint(
+                                        "Long-press a trip to change how you travelled or when it started and ended. " +
+                                            "Trips in a row in the same mode are shown together: long-press to see each part."
+                                    )
+                                }
                             }
                         }
-                        if (d.entries.any { it is DayEntry.Move || it is DayEntry.Group }) {
-                            item {
-                                Hint(
-                                    "Long-press a trip to change how you travelled or when it started and ended. " +
-                                        "Trips in a row in the same mode are shown together: long-press to see each part."
-                                )
-                            }
-                        }
-                    }
-                    else -> {
-                        if (d.stats.isEmpty()) item { Empty("Nothing recorded in this ${scale.label.lowercase()}.") }
-                        val max = d.stats.maxOfOrNull { it.meters } ?: 0.0
-                        items(d.stats, key = { it.key }) { stat ->
-                            PeriodRow(stat, scale, max) {
-                                if (scale == TimelineScale.YEAR) {
-                                    anchor = YearMonth.parse(stat.key).atDay(1)
-                                    scale = TimelineScale.MONTH
-                                } else {
-                                    anchor = LocalDate.parse(stat.key)
-                                    scale = TimelineScale.DAY
+                        else -> {
+                            if (d.stats.isEmpty()) item { Empty("Nothing recorded in this ${scale.label.lowercase()}.") }
+                            val max = d.stats.maxOfOrNull { it.meters } ?: 0.0
+                            items(d.stats, key = { it.key }) { stat ->
+                                PeriodRow(stat, scale, max) {
+                                    if (scale == TimelineScale.YEAR) {
+                                        anchor = YearMonth.parse(stat.key).atDay(1)
+                                        scale = TimelineScale.MONTH
+                                    } else {
+                                        anchor = LocalDate.parse(stat.key)
+                                        scale = TimelineScale.DAY
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            picked?.let { ids ->
-                SelectionBar(
-                    count = ids.size,
-                    onMode = { mode ->
-                        val trips = data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }
-                        scope.launch {
-                            withContext(Dispatchers.IO) { store.setTripModes(ids, mode) }
-                            val days = trips.map { Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString() }.toSet()
-                            afterDotEdit(context, DeleteResult(days, emptyList()))
-                        }
-                        picked = null
-                    },
-                    onCancel = { picked = null },
-                )
+                picked?.let { ids ->
+                    SelectionBar(
+                        count = ids.size,
+                        onMode = { mode ->
+                            val trips = data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }
+                            scope.launch {
+                                withContext(Dispatchers.IO) { store.setTripModes(ids, mode) }
+                                val days = trips.map { Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString() }.toSet()
+                                afterDotEdit(context, DeleteResult(days, emptyList()))
+                            }
+                            picked = null
+                        },
+                        onCancel = { picked = null },
+                    )
+                }
             }
         }
     }

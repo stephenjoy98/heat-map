@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Trip and road questions waiting on the Timeline, shown as a badge on the account button. */
+/** Questions waiting on the Timeline, shown as a badge on the account button. */
 val LocalReviewCount = compositionLocalOf { 0 }
 
 @Composable
@@ -220,7 +220,10 @@ private fun AppScaffold(
             onReview = { stack.push(Page.REVIEW) },
             onSettings = { stack.push(Page.SETTINGS) },
             onAbout = { stack.push(Page.ABOUT) },
-            onQuestions = { tab = MainActivity.TAB_TIMELINE },
+            onQuestions = {
+                TimelineTabs.questions = true
+                tab = MainActivity.TAB_TIMELINE
+            },
         )
     }
 
@@ -244,7 +247,7 @@ private fun AppScaffold(
                                 selected = tab == MainActivity.TAB_TIMELINE,
                                 onClick = { tab = MainActivity.TAB_TIMELINE },
                                 icon = {
-                                    // Questions about trips wait at the top of the Timeline.
+                                    // Questions wait on the Timeline's Questions tab.
                                     BadgedBox(badge = { if (questions > 0) Badge { Text(if (questions > 99) "99+" else questions.toString()) } }) {
                                         Icon(Icons.Filled.DateRange, contentDescription = null)
                                     }
