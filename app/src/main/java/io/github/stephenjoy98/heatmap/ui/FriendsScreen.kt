@@ -73,6 +73,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -232,10 +233,24 @@ private fun StorageCard(signedIn: Boolean) {
             if (p == null) {
                 Text("Working it out…", style = MaterialTheme.typography.bodySmall)
             } else {
-                UsageBar(used = p.totalBytes - p.freeBytes, total = p.totalBytes, mine = p.appBytes)
+                val otherApps = (p.totalBytes - p.freeBytes - p.appBytes).coerceAtLeast(0)
+                UsageBar(
+                    parts = listOf(
+                        p.databaseBytes to ChartColors.Blue,
+                        p.cacheBytes to ChartColors.Amber,
+                        p.otherBytes to ChartColors.Magenta,
+                        otherApps to ChartColors.Grey,
+                    ),
+                    total = p.totalBytes,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    UsageKey(ChartColors.Blue, "Your history", f(p.databaseBytes))
+                    UsageKey(ChartColors.Amber, "Map and picture cache", f(p.cacheBytes))
+                    UsageKey(ChartColors.Magenta, "Other app files", f(p.otherBytes))
+                    UsageKey(ChartColors.Grey, "Other apps and system", f(otherApps))
+                }
                 Text(
-                    "Location Ticker uses ${f(p.appBytes)}: your history ${f(p.databaseBytes)}, map and picture cache ${f(p.cacheBytes)}, " +
-                        "other app files ${f(p.otherBytes)}.",
+                    "Location Ticker uses ${f(p.appBytes)} in all.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
@@ -251,11 +266,15 @@ private fun StorageCard(signedIn: Boolean) {
                 if (c == null) {
                     Text("Working it out…", style = MaterialTheme.typography.bodySmall)
                 } else {
-                    UsageBar(used = c.totalBytes, total = StorageUsage.FREE_CLOUD_BYTES, mine = c.totalBytes)
-                    Text(
-                        "About ${f(c.totalBytes)}: backup ${f(c.backupBytes)}, routes shared with friends ${f(c.routeBytes)}.",
-                        style = MaterialTheme.typography.bodyMedium,
+                    UsageBar(
+                        parts = listOf(c.backupBytes to ChartColors.Green, c.routeBytes to ChartColors.Blue),
+                        total = StorageUsage.FREE_CLOUD_BYTES,
                     )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        UsageKey(ChartColors.Green, "Backup", f(c.backupBytes))
+                        UsageKey(ChartColors.Blue, "Routes shared with friends", f(c.routeBytes))
+                    }
+                    Text("About ${f(c.totalBytes)} in all.", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "About ${f(c.leftBytes)} left of the ${f(StorageUsage.FREE_CLOUD_BYTES)} of database storage in Firebase's free plan. " +
                             "That allowance is for the whole Firebase project, and Firebase doesn't tell the app its exact usage, " +
@@ -269,24 +288,38 @@ private fun StorageCard(signedIn: Boolean) {
     }
 }
 
-/** A thin bar: the share of [total] that's used, with this app's part in the primary colour. */
+/** A bar split into coloured [parts] (bytes and colour) out of [total]; what's left over is free space. */
 @Composable
-private fun UsageBar(used: Long, total: Long, mine: Long) {
+private fun UsageBar(parts: List<Pair<Long, Color>>, total: Long) {
     if (total <= 0) return
-    val usedShare = (used.toDouble() / total).toFloat().coerceIn(0f, 1f)
-    val mineShare = (mine.toDouble() / total).toFloat().coerceIn(0f, usedShare).let { if (mine > 0) it.coerceAtLeast(0.01f) else it }
     Row(
         Modifier
             .fillMaxWidth()
-            .height(10.dp)
-            .clip(RoundedCornerShape(5.dp))
+            .height(12.dp)
+            .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (mineShare > 0f) Box(Modifier.fillMaxHeight().weight(mineShare).background(MaterialTheme.colorScheme.primary))
-        val others = usedShare - mineShare
-        if (others > 0f) Box(Modifier.fillMaxHeight().weight(others).background(MaterialTheme.colorScheme.outline))
-        val free = 1f - usedShare - (if (mineShare > usedShare) mineShare - usedShare else 0f)
-        if (free > 0f) Spacer(Modifier.weight(free))
+        var used = 0f
+        parts.forEach { (bytes, color) ->
+            if (bytes <= 0) return@forEach
+            // Tiny parts still show as a sliver.
+            val share = (bytes.toDouble() / total).toFloat().coerceIn(0.01f, 1f - used)
+            if (share <= 0f) return@forEach
+            used += share
+            Box(Modifier.fillMaxHeight().weight(share).background(color))
+        }
+        if (used < 1f) Spacer(Modifier.weight(1f - used))
+    }
+}
+
+/** A key for [UsageBar]: a coloured dot, what it is and how much. */
+@Composable
+private fun UsageKey(color: Color, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).background(color, CircleShape))
+        Spacer(Modifier.width(10.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

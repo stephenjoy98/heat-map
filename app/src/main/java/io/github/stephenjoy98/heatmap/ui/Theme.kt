@@ -31,6 +31,20 @@ val HeatOrange = Color(0xFFFF7A1A)
 val RecordRed = Color(0xFFE53935)
 val FriendBlue = Color(0xFF3D9BFF)
 
+/**
+ * Colours for graphs (storage, battery), in the same bright family as the travel-mode bars, so charts read
+ * at a glance in light and dark themes. Like map colours, they don't follow the Material theme.
+ */
+object ChartColors {
+    val Blue = Color(0xFF2883FF)
+    val Green = Color(0xFF43A047)
+    val Amber = Color(0xFFE5A635)
+    val Orange = Color(0xFFFB8C00)
+    val Red = Color(0xFFE53935)
+    val Magenta = Color(0xFFE535E5)
+    val Grey = Color(0xFF8A8A8A)
+}
+
 /** Lines, dots and rings drawn on maps: the map's own orange, kept apart from the app's Material theme. */
 val MapAccent = HeatOrange
 

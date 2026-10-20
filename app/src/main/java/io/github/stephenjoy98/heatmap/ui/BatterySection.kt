@@ -103,11 +103,18 @@ private fun BatteryBars(uses: List<BatteryUse>) {
                 )
                 Box(Modifier.weight(1f).height(14.dp)) {
                     val share = (u.percentPerHour / max).toFloat().coerceIn(0.02f, 1f)
+                    // Coloured by how hard it drains: green for light use up to red for the heaviest.
+                    val color = when {
+                        share < 0.25f -> ChartColors.Green
+                        share < 0.5f -> ChartColors.Amber
+                        share < 0.75f -> ChartColors.Orange
+                        else -> ChartColors.Red
+                    }
                     Box(
                         Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(share)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)),
+                            .background(color, RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)),
                     )
                 }
                 Column(Modifier.width(76.dp).padding(start = 8.dp), horizontalAlignment = Alignment.End) {

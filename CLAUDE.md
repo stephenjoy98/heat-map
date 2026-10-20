@@ -194,7 +194,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   `MaterialIcon(R.drawable.ic_*)` in ui/MaterialIcon.kt; add icons as vector drawables generated from the npm package
   `@material-design-icons/svg` outlined SVGs — material-icons-extended isn't used, it would bloat the unminified APK),
   neutral near-white accent in the default dark theme (no orange in the UI) but **map elements are never
-  Material-themed**: 3D ribbon `#FF7A1A`, preview lines/rings/edit dots use `MapAccent` (Theme.kt), text a size up
+  Material-themed**: 3D ribbon `#FF7A1A`, preview lines/rings/edit dots use `MapAccent` (Theme.kt), graphs use `ChartColors` (Theme.kt, bright like the mode bars), text a size up
   from Material defaults with no letter spacing (`baseTypography` in Theme.kt, user compares with Gmail/Claude apps), units setting respected everywhere (`Units`), long-press tooltips on icon buttons.
 - When something can't be done exactly (e.g. no system dialog for revoking permissions), do the closest
   sensible thing and say so plainly in the reply.

@@ -16,6 +16,9 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ### Changed
 - The country, city and continent lists on your profile show JoyPixels flags and globes again.
+- Graphs use bright colours like the travel-mode bars: storage is split into coloured parts (your history,
+  map cache, other app files, other apps) with a key, and battery bars go from green for light use to red for
+  the heaviest.
 
 ## [2.30.1] - 2026-10-20
 
