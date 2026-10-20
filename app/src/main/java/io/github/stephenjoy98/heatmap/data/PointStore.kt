@@ -89,6 +89,11 @@ class EditablePoint(val id: Long, val time: Long, val lat: Double, val lon: Doub
 
 class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>)
 
+/** Battery used while recording at one interval: [hours] spent at it and [percent] of the battery used. */
+class BatteryUse(val intervalSec: Int, val hours: Double, val percent: Double) {
+    val percentPerHour: Double get() = if (hours > 0) percent / hours else 0.0
+}
+
 class PeriodStat(
     val key: String,
     val meters: Double,
@@ -129,7 +134,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 7) {
+    SQLiteOpenHelper(context, "points.db", null, 8) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -266,6 +271,19 @@ class PointStore private constructor(context: Context) :
             // Elevation of each dot, for 3D routes. Older dots have none.
             db.execSQL("ALTER TABLE points ADD COLUMN altitude REAL")
             db.execSQL("ALTER TABLE deleted_points ADD COLUMN altitude REAL")
+        }
+        if (oldVersion < 8) {
+            // Battery samples taken while recording, to show how much each recording interval uses.
+            db.execSQL(
+                """CREATE TABLE battery_log (
+                    time INTEGER PRIMARY KEY,
+                    level REAL NOT NULL,
+                    charge_uah INTEGER NOT NULL,
+                    charging INTEGER NOT NULL,
+                    screen_on INTEGER NOT NULL,
+                    interval_ms INTEGER NOT NULL
+                )"""
+            )
         }
     }
 
@@ -547,6 +565,58 @@ class PointStore private constructor(context: Context) :
         db.execSQL("UPDATE points SET trip_id = 0 WHERE trip_id IN ($trips)")
     }
 
+    // ---- Battery ----
+
+    /** Records a battery sample taken while recording; samples older than 30 days are dropped. */
+    fun logBattery(time: Long, levelPct: Float, chargeUah: Long, charging: Boolean, screenOn: Boolean, intervalMs: Long) {
+        val db = writableDatabase
+        db.insertWithOnConflict("battery_log", null, ContentValues().apply {
+            put("time", time)
+            put("level", levelPct)
+            put("charge_uah", chargeUah)
+            put("charging", if (charging) 1 else 0)
+            put("screen_on", if (screenOn) 1 else 0)
+            put("interval_ms", intervalMs)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+        db.execSQL("DELETE FROM battery_log WHERE time < ${time - 30 * 86_400_000L}")
+    }
+
+    /**
+     * Battery used while recording since [from], split by recording interval: for each interval, how many hours
+     * were spent recording at it and how many percent of the battery went in that time. Only stretches on
+     * battery count (not while charging); with [screenOffOnly], only stretches with the screen off, which
+     * leaves out most of what other apps use.
+     */
+    fun batteryByInterval(from: Long, screenOffOnly: Boolean): List<BatteryUse> {
+        class Sample(val time: Long, val level: Float, val uah: Long, val charging: Boolean, val screenOn: Boolean, val intervalMs: Long)
+        val samples = readableDatabase.rawQuery(
+            "SELECT time, level, charge_uah, charging, screen_on, interval_ms FROM battery_log WHERE time >= $from ORDER BY time", null
+        ).use { c ->
+            buildList { while (c.moveToNext()) add(Sample(c.getLong(0), c.getFloat(1), c.getLong(2), c.getInt(3) == 1, c.getInt(4) == 1, c.getLong(5))) }
+        }
+        val hours = HashMap<Int, Double>()
+        val used = HashMap<Int, Double>()
+        for (k in 1 until samples.size) {
+            val a = samples[k - 1]
+            val b = samples[k]
+            val dt = b.time - a.time
+            // Gaps (recording stopped, phone off) and charging don't count.
+            if (dt <= 0 || dt > maxOf(15 * 60_000L, a.intervalMs * 5 / 2) || a.charging || b.charging) continue
+            if (screenOffOnly && (a.screenOn || b.screenOn)) continue
+            // The charge counter is far finer than the whole-percent level, when the phone has one.
+            val drop = if (a.uah > 0 && b.uah > 0 && a.level > 0) {
+                (a.uah - b.uah) / (a.uah / (a.level / 100.0)) * 100.0
+            } else {
+                (a.level - b.level).toDouble()
+            }
+            if (drop < 0) continue
+            val sec = ((a.intervalMs + 500) / 1000).toInt().coerceAtLeast(1)
+            hours[sec] = (hours[sec] ?: 0.0) + dt / 3_600_000.0
+            used[sec] = (used[sec] ?: 0.0) + drop
+        }
+        return hours.keys.sorted().map { BatteryUse(it, hours.getValue(it), used[it] ?: 0.0) }
+    }
+
     // ---- Trips ----
 
     /** Points not yet looked at by the trip detector, oldest first. */
@@ -674,6 +744,66 @@ class PointStore private constructor(context: Context) :
         }
         changed()
         return DeleteResult(days, remoteIds)
+    }
+
+    /**
+     * Makes the dots from [start] to [end] (inclusive) a trip of their own, travelled by [mode], as picked on the
+     * Timeline. It can cover a stay, or parts of other trips: those are trimmed, and a trip it lands in the
+     * middle of is split in two around it. Returns the edited days and remote ids of shared routes removed.
+     */
+    fun addTrip(start: Long, end: Long, mode: TravelMode): DeleteResult {
+        if (end <= start) return DeleteResult(emptySet(), emptyList())
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        db.beginTransaction()
+        try {
+            db.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM points WHERE time >= $start AND time <= $end", null)
+                .use { c -> while (c.moveToNext()) days += c.getString(0) }
+            val touched = db.rawQuery("SELECT DISTINCT trip_id FROM points WHERE time >= $start AND time <= $end AND trip_id > 0", null)
+                .use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
+            val refresh = touched.toMutableList()
+            for (id in touched) {
+                // A trip with dots on both sides of the new one carries on after it as a trip of its own.
+                val before = long("SELECT COUNT(*) FROM points WHERE trip_id = $id AND time < $start")
+                val after = long("SELECT COUNT(*) FROM points WHERE trip_id = $id AND time > $end")
+                if (before == 0L || after == 0L) continue
+                val old = trip(id) ?: continue
+                val rest = insertTripRow(db, old.mode, old.inferredMode, old.confidence, old.needsReview)
+                db.execSQL("UPDATE points SET trip_id = $rest WHERE trip_id = $id AND time > $end")
+                refresh += rest
+            }
+            val created = insertTripRow(db, mode, mode, 1f, needsReview = false)
+            db.execSQL("UPDATE points SET trip_id = $created, mode = ${mode.id} WHERE time >= $start AND time <= $end")
+            refresh += created
+            for (id in refresh) refreshTrip(db, id, remoteIds)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
+
+    /** A new, empty trip row; [refreshTrip] fills in its times and ends once it has dots. */
+    private fun insertTripRow(db: SQLiteDatabase, mode: TravelMode, inferred: TravelMode, confidence: Float, needsReview: Boolean): Long =
+        db.insert("trips", null, ContentValues().apply {
+            put("start_time", 0L)
+            put("end_time", 0L)
+            put("distance_m", 0.0)
+            put("mode", mode.id)
+            put("inferred_mode", inferred.id)
+            put("confidence", confidence)
+            put("needs_review", if (needsReview) 1 else 0)
+            put("start_lat", 0.0)
+            put("start_lon", 0.0)
+            put("end_lat", 0.0)
+            put("end_lon", 0.0)
+        })
+
+    /** Changes the travel mode of several trips at once (picked together on the Timeline). */
+    fun setTripModes(tripIds: Collection<Long>, mode: TravelMode) {
+        tripIds.forEach { setTripMode(it, mode) }
     }
 
     /** Recomputes a trip's times, distance and ends from its dots, or removes it if fewer than two are left. */

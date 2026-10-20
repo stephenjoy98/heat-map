@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.19.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.20.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -66,9 +66,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,
   `BootReceiver`. Manual interval slider is 15 s … 1 day. Fixes worse than `accuracyLimitM` (100 m high
   accuracy / 500 m) are skipped.
-- `data/`: `PointStore` (SQLite, **schema v7**: points incl. altitude, trips, places, friend_routes,
+- `data/`: `PointStore` (SQLite, **schema v8**: points incl. altitude, trips, places, friend_routes,
   trip_paths, road_questions, deleted_points (soft delete), explored_cells/explored_days/explored_state
-  (km-explored cache)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,
+  (km-explored cache), battery_log (v8: sample/min while recording via `LocationTickerService.sampleBattery`;
+  `batteryByInterval` → `BatterySection` in Settings)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,
   `TravelMode` — **a class, not an enum** since 2.18.0: built-ins as companion vals (ids 0–5), user-added
   modes from id 100 (`TravelMode.added`, Prefs "custom_modes"/"next_mode_id"; never reuse ids), deleted
   built-ins in "deleted_modes" (Walking/Cycling/Driving/Other can't be deleted); equality by id; `entries`,
@@ -102,7 +103,9 @@ travel stats, Insights (AI write-ups), backup and friends.
   for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
   the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back
-  same-mode trips (long-press expands; `flattened()` for lookups); `TripQuestionsCard` and
+  same-mode trips (long-press expands; `flattened()` for lookups); multi-select (`picked` set,
+  `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null →
+  `PointStore.addTrip`, which splits a trip it lands inside); `TripQuestionsCard` and
   `RoadQuestionsCard` (TripQuestions.kt) sit at the top of the list — questions moved off Insights in 2.19.0;
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton, ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain

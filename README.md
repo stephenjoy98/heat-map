@@ -94,6 +94,9 @@ up to your Google account, and lets you compare explored areas with friends.
   them.
 - **Grouped trips**: back-to-back trips in the same mode show as one entry; long-press it (or tap the arrow)
   to see and edit each part, or change the mode of all parts from its menu.
+- **Select several trips** (long-press › Select) and change their mode together.
+- **Add a trip** (+ on a day, or long-press a stay › Add a trip here): pick its first and last dot with a
+  slider and its mode; overlapping trips are trimmed or split around it.
 - **Long-press a trip** to change how you travelled (walking, cycling, driving, car share, transit) or
   **Change times**: a start–end slider over the day's dots, like Edit dots, picks the trip's first and last
   dot. The trips or stays before and after it grow or shrink to match.
@@ -101,6 +104,8 @@ up to your Google account, and lets you compare explored areas with friends.
   under it until you stop recording) and switch between automatic and a set interval.
 - **Sub-modes**: CarPool, RideShare › Bike and Car, PublicTransit › SkyTrain, Bus and SeaBus come
   suggested; add your own with "Part of". Train and boat modes aren't snapped to roads.
+- **Battery** in Settings: battery used per hour at each recording interval (last 7 or 30 days, screen off
+  or all), measured on battery power while recording.
 - **Travel modes** in Settings: pick each mode's colour with a colour picker or a hex code (reset one or all
   to the defaults), **add your own modes** (a name, a colour, and whether it travels on foot, by bike, by car
   or by public transport, which decides how its trips are matched to roads), and **delete** modes you don't

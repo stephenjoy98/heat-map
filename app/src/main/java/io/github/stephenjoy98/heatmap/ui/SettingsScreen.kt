@@ -207,6 +207,8 @@ fun SettingsScreen(
                 }
             }
 
+            BatterySection()
+
             Section("Appearance") {
                 Column(Modifier.padding(16.dp)) {
                     Text("Theme", style = MaterialTheme.typography.labelLarge)
@@ -440,7 +442,7 @@ private fun CustomInterval(intervalSec: Int, onChange: (Int) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+internal fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
         options.forEachIndexed { i, (value, label) ->
             SegmentedButton(

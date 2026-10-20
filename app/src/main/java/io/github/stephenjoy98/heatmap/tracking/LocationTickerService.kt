@@ -8,6 +8,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
+import android.os.BatteryManager
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
@@ -51,6 +54,7 @@ class LocationTickerService : Service() {
     private var maxAccuracyM = 100f
     private var lastSavedAt = 0L
     private var lastDetectedAt = 0L
+    private var lastBatteryAt = 0L
 
     // Automatic interval: recent fixes, and since when they've stayed in one spot. Worker thread only.
     private val recent = ArrayDeque<Location>()
@@ -136,6 +140,19 @@ class LocationTickerService : Service() {
         fused.requestLocationUpdates(request, callback, worker.looper)
     }
 
+    private fun sampleBattery(now: Long) {
+        val status = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return
+        val level = status.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = status.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        if (level < 0 || scale <= 0) return
+        val charging = status.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        val counter = getSystemService(BatteryManager::class.java)
+            ?.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
+            ?.takeIf { it > 0 && it != Long.MIN_VALUE } ?: 0L
+        val screenOn = getSystemService(PowerManager::class.java)?.isInteractive ?: true
+        store.logBattery(now, level * 100f / scale, counter, charging, screenOn, intervalMs)
+    }
+
     private fun record(location: Location) {
         if (location.hasAccuracy() && location.accuracy > maxAccuracyM) return
         // The fused provider can deliver early (e.g. when another app asks for location); keep the set pace.
@@ -155,6 +172,12 @@ class LocationTickerService : Service() {
             )
         )
         lastSavedAt = location.time
+        // About once a minute, note the battery, so Settings can show what each interval uses.
+        val now = System.currentTimeMillis()
+        if (now - lastBatteryAt >= 60_000L) {
+            lastBatteryAt = now
+            runCatching { sampleBattery(now) }
+        }
 
         if (Prefs.autoInterval.value) reconsider(ActivityTracker.current, location)
 

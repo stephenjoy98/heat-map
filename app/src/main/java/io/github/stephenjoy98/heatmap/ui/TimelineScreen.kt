@@ -113,6 +113,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.mutableStateMapOf
 import io.github.stephenjoy98.heatmap.timeline.flattened
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.key
+import androidx.compose.foundation.verticalScroll
 import kotlin.math.ln
 import kotlin.math.min
 
@@ -166,7 +171,16 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     var retiming by remember { mutableStateOf<Trip?>(null) }
     val retime = remember { DotEditState(anchor) }
     var retimeLoading by remember { mutableStateOf(false) }
-    val mapEditing = editing || retiming != null
+    // Adding a trip: the same slider over the day's dots, starting from this stretch (start to end times).
+    var adding by remember { mutableStateOf<LongRange?>(null) }
+    val rangeEditing = retiming != null || adding != null
+    val mapEditing = editing || rangeEditing
+    // Picking several trips to change their mode together; null when not picking.
+    var picked by remember { mutableStateOf<Set<Long>?>(null) }
+    val select = { ids: List<Long>, on: Boolean ->
+        val now = picked.orEmpty()
+        picked = if (on) now + ids else now - ids.toSet()
+    }
 
     val layers = remember(data, dark, mapEditing) {
         val d = data ?: return@remember emptyList()
@@ -174,20 +188,31 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         listOf(MapLayer("timeline-${d.period}-$colors", TimelineTiles(d.routes, tilePx, casing.toArgb()), alpha = if (mapEditing) 0.35f else 1f))
     }
 
-    LaunchedEffect(retiming) {
-        val trip = retiming ?: return@LaunchedEffect
+    LaunchedEffect(retiming, adding) {
+        val window = retiming?.let { it.startTime..it.endTime } ?: adding ?: return@LaunchedEffect
         retimeLoading = true
-        val from = minOf(period.fromMs, trip.startTime)
-        val to = maxOf(period.toMs, trip.endTime + 1)
+        val from = minOf(period.fromMs, window.first)
+        val to = maxOf(period.toMs, window.last + 1)
         val pts = withContext(Dispatchers.IO) { store.editablePoints(from, to) }
         retime.load(pts)
-        val first = pts.indexOfFirst { it.time >= trip.startTime }.coerceAtLeast(0)
-        val last = pts.indexOfLast { it.time <= trip.endTime }.coerceAtLeast(first)
-        if (pts.isNotEmpty()) retime.range = first..last.coerceAtMost(pts.size - 1)
+        if (pts.isNotEmpty()) {
+            var first = pts.indexOfFirst { it.time >= window.first }
+            var last = pts.indexOfLast { it.time <= window.last }
+            if (first < 0 || last < first) {
+                // Nothing in the stretch: start from the middle of the day's dots.
+                first = pts.size * 2 / 5
+                last = (pts.size * 3 / 5).coerceAtLeast(minOf(first + 1, pts.size - 1))
+            }
+            retime.range = first..last.coerceAtMost(pts.size - 1)
+        }
         retimeLoading = false
         frameDots(camera, retime.target)
     }
-    BackHandler(enabled = retiming != null && !LocalCovered.current) { retiming = null }
+    BackHandler(enabled = rangeEditing && !LocalCovered.current) {
+        retiming = null
+        adding = null
+    }
+    BackHandler(enabled = picked != null && !LocalCovered.current) { picked = null }
     val changeMode = { trip: Trip, mode: TravelMode ->
         scope.launch {
             withContext(Dispatchers.IO) { store.setTripMode(trip.id, mode) }
@@ -249,12 +274,19 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 Text(
                     when {
                         retiming != null -> "Change times"
+                        adding != null -> "Add a trip"
+                        picked != null -> "${picked!!.size} selected"
                         editing -> "Edit dots"
                         else -> "Timeline"
                     }
                 )
             },
             actions = {
+                if (!mapEditing && scale == TimelineScale.DAY && picked == null) {
+                    Tip("Add a trip on this day") {
+                        IconButton(onClick = { adding = period.fromMs..period.fromMs }) { Icon(Icons.Filled.Add, contentDescription = "Add a trip") }
+                    }
+                }
                 if (!mapEditing) {
                     Tip("Edit or delete dots for this day") {
                         IconButton(onClick = {
@@ -311,7 +343,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 onMapClick = when {
                     editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
                     // Tapping a dot moves whichever end of the trip is nearer to it.
-                    retiming != null -> { lat, lon ->
+                    rangeEditing -> { lat, lon ->
                         nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
                             val r = retime.range
                             retime.range = if (abs(i - r.first) <= abs(i - r.last)) i..r.last else r.first..i
@@ -326,7 +358,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 // Map type and 3D buildings, right where you're editing.
                 LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
                 SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
-            } else if (retiming != null) {
+            } else if (rangeEditing) {
                 DotsOverlay(camera, retime, Modifier.fillMaxSize())
                 LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
             } else if (data == null) {
@@ -367,22 +399,32 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     onClose = stopEditing,
                 )
             }
-        } else if (retiming != null) {
-            val trip = retiming!!
+        } else if (rangeEditing) {
+            val trip = retiming
             Box(Modifier.padding(12.dp)) {
-                RetimePanel(
-                    trip = trip,
-                    state = retime,
-                    loading = retimeLoading,
-                    entries = data?.entries.orEmpty().flattened(),
-                    onCancel = { retiming = null },
-                    onSave = { start, end ->
-                        scope.launch {
-                            afterDotEdit(context, withContext(Dispatchers.IO) { store.retimeTrip(trip.id, start, end) })
+                key(trip?.id, adding) {
+                    RetimePanel(
+                        trip = trip,
+                        state = retime,
+                        loading = retimeLoading,
+                        entries = data?.entries.orEmpty(),
+                        onCancel = {
                             retiming = null
-                        }
-                    },
-                )
+                            adding = null
+                        },
+                        onSave = { start, end, mode ->
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    if (trip != null) store.retimeTrip(trip.id, start, end)
+                                    else store.addTrip(start, end, mode ?: TravelMode.UNKNOWN)
+                                }
+                                afterDotEdit(context, result)
+                                retiming = null
+                                adding = null
+                            }
+                        },
+                    )
+                }
             }
         } else {
             val d = data
@@ -430,8 +472,14 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                     onClick = { entry.box?.let { frame(camera, it) } },
                                     onMode = { changeMode(entry.trip, it) },
                                     onRetime = { retiming = entry.trip },
+                                    selection = picked,
+                                    onSelect = select,
                                 )
-                                is DayEntry.Stay -> StayRow(entry) { camera.animateTo(entry.lat, entry.lon, 16f) }
+                                is DayEntry.Stay -> StayRow(
+                                    entry = entry,
+                                    onClick = { camera.animateTo(entry.lat, entry.lon, 16f) },
+                                    onAddTrip = { adding = (entry.start + 1)..(entry.end - 1) },
+                                )
                                 is DayEntry.Group -> GroupRow(
                                     group = entry,
                                     expanded = expanded[entry.start] == true,
@@ -441,6 +489,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                     onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
                                     onSectionMode = { mv, m -> changeMode(mv.trip, m) },
                                     onSectionRetime = { mv -> retiming = mv.trip },
+                                    selection = picked,
+                                    onSelect = select,
                                 )
                             }
                         }
@@ -469,6 +519,21 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         }
                     }
                 }
+            }
+            picked?.let { ids ->
+                SelectionBar(
+                    count = ids.size,
+                    onMode = { mode ->
+                        val trips = data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }
+                        scope.launch {
+                            withContext(Dispatchers.IO) { store.setTripModes(ids, mode) }
+                            val days = trips.map { Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString() }.toSet()
+                            afterDotEdit(context, DeleteResult(days, emptyList()))
+                        }
+                        picked = null
+                    },
+                    onCancel = { picked = null },
+                )
             }
         }
     }
@@ -550,6 +615,7 @@ private fun TimelineRow(
     color: Color,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    picked: Boolean? = null,
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
@@ -557,6 +623,7 @@ private fun TimelineRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
+            .then(if (picked == true) Modifier.background(MaterialTheme.colorScheme.secondaryContainer) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
             .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -568,12 +635,15 @@ private fun TimelineRow(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).padding(vertical = 4.dp)) { content() }
         trailing?.let { Box(Modifier.align(Alignment.CenterVertically)) { it() } }
+        // While picking trips: a tick box (the row itself handles the tap).
+        picked?.let { Checkbox(checked = it, onCheckedChange = null, modifier = Modifier.align(Alignment.CenterVertically).padding(horizontal = 8.dp)) }
     }
 }
 
 /**
  * Back-to-back trips in the same mode, as one row. Long-press (or the arrow) opens it up into its parts, each
- * of which can be edited like any trip; the menu changes the mode of all of them at once.
+ * of which can be edited like any trip; the menu changes the mode of all of them at once. While picking trips
+ * ([selection] non-null), tapping the row picks or unpicks all its parts.
  */
 @Composable
 private fun GroupRow(
@@ -585,22 +655,29 @@ private fun GroupRow(
     onSectionClick: (DayEntry.Move) -> Unit,
     onSectionMode: (DayEntry.Move, TravelMode) -> Unit,
     onSectionRetime: (DayEntry.Move) -> Unit,
+    selection: Set<Long>?,
+    onSelect: (List<Long>, Boolean) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
+    val ids = group.moves.map { it.trip.id }
+    val allPicked = selection != null && selection.containsAll(ids)
     Column {
         Box {
             TimelineRow(
                 color = Color(group.mode.color),
-                onClick = onClick,
+                onClick = { if (selection != null) onSelect(ids, !allPicked) else onClick() },
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     onToggle()
                 },
+                picked = if (selection != null) allPicked else null,
                 trailing = {
                     Row {
-                        Tip("Change all ${group.moves.size} parts") {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Change all parts") }
+                        if (selection == null) {
+                            Tip("Change all ${group.moves.size} parts") {
+                                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Change all parts") }
+                            }
                         }
                         Tip(if (expanded) "Hide the parts" else "Show the parts") {
                             IconButton(onClick = onToggle) {
@@ -632,6 +709,16 @@ private fun GroupRow(
                     menu = false
                     if (m != group.mode || group.needsReview) onModeAll(m)
                 }
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                DropdownMenuItem(
+                    text = { Text("Select parts…") },
+                    leadingIcon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
+                    onClick = {
+                        menu = false
+                        if (!expanded) onToggle()
+                        onSelect(emptyList(), true)
+                    },
+                )
             }
         }
         AnimatedVisibility(visible = expanded) {
@@ -642,6 +729,8 @@ private fun GroupRow(
                         onClick = { onSectionClick(mv) },
                         onMode = { onSectionMode(mv, it) },
                         onRetime = { onSectionRetime(mv) },
+                        selection = selection,
+                        onSelect = onSelect,
                     )
                 }
             }
@@ -649,22 +738,38 @@ private fun GroupRow(
     }
 }
 
-/** A trip. Long-press it to change how it was travelled, or its start and end. */
+/**
+ * A trip. Long-press it to change how it was travelled or its start and end, or to start picking several
+ * trips. While picking ([selection] non-null), a tap picks or unpicks it.
+ */
 @Composable
-private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit, onMode: (TravelMode) -> Unit, onRetime: () -> Unit) {
+private fun MoveRow(
+    entry: DayEntry.Move,
+    onClick: () -> Unit,
+    onMode: (TravelMode) -> Unit,
+    onRetime: () -> Unit,
+    selection: Set<Long>?,
+    onSelect: (List<Long>, Boolean) -> Unit,
+) {
     val t = entry.trip
     var menu by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
+    val picked = selection?.contains(t.id)
     Box {
         TimelineRow(
             color = Color(t.mode.color),
-            onClick = onClick,
+            onClick = { if (picked != null) onSelect(listOf(t.id), !picked) else onClick() },
             onLongClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                menu = true
+                if (picked != null) {
+                    onSelect(listOf(t.id), !picked)
+                } else {
+                    menu = true
+                }
             },
+            picked = picked,
         ) {
-            Text("${t.mode.label} · ${Insights.km(t.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
+            Text("${t.mode.fullLabel} · ${Insights.km(t.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
             Text(
                 "${timeFormat.format(Date(t.startTime))} – ${timeFormat.format(Date(t.endTime))} · ${duration(t.endTime - t.startTime)}" +
                     (if (t.needsReview) " · needs your answer (long-press, or see above)" else ""),
@@ -692,6 +797,14 @@ private fun MoveRow(entry: DayEntry.Move, onClick: () -> Unit, onMode: (TravelMo
                     onRetime()
                 },
             )
+            DropdownMenuItem(
+                text = { Text("Select…") },
+                leadingIcon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
+                onClick = {
+                    menu = false
+                    onSelect(listOf(t.id), true)
+                },
+            )
         }
     }
 }
@@ -714,20 +827,22 @@ private fun entryLabel(e: DayEntry): String = when (e) {
 }
 
 /**
- * Changes when a trip started and ended, in the style of Edit dots: the slider picks the first and last dot
- * of the trip. The sections before and after it grow or shrink to match.
+ * Picks a stretch of the day's dots with a start–end slider, in the style of Edit dots: either the new start
+ * and end of [trip] (the sections before and after it grow or shrink to match), or, with [trip] null, a new
+ * trip to add, in the mode picked here (it can go between other sections, or before or after them all).
  */
 @Composable
 private fun RetimePanel(
-    trip: Trip,
+    trip: Trip?,
     state: DotEditState,
     loading: Boolean,
     entries: List<DayEntry>,
     onCancel: () -> Unit,
-    onSave: (Long, Long) -> Unit,
+    onSave: (Long, Long, TravelMode?) -> Unit,
 ) {
     val pts = state.points
     var saving by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf<TravelMode?>(null) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -735,15 +850,19 @@ private fun RetimePanel(
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Tip("Cancel") { IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Cancel") } }
-                Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
-                Spacer(Modifier.width(8.dp))
-                Text("${trip.mode.label} trip", style = MaterialTheme.typography.titleMedium)
+                if (trip != null) {
+                    Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Text("${trip.mode.fullLabel} trip", style = MaterialTheme.typography.titleMedium)
+                } else {
+                    Text("New trip", style = MaterialTheme.typography.titleMedium)
+                }
             }
             if (loading || pts.isEmpty()) {
-                Hint(if (loading) "Loading dots…" else "No dots for this trip.")
+                Hint(if (loading) "Loading dots…" else if (trip != null) "No dots for this trip." else "No dots on this day.")
             } else {
                 val first = pts[state.range.first]
                 val last = pts[state.range.last]
@@ -762,12 +881,20 @@ private fun RetimePanel(
                         modifier = Modifier.padding(horizontal = 8.dp),
                     )
                 }
-                val i = entries.indexOfFirst { it is DayEntry.Move && it.trip.id == trip.id }
-                val before = entries.getOrNull(i - 1)?.takeIf { i > 0 }
-                val after = entries.getOrNull(i + 1)?.takeIf { i >= 0 }
-                val changes = buildList {
-                    if (before != null) add("${entryLabel(before)} now ends at ${timeFormat.format(Date(first.time))}")
-                    if (after != null) add("${entryLabel(after)} now starts at ${timeFormat.format(Date(last.time))}")
+                val flat = entries.flattened()
+                val changes = if (trip != null) {
+                    val i = flat.indexOfFirst { it is DayEntry.Move && it.trip.id == trip.id }
+                    val before = flat.getOrNull(i - 1)?.takeIf { i > 0 }
+                    val after = flat.getOrNull(i + 1)?.takeIf { i >= 0 }
+                    buildList {
+                        if (before != null) add("${entryLabel(before)} now ends at ${timeFormat.format(Date(first.time))}")
+                        if (after != null) add("${entryLabel(after)} now starts at ${timeFormat.format(Date(last.time))}")
+                    }
+                } else {
+                    // Which sections the new trip takes dots from.
+                    val covered = flat.filter { it.end >= first.time && it.start <= last.time }
+                    if (covered.isEmpty()) listOf("Nothing else is recorded at this time.")
+                    else listOf("Takes over from: " + covered.joinToString { entryLabel(it) } + ". Trips it lands in the middle of are split around it.")
                 }
                 if (changes.isNotEmpty()) {
                     Text(
@@ -776,6 +903,14 @@ private fun RetimePanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
+                }
+                if (trip == null) {
+                    Text(
+                        "How did you travel?",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
+                    )
+                    ModeChips(selected = mode, onPick = { mode = it }, modifier = Modifier.padding(horizontal = 12.dp))
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -786,32 +921,86 @@ private fun RetimePanel(
                     )
                     TextButton(onClick = onCancel) { Text("Cancel") }
                     Spacer(Modifier.width(4.dp))
+                    val changed = trip == null || first.time != trip.startTime || last.time != trip.endTime
                     Button(
                         onClick = {
                             saving = true
-                            onSave(first.time, last.time)
+                            onSave(first.time, last.time, mode)
                         },
-                        enabled = !saving && count >= 2 && (first.time != trip.startTime || last.time != trip.endTime),
-                    ) { Text("Save") }
+                        enabled = !saving && count >= 2 && changed && (trip != null || mode != null),
+                    ) { Text(if (trip == null) "Add" else "Save") }
                 }
             }
         }
     }
 }
 
+/** While picking trips: how many are picked, and a menu to change all of their modes at once. */
 @Composable
-private fun StayRow(entry: DayEntry.Stay, onClick: () -> Unit) {
-    TimelineRow(MaterialTheme.colorScheme.outline, onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(4.dp))
-            Text(entry.place ?: "Stayed here", style = MaterialTheme.typography.titleSmall)
+private fun SelectionBar(count: Int, onMode: (TravelMode) -> Unit, onCancel: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+    ) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Tip("Stop selecting") { IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Stop selecting") } }
+            Text(
+                if (count == 0) "Tap trips to select them" else if (count == 1) "1 trip selected" else "$count trips selected",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            Box {
+                Button(onClick = { menu = true }, enabled = count > 0) { Text("Change mode") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    ModeMenuItems(current = null) { m ->
+                        menu = false
+                        onMode(m)
+                    }
+                }
+            }
         }
-        Text(
-            "${timeFormat.format(Date(entry.start))} – ${timeFormat.format(Date(entry.end))} · ${duration(entry.end - entry.start)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    }
+}
+
+/** A stay between trips. Long-press it to add a trip in its place (if you were moving after all). */
+@Composable
+private fun StayRow(entry: DayEntry.Stay, onClick: () -> Unit, onAddTrip: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box {
+        TimelineRow(
+            color = MaterialTheme.colorScheme.outline,
+            onClick = onClick,
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                menu = true
+            },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(4.dp))
+                Text(entry.place ?: "Stayed here", style = MaterialTheme.typography.titleSmall)
+            }
+            Text(
+                "${timeFormat.format(Date(entry.start))} – ${timeFormat.format(Date(entry.end))} · ${duration(entry.end - entry.start)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, offset = DpOffset(48.dp, 0.dp)) {
+            DropdownMenuItem(
+                text = { Text("Add a trip here") },
+                leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                onClick = {
+                    menu = false
+                    onAddTrip()
+                },
+            )
+        }
     }
 }
 

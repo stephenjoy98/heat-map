@@ -12,6 +12,18 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-10-20
+
+### Added
+- Select several trips on the Timeline and change their mode together: long-press a trip and choose
+  Select, then tap the others (parts of grouped trips too).
+- Add a trip yourself: the + button on a day, or long-press a stay and choose "Add a trip here". Pick its
+  first and last dot with the start and end slider (or tap dots), and how you travelled. It can go between
+  other sections or before or after them all; trips it overlaps are trimmed, and one it lands in the middle
+  of is split around it.
+- Battery in Settings: how much battery recording used per hour at each recording interval, over the last
+  7 or 30 days, with the screen off (to leave out most other use) or for all the time recording.
+
 ## [2.19.0] - 2026-10-20
 
 ### Added
