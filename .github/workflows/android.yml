@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Writing a release (and its tag) needs write access to the repository's contents.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
 
@@ -42,3 +45,30 @@ jobs:
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
+
+      # On main, publish the build as a GitHub release for its version: tag vX.Y.Z, that version's CHANGELOG
+      # entry as the notes, and the APKs attached. Pushing again without a version bump refreshes the same
+      # release's notes and APKs instead of making a new one.
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          printf '\n---\nInstall **location-ticker-%s.apk** (signed release build). The debug build is for testing.\n' "$VERSION" >> notes.md
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/location-ticker-$VERSION.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/location-ticker-$VERSION-debug.apk"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release edit "$tag" --title "Location Ticker $VERSION" --notes-file notes.md
+            gh release upload "$tag" dist/*.apk --clobber
+          else
+            gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --title "Location Ticker $VERSION" --notes-file notes.md --latest
+          fi

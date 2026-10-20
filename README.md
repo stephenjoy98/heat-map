@@ -167,9 +167,13 @@ up to your Google account, and lets you compare explored areas with friends.
 
 ## Install
 
-Every push builds the APKs in GitHub Actions (**Actions → Android build → artifact
-`location-ticker-apk`**). Install `app-release.apk` on Android 8.0+. You'll need to allow installing
-from unknown sources.
+Download the latest APK from the repository's **[Releases](https://github.com/stephenjoy98/heat-map/releases)**
+page: each version has its own release (tag `vX.Y.Z`) with its changelog and `location-ticker-X.Y.Z.apk`.
+Install it on Android 8.0+; you'll need to allow installing from unknown sources.
+
+Every push to `main` builds the APKs in GitHub Actions and publishes (or refreshes) the release for the
+version in `gradle.properties`. Builds of other branches are under **Actions → Android build** as the
+artifact `location-ticker-<version>-apk`.
 
 Without any setup the app works fully on OpenStreetMap: recording, heatmap, travel modes, Insights,
 steps, on-device AI and statistics. Sign-in, backup, friends and cloud AI need Firebase (below).
