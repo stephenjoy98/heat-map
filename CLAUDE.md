@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.17.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.18.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -69,8 +69,14 @@ travel stats, Insights (AI write-ups), backup and friends.
 - `data/`: `PointStore` (SQLite, **schema v7**: points incl. altitude, trips, places, friend_routes,
   trip_paths, road_questions, deleted_points (soft delete), explored_cells/explored_days/explored_state
   (km-explored cache)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,
-  `TravelMode` (`defaultColor`; `color` reads `ModeColors`, Compose-state overrides saved as Prefs
-  "mode_colors"; Settings → Travel mode colours via `ModeColorsSection` + `ColorPickerDialog`),
+  `TravelMode` — **a class, not an enum** since 2.18.0: built-ins as companion vals (ids 0–5), user-added
+  modes from id 100 (`TravelMode.added`, Prefs "custom_modes"/"next_mode_id"; never reuse ids), deleted
+  built-ins in "deleted_modes" (Walking/Cycling/Driving/Other can't be deleted); equality by id; `entries`,
+  `choosable`, `vehicles` are computed from Compose state; `kind` (FOOT/BIKE/CAR/PUBLIC) drives Valhalla
+  costing and vehicle checks. `color` = `ModeColors` override (built-ins, Prefs "mode_colors") or
+  `defaultColor`. Deleting a mode runs `PointStore.replaceMode` (trips → Other, needs_review). Backups
+  write a `backup/modes` doc; restore merges it first. UI: `TravelModesSection` + `ColorPickerDialog`.
+  When checking "all modes shown" use `containsAll(TravelMode.entries)`, not sizes.
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
   `Route3d` (3D route geometry), `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
 - `map/`: `VectorMapSupport.kt` (`VectorMaps`: OpenFreeMap Positron style, dark recolour, terrain hillshade

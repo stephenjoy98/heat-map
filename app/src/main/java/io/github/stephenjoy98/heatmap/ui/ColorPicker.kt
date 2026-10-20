@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 // A spread of Material colours to start from.
-private val SWATCHES = listOf(
+internal val SWATCHES = listOf(
     0xFFE53935, 0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1, 0xFF3949AB, 0xFF1E88E5,
     0xFF039BE5, 0xFF00ACC1, 0xFF00897B, 0xFF43A047, 0xFF7CB342, 0xFFC0CA33,
     0xFFFDD835, 0xFFFFB300, 0xFFFB8C00, 0xFFF4511E, 0xFF6D4C41, 0xFF757575,

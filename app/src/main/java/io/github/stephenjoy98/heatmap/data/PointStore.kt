@@ -703,6 +703,42 @@ class PointStore private constructor(context: Context) :
         db.execSQL("DELETE FROM road_questions WHERE trip_id = $tripId")
     }
 
+    /** Forgets the road matches of a mode's trips, so they're matched again (after its kind changed). */
+    fun clearRoadMatches(mode: TravelMode) {
+        val db = writableDatabase
+        db.execSQL("DELETE FROM road_questions WHERE trip_id IN (SELECT id FROM trips WHERE mode = ${mode.id})")
+        db.execSQL("DELETE FROM trip_paths WHERE trip_id IN (SELECT id FROM trips WHERE mode = ${mode.id})")
+        changed()
+    }
+
+    /** How many trips were travelled by [mode]. */
+    fun tripCountForMode(mode: TravelMode): Int = long("SELECT COUNT(*) FROM trips WHERE mode = ${mode.id}").toInt()
+
+    /**
+     * Moves every trip and dot of a travel mode that's being deleted to Other, and asks about those trips again
+     * on the Insights page. Returns the local days whose dots changed, for backups.
+     */
+    fun replaceMode(mode: TravelMode): Set<String> {
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val other = TravelMode.UNKNOWN.id
+        db.beginTransaction()
+        try {
+            db.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM points WHERE mode = ${mode.id}", null)
+                .use { c -> while (c.moveToNext()) days += c.getString(0) }
+            db.execSQL("DELETE FROM trip_paths WHERE trip_id IN (SELECT id FROM trips WHERE mode = ${mode.id})")
+            db.execSQL("DELETE FROM road_questions WHERE trip_id IN (SELECT id FROM trips WHERE mode = ${mode.id})")
+            db.execSQL("UPDATE trips SET inferred_mode = $other WHERE inferred_mode = ${mode.id}")
+            db.execSQL("UPDATE trips SET mode = $other, needs_review = 1, uploaded = 0 WHERE mode = ${mode.id}")
+            db.execSQL("UPDATE points SET mode = $other WHERE mode = ${mode.id}")
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return days
+    }
+
     fun tripsNeedingReview(): List<Trip> = trips("WHERE needs_review = 1 ORDER BY start_time DESC")
 
     fun tripsNotUploaded(limit: Int = 400): List<Trip> = trips("WHERE uploaded = 0 ORDER BY start_time LIMIT $limit")
@@ -849,7 +885,7 @@ class PointStore private constructor(context: Context) :
 
     /** Road-snapped trip shapes overlapping [box], for travel modes being shown. */
     fun snappedPathsIn(box: GeoBox, modes: Set<TravelMode>): List<String> {
-        val modeFilter = if (modes.size >= TravelMode.entries.size) "" else
+        val modeFilter = if (modes.containsAll(TravelMode.entries)) "" else
             " AND t.mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
         return readableDatabase.rawQuery(
             """SELECT p.poly FROM trip_paths p JOIN trips t ON t.id = p.trip_id
@@ -1212,7 +1248,7 @@ class PointStore private constructor(context: Context) :
         "lat BETWEEN ${box.south} AND ${box.north} AND lon BETWEEN ${box.west} AND ${box.east}"
 
     private fun modeClause(modes: Set<TravelMode>): String =
-        if (modes.size >= TravelMode.entries.size) "" else " AND mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
+        if (modes.containsAll(TravelMode.entries)) "" else " AND mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
 
     companion object {
         // Trips closer together than this have no stay between them (the Timeline shows stays from 5 min).

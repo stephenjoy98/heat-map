@@ -12,6 +12,19 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-10-20
+
+### Added
+- Add your own travel modes in Settings → Travel modes: give each a name, a colour, and whether it travels
+  on foot, by bike, by car or by public transport (used to match its trips to roads). They show up
+  everywhere the built-in modes do: the Timeline, Insights questions and the map filters.
+- Delete travel modes you don't use. Their trips become Other and Insights asks how you travelled them.
+  Walking, Cycling, Driving and Other always stay; Car share and Transit can be added back.
+- Backups include the travel modes you added, so restoring on another phone brings them back.
+
+### Changed
+- Settings → Travel mode colours is now Travel modes.
+
 ## [2.17.0] - 2026-10-20
 
 ### Added

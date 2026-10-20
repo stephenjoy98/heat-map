@@ -175,7 +175,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 FilterButton(
                     open = filtersOpen,
-                    active = filter.size != TravelMode.entries.size,
+                    active = !filter.containsAll(TravelMode.entries),
                     onClick = { filtersOpen = !filtersOpen },
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
@@ -305,7 +305,7 @@ private fun FilterButton(open: Boolean, active: Boolean, onClick: () -> Unit, mo
 
 @Composable
 private fun ModeFilterRow(filter: Set<TravelMode>) {
-    val all = filter.size == TravelMode.entries.size
+    val all = filter.containsAll(TravelMode.entries)
     Row(
         Modifier
             .fillMaxWidth()

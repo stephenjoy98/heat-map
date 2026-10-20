@@ -110,6 +110,11 @@ object Prefs {
         _mapTheme.value = MapTheme.entries.byName(sp.getString("map_theme", null)) ?: MapTheme.DARK
         _units.value = UnitSystem.entries.byName(sp.getString("units", null)) ?: Units.defaultFor(Locale.getDefault())
         Units.system = _units.value
+        TravelMode.loadAdded(
+            sp.getString("custom_modes", null),
+            sp.getString("deleted_modes", null).orEmpty().split(',').mapNotNull { it.toIntOrNull() },
+            sp.getInt("next_mode_id", TravelMode.FIRST_CUSTOM_ID),
+        )
         ModeColors.replace(ModeColors.decode(sp.getString("mode_colors", null)))
         _modeFilter.value = sp.getStringSet("mode_filter", null)
             ?.mapNotNull { it.toIntOrNull()?.let(TravelMode::fromId) }?.toSet()
@@ -158,6 +163,58 @@ object Prefs {
         if (color == null || color == mode.defaultColor) colors.remove(mode) else colors[mode] = color
         ModeColors.replace(colors)
         sp.edit().putString("mode_colors", ModeColors.encode(colors)).apply()
+    }
+
+    private fun saveModes() {
+        sp.edit()
+            .putString("custom_modes", TravelMode.encodeAdded())
+            .putString("deleted_modes", TravelMode.deletedBuiltIns.joinToString(","))
+            .putInt("next_mode_id", TravelMode.nextId)
+            .apply()
+        ModeColors.bump()
+    }
+
+    /** Adds a travel mode. If the map shows every mode, it shows the new one too. */
+    fun addMode(label: String, color: Long, kind: TravelMode.Kind): TravelMode {
+        val showingAll = _modeFilter.value.containsAll(TravelMode.entries)
+        val mode = TravelMode.create(label, color, kind)
+        saveModes()
+        if (showingAll) setModeFilter(_modeFilter.value + mode)
+        return mode
+    }
+
+    fun editMode(mode: TravelMode, label: String, color: Long, kind: TravelMode.Kind) {
+        TravelMode.edit(mode, label, color, kind)
+        saveModes()
+    }
+
+    /**
+     * Removes a travel mode from the lists. Its trips should be moved to another mode first
+     * ([PointStore.replaceMode]). Built-in modes can be added back with [restoreMode].
+     */
+    fun deleteMode(mode: TravelMode) {
+        if (!mode.deletable) return
+        if (mode.builtIn) TravelMode.deletedBuiltIns += mode.id else TravelMode.added.remove(mode)
+        if (mode in ModeColors.custom) setModeColor(mode, null)
+        saveModes()
+        val filter = _modeFilter.value - mode
+        setModeFilter(filter.ifEmpty { TravelMode.entries.toSet() })
+    }
+
+    /** Adds the travel modes saved in a backup. */
+    fun mergeModes(added: String?, next: Int) {
+        val showingAll = _modeFilter.value.containsAll(TravelMode.entries)
+        TravelMode.merge(added, next)
+        saveModes()
+        setModeFilter(if (showingAll) TravelMode.entries.toSet() else _modeFilter.value)
+    }
+
+    /** Adds a deleted built-in mode back. */
+    fun restoreMode(mode: TravelMode) {
+        val showingAll = _modeFilter.value.containsAll(TravelMode.entries)
+        TravelMode.deletedBuiltIns.remove(mode.id)
+        saveModes()
+        if (showingAll) setModeFilter(_modeFilter.value + mode)
     }
 
     fun resetModeColors() {

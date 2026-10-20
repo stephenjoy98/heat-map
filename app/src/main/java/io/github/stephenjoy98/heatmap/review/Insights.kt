@@ -195,7 +195,7 @@ object StatsInsights {
                 TravelMode.DRIVE -> "driv" in q || " car" in q
                 TravelMode.RIDESHARE -> "share" in q || "uber" in q || "lyft" in q || "taxi" in q
                 TravelMode.TRANSIT -> "transit" in q || "bus" in q || "train" in q || "metro" in q
-                else -> false
+                else -> m.label.lowercase() in q
             }
         }
         return when {
@@ -219,5 +219,6 @@ object StatsInsights {
         TravelMode.RIDESHARE -> "in car shares"
         TravelMode.TRANSIT -> "on transit"
         TravelMode.UNKNOWN -> "unclassified"
+        else -> "by ${m.label.lowercase()}"
     }
 }

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
@@ -17,6 +18,7 @@ import java.time.ZoneId
  */
 object Backup {
     private const val POINTS_PER_DOC = 7_000
+    private const val MODES_DOC = "modes"
 
     /** Uploads every day that changed since the last backup. Returns the number of days uploaded. */
     suspend fun backUp(context: Context): Int {
@@ -43,6 +45,8 @@ object Backup {
             for (i in chunks.size until chunks.size + 3) batch.delete(col.document(if (i == 0) day else "${day}_$i"))
             batch.commit().await()
         }
+        // The travel modes you added, so a restore knows them.
+        col.document(MODES_DOC).set(mapOf("added" to TravelMode.encodeAdded(), "next" to TravelMode.nextId)).await()
         Prefs.setLastBackup(started)
         Prefs.clearDirtyBackupDays(dirty)
         return days.size
@@ -54,7 +58,12 @@ object Backup {
         val store = PointStore.get(context)
         val docs = FirebaseFirestore.getInstance().collection("users").document(uid).collection("backup").get().await()
         var added = 0
+        // Modes first, so restored dots keep the modes they were travelled by.
+        docs.documents.firstOrNull { it.id == MODES_DOC }?.let { d ->
+            Prefs.mergeModes(d.getString("added"), d.getLong("next")?.toInt() ?: 0)
+        }
         for (doc in docs.documents) {
+            if (doc.id == MODES_DOC) continue
             added += store.insertAll(decode(doc.data ?: continue))
         }
         TripDetector.process(context)

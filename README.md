@@ -92,8 +92,12 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Long-press a trip** to change how you travelled (walking, cycling, driving, car share, transit) or
   **Change times**: a start–end slider over the day's dots, like Edit dots, picks the trip's first and last
   dot. The trips or stays before and after it grow or shrink to match.
-- **Travel mode colours** in Settings: pick each mode's colour with a colour picker or a hex code, and reset
-  one or all to the defaults.
+- **Travel modes** in Settings: pick each mode's colour with a colour picker or a hex code (reset one or all
+  to the defaults), **add your own modes** (a name, a colour, and whether it travels on foot, by bike, by car
+  or by public transport, which decides how its trips are matched to roads), and **delete** modes you don't
+  use. Walking, Cycling, Driving and Other always stay; deleted Car share and Transit can be added back.
+  Trips of a deleted mode become Other and are asked about again in Insights. Added modes are included in
+  backups.
 - **Week / Month**: a row per day; **Year**: a row per month, each with distance, trips and a bar split by
   travel mode. Tap a row to drill in.
 

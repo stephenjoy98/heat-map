@@ -274,7 +274,7 @@ fun SettingsScreen(
                 }
             }
 
-            ModeColorsSection()
+            TravelModesSection()
 
             Section("Insights") {
                 SettingRow(title = "Who writes your insights", subtitle = engineLabel(aiEngine)) {
