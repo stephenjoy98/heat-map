@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-10-20
+
+### Added
+- Storage on the Backup page: how much Location Ticker uses on the phone (your history, the map and picture
+  cache, other app files) and how much free space the phone has; and, when signed in, about how much the
+  backup and shared routes take in the cloud and how much of the free Firebase plan's 1 GiB is left.
+
 ## [2.24.0] - 2026-10-20
 
 ### Changed

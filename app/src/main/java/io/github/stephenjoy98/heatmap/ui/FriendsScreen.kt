@@ -1,5 +1,12 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.cloud.StorageUsage
+import io.github.stephenjoy98.heatmap.data.PointStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -121,8 +128,14 @@ fun BackupScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, onB
     val user by Account.user.collectAsStateWithLifecycle()
     AccountPage("Backup", contentPadding, onBack) {
         when {
-            !configured -> item { SetupCard() }
-            user == null -> item { SignInCard(snackbar, "Sign in to back up your history, so it's safe if you lose or change your phone.") }
+            !configured -> {
+                item { SetupCard() }
+                item { StorageCard(signedIn = false) }
+            }
+            user == null -> {
+                item { SignInCard(snackbar, "Sign in to back up your history, so it's safe if you lose or change your phone.") }
+                item { StorageCard(signedIn = false) }
+            }
             else -> {
                 item {
                     Text(
@@ -133,8 +146,92 @@ fun BackupScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, onB
                     )
                 }
                 item { BackupCard(snackbar) }
+                item { StorageCard(signedIn = true) }
             }
         }
+    }
+}
+
+/**
+ * Storage: what Location Ticker takes on this phone and in the cloud, and what's left. Phone figures are exact;
+ * cloud figures are worked out from what's uploaded, since Firebase doesn't report them to the app.
+ */
+@Composable
+private fun StorageCard(signedIn: Boolean) {
+    val context = LocalContext.current
+    val store = remember { PointStore.get(context) }
+    val changes by store.changes.collectAsStateWithLifecycle()
+    val phone by produceState<StorageUsage.Phone?>(null, changes) {
+        value = withContext(Dispatchers.IO) { runCatching { StorageUsage.phone(context) }.getOrNull() }
+    }
+    val cloud by produceState<StorageUsage.Cloud?>(null, changes, signedIn) {
+        value = if (!signedIn) null else withContext(Dispatchers.IO) { runCatching { StorageUsage.cloud(context) }.getOrNull() }
+    }
+    val f = StorageUsage::format
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Storage", style = MaterialTheme.typography.titleMedium)
+
+            Text("On this phone", style = MaterialTheme.typography.labelLarge)
+            val p = phone
+            if (p == null) {
+                Text("Working it out…", style = MaterialTheme.typography.bodySmall)
+            } else {
+                UsageBar(used = p.totalBytes - p.freeBytes, total = p.totalBytes, mine = p.appBytes)
+                Text(
+                    "Location Ticker uses ${f(p.appBytes)}: your history ${f(p.databaseBytes)}, map and picture cache ${f(p.cacheBytes)}, " +
+                        "other app files ${f(p.otherBytes)}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "${f(p.freeBytes)} free of ${f(p.totalBytes)} on the phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (signedIn) {
+                Text("In the cloud", style = MaterialTheme.typography.labelLarge)
+                val c = cloud
+                if (c == null) {
+                    Text("Working it out…", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    UsageBar(used = c.totalBytes, total = StorageUsage.FREE_CLOUD_BYTES, mine = c.totalBytes)
+                    Text(
+                        "About ${f(c.totalBytes)}: backup ${f(c.backupBytes)}, routes shared with friends ${f(c.routeBytes)}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "About ${f(c.leftBytes)} left of the ${f(StorageUsage.FREE_CLOUD_BYTES)} of database storage in Firebase's free plan. " +
+                            "That allowance is for the whole Firebase project, and Firebase doesn't tell the app its exact usage, " +
+                            "so this is worked out from what the app uploads.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A thin bar: the share of [total] that's used, with this app's part in the primary colour. */
+@Composable
+private fun UsageBar(used: Long, total: Long, mine: Long) {
+    if (total <= 0) return
+    val usedShare = (used.toDouble() / total).toFloat().coerceIn(0f, 1f)
+    val mineShare = (mine.toDouble() / total).toFloat().coerceIn(0f, usedShare).let { if (mine > 0) it.coerceAtLeast(0.01f) else it }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(10.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        if (mineShare > 0f) Box(Modifier.fillMaxHeight().weight(mineShare).background(MaterialTheme.colorScheme.primary))
+        val others = usedShare - mineShare
+        if (others > 0f) Box(Modifier.fillMaxHeight().weight(others).background(MaterialTheme.colorScheme.outline))
+        val free = 1f - usedShare - (if (mineShare > usedShare) mineShare - usedShare else 0f)
+        if (free > 0f) Spacer(Modifier.weight(free))
     }
 }
 

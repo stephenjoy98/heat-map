@@ -419,6 +419,18 @@ class PointStore private constructor(context: Context) :
         return runs
     }
 
+    /** How many dots each local day has (for estimating backup size). */
+    fun pointsPerDay(): List<Int> =
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM points GROUP BY date(time / 1000, 'unixepoch', 'localtime')", null).use { c ->
+            buildList { while (c.moveToNext()) add(c.getInt(0)) }
+        }
+
+    /** How many points each trip's shared route has (its road-snapped shape, or its dots). */
+    fun routePointCounts(): List<Int> {
+        val trips = readableDatabase.rawQuery("SELECT id FROM trips", null).use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
+        return trips.map { tripDisplayPath(it).size / 2 }
+    }
+
     /** Every dot with a height in [box], as samples for a [HeightGrid]. */
     fun heightSamples(box: GeoBox, limit: Int = 250_000): List<HeightGrid.Sample> =
         readableDatabase.rawQuery(

@@ -79,7 +79,7 @@ private val FEATURES = listOf(
     "⚙️" to "Settings as a page per section, or all in one list",
     "✨" to "Insights from on-device AI, with steps from Health Connect",
     "🔋" to "Battery use per recording interval",
-    "☁️" to "Automatic backups and restore",
+    "☁️" to "Automatic backups and restore, with storage used on the phone and in the cloud",
     "👥" to "Friends: their profiles, a map of where they've been, and comparisons with yours",
 )
 
