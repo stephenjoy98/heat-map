@@ -64,10 +64,13 @@ object StorageUsage {
             backup += docs * (name("users", uid, "backup", "2026-01-01_1") + fieldNames + DOC_OVERHEAD).toLong()
             backup += n.toLong() * BACKUP_FIELDS.size * NUMBER_BYTES
         }
-        // The travel modes document and the profile are tiny; count a kilobyte for them.
+        // The travel modes, height answers and profile documents are tiny; count a kilobyte for them.
         backup += 1024
+        val routePoints = store.routePointCounts()
+        // Trips in the backup: about a dozen small fields each, plus the road shape twice (matched and final).
+        backup += routePoints.sumOf { points -> 160L + 2L * (points * POLYLINE_CHARS_PER_POINT + 1) }
         val routes = if (Prefs.shareRoutes.value) {
-            store.routePointCounts().sumOf { points ->
+            routePoints.sumOf { points ->
                 (name("users", uid, "routes", "a".repeat(20)) + 2 + NUMBER_BYTES + 2 + (minOf(points, 1500) * POLYLINE_CHARS_PER_POINT + 1) +
                     2 + NUMBER_BYTES + DOC_OVERHEAD).toLong()
             }

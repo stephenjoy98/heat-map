@@ -360,6 +360,13 @@ object Prefs {
         sp.edit().putBoolean("buildings_3d", on).apply()
     }
 
+    /** Whether the backup has had trips and road answers added to every day (they were added in 2.26.0). */
+    val backupHasTrips: Boolean get() = sp.getBoolean("backup_has_trips", false)
+
+    fun setBackupHasTrips() {
+        sp.edit().putBoolean("backup_has_trips", true).apply()
+    }
+
     fun addDirtyBackupDays(days: Collection<String>) {
         val next = _dirtyBackupDays.value + days
         _dirtyBackupDays.value = next

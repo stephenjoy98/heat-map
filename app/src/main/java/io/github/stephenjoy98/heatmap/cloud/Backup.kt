@@ -3,6 +3,9 @@ package io.github.stephenjoy98.heatmap.cloud
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import io.github.stephenjoy98.heatmap.data.HeightGrid
+import io.github.stephenjoy98.heatmap.data.LevelBackup
+import io.github.stephenjoy98.heatmap.data.TripBackup
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
@@ -13,12 +16,19 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Backs up the full history (with timestamps) to the user's private area in Firestore, one document per
- * day, and restores it on a new phone. Only the signed-in user can read their backup.
+ * Backs up the full history (with timestamps) to the user's private area in Firestore, and restores it on a
+ * new phone. Only the signed-in user can read their backup. Documents:
+ * - `yyyy-MM-dd` (and `_1`, `_2`… for busy days): the day's dots, as parallel lists.
+ * - `trips_yyyy-MM-dd`: the trips that start that day, with their travel mode, whether they still need an
+ *   answer, their road-snapped shape and "which road?" answers.
+ * - `levels`: answers to "different heights here?".
+ * - `modes`: the travel modes you added.
  */
 object Backup {
     private const val POINTS_PER_DOC = 7_000
     private const val MODES_DOC = "modes"
+    private const val LEVELS_DOC = "levels"
+    private const val TRIPS_PREFIX = "trips_"
 
     /** Uploads every day that changed since the last backup. Returns the number of days uploaded. */
     suspend fun backUp(context: Context): Int {
@@ -28,6 +38,8 @@ object Backup {
         val started = System.currentTimeMillis()
         val zone = ZoneId.systemDefault()
 
+        // Backups from before trips were included get every day uploaded once more, now with its trips.
+        if (!Prefs.backupHasTrips) Prefs.addDirtyBackupDays(store.daysWithPointsAfter(0L))
         // Re-upload whole days so each document is always complete, including days edited since.
         val dirty = Prefs.dirtyBackupDays.value
         val days = (store.daysWithPointsAfter(Prefs.lastBackup.value) + dirty).distinct().sorted()
@@ -43,12 +55,20 @@ object Backup {
             }
             // Remove leftover parts from before an edit made the day smaller (or empty).
             for (i in chunks.size until chunks.size + 3) batch.delete(col.document(if (i == 0) day else "${day}_$i"))
+            val trips = store.tripBackups(from, to)
+            if (trips.isEmpty()) batch.delete(col.document(TRIPS_PREFIX + day))
+            else batch.set(col.document(TRIPS_PREFIX + day), mapOf("trips" to trips.map(::encodeTrip)))
             batch.commit().await()
         }
         // The travel modes you added, so a restore knows them.
         col.document(MODES_DOC).set(mapOf("added" to TravelMode.encodeAdded(), "next" to TravelMode.nextId)).await()
+        // Height answers: few and small, so always the full set.
+        col.document(LEVELS_DOC).set(mapOf("levels" to store.levelBackups().map { l ->
+            mapOf("a" to l.area, "la" to l.lat, "lo" to l.lon, "l" to l.low, "h" to l.high, "d" to l.decision)
+        })).await()
         Prefs.setLastBackup(started)
         Prefs.clearDirtyBackupDays(dirty)
+        Prefs.setBackupHasTrips()
         return days.size
     }
 
@@ -62,13 +82,65 @@ object Backup {
         docs.documents.firstOrNull { it.id == MODES_DOC }?.let { d ->
             Prefs.mergeModes(d.getString("added"), d.getLong("next")?.toInt() ?: 0)
         }
-        for (doc in docs.documents) {
-            if (doc.id == MODES_DOC) continue
-            added += store.insertAll(decode(doc.data ?: continue))
+        docs.documents.firstOrNull { it.id == LEVELS_DOC }?.let { d ->
+            @Suppress("UNCHECKED_CAST")
+            val list = (d.get("levels") as? List<Map<String, Any?>>).orEmpty()
+            store.restoreLevels(list.mapNotNull { m ->
+                LevelBackup(
+                    area = (m["a"] as? Number)?.toLong() ?: return@mapNotNull null,
+                    lat = (m["la"] as? Number)?.toDouble() ?: return@mapNotNull null,
+                    lon = (m["lo"] as? Number)?.toDouble() ?: return@mapNotNull null,
+                    low = (m["l"] as? Number)?.toDouble() ?: 0.0,
+                    high = (m["h"] as? Number)?.toDouble() ?: 0.0,
+                    decision = (m["d"] as? Number)?.toInt() ?: HeightGrid.ASK,
+                )
+            })
         }
+        val tripDocs = docs.documents.filter { it.id.startsWith(TRIPS_PREFIX) }
+        // Dots and trips go in together, before the trip detector can claim the dots.
+        synchronized(TripDetector) {
+            for (doc in docs.documents) {
+                if (doc.id == MODES_DOC || doc.id == LEVELS_DOC || doc.id.startsWith(TRIPS_PREFIX)) continue
+                added += store.insertAll(decode(doc.data ?: continue))
+            }
+            for (doc in tripDocs) {
+                @Suppress("UNCHECKED_CAST")
+                val list = (doc.get("trips") as? List<Map<String, Any?>>).orEmpty()
+                store.restoreTrips(list.mapNotNull(::decodeTrip))
+            }
+        }
+        // Dots without a backed-up trip (from older backups) are sorted into trips as usual.
         TripDetector.process(context)
         return added
     }
+
+    private fun encodeTrip(t: TripBackup): Map<String, Any?> = mapOf(
+        "s" to t.start,
+        "e" to t.end,
+        "m" to t.mode,
+        "im" to t.inferredMode,
+        "c" to t.confidence,
+        "r" to t.needsReview,
+        "ps" to t.pathStatus,
+        "bp" to t.basePoly,
+        "p" to t.poly,
+        "q" to t.questions,
+        "id" to t.remoteId,
+    ).filterValues { it != null } // Leave out what a trip doesn't have.
+
+    private fun decodeTrip(m: Map<String, Any?>): TripBackup? = TripBackup(
+        start = (m["s"] as? Number)?.toLong() ?: return null,
+        end = (m["e"] as? Number)?.toLong() ?: return null,
+        mode = (m["m"] as? Number)?.toInt() ?: 0,
+        inferredMode = (m["im"] as? Number)?.toInt() ?: 0,
+        confidence = (m["c"] as? Number)?.toDouble() ?: 1.0,
+        needsReview = m["r"] as? Boolean ?: false,
+        pathStatus = (m["ps"] as? Number)?.toInt(),
+        basePoly = m["bp"] as? String,
+        poly = m["p"] as? String,
+        questions = m["q"] as? String,
+        remoteId = m["id"] as? String,
+    )
 
     private fun encode(points: List<LocationPoint>): Map<String, Any> = mapOf(
         "t" to points.map { it.time },

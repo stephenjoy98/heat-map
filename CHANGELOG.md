@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-10-20
+
+### Added
+- Backups now include your trips (with their travel modes and whether they still need an answer), their
+  road-snapped shapes and your "which road?" answers, and your "different heights here?" answers. Restoring
+  on another phone brings them back as they were instead of working them out again. The first backup after
+  updating uploads every day once more to add them.
+- Restored trips keep their shared route, so friends don't see a second copy.
+
 ## [2.25.0] - 2026-10-20
 
 ### Added

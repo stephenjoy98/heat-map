@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.25.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.26.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -135,9 +135,12 @@ travel stats, Insights (AI write-ups), backup and friends.
   `SyncWorker` (periodic at Prefs.backupEveryHours 6/12/24/168, UPDATE policy; backup when due, and on every app open via `runNow(appOpen = true)` unless one ran <5 min ago),
   `Friends` (list cached in Prefs "friends_cache" → `Friends.saved()`), `Account`, `StorageUsage` (phone: file
   sizes + StatFs; cloud: estimated from Firestore's document size rules, since the client can't query usage;
-  shown in `StorageCard` on the Backup page). Backups hold raw dots only (t, la, lo, ac, iv, at, md, al arrays per
-  local day, ≤7000 per doc) plus `backup/modes`; trips, snapped paths, 3D ribbons and heatmaps are rebuilt or
-  drawn on the phone. Shared routes (`users/{uid}/routes`) hold mode + polyline + distance, no times or heights. Friend profile page
+  shown in `StorageCard` on the Backup page). Backup docs: `yyyy-MM-dd[_n]` dots (t, la, lo, ac, iv, at, md, al
+  arrays, ≤7000 per doc); `trips_yyyy-MM-dd` (since 2.26.0: trips starting that day as maps s, e, m, im, c, r, ps,
+  bp, p, q (road questions JSON), id (remote route id); null fields omitted); `levels` (height answers);
+  `modes`. Restore: modes, levels, then dots + `restoreTrips` inside `synchronized(TripDetector)`, then the
+  detector for leftovers. `createTrip`/`saveTripPath` mark the trip's day dirty; Prefs "backup_has_trips" makes
+  the first 2.26 backup re-upload every day. 3D ribbons and heatmaps are always drawn on the phone. Shared routes (`users/{uid}/routes`) hold mode + polyline + distance, no times or heights. Friend profile page
   `FriendProfileScreen` (`Page.FRIEND`): stats + heatmap of `friend_routes` framed by `PointStore.friendBounds`.
 - `ui/Breakdowns.kt`: `ModeBreakdownRows` (top-level modes with children summed, tap to expand; used on Insights
   and Profile), `ListDialog`, `AREA_EXPLANATION`. `PointStore.kmByArea` / `cellsByArea` + `ReviewRepository.byCity`

@@ -87,6 +87,26 @@ class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
 class EditablePoint(val id: Long, val time: Long, val lat: Double, val lon: Double, val accuracy: Float)
 
+/** A trip as kept in a backup: when it ran, how it was travelled, and its road shape and road answers. */
+class TripBackup(
+    val start: Long,
+    val end: Long,
+    val mode: Int,
+    val inferredMode: Int,
+    val confidence: Double,
+    val needsReview: Boolean,
+    val pathStatus: Int?,
+    val basePoly: String?,
+    val poly: String?,
+    /** Road questions as JSON: [{"from", "to", "options", "chosen"}]. */
+    val questions: String?,
+    /** Its shared route's document id, so a restore updates that route instead of adding a copy. */
+    val remoteId: String? = null,
+)
+
+/** A height answer as kept in a backup. */
+class LevelBackup(val area: Long, val lat: Double, val lon: Double, val low: Double, val high: Double, val decision: Int)
+
 /** A run of dots with heights: its trip (0 or -1 outside trips), its [HeightGrid] pass and the dots. */
 class ElevationRun(val tripId: Long, val pass: Long, val dots: List<ElevationPoint>)
 
@@ -417,6 +437,122 @@ class PointStore private constructor(context: Context) :
         }
         if (current.size >= 2) runs += ElevationRun(currentTrip, HeightGrid.passOf(currentTrip, startTime), current)
         return runs
+    }
+
+    /** The day (yyyy-MM-dd, local) a time falls on. */
+    private fun dayOf(time: Long): String = java.time.Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+
+    /** Trips that start in the period, with their road shapes and answers, for the backup. */
+    fun tripBackups(from: Long, to: Long): List<TripBackup> =
+        trips("WHERE start_time >= $from AND start_time < $to ORDER BY start_time").map { t ->
+            val path = tripPathRow(t.id)
+            val questions = roadQuestionsForTrip(t.id).takeIf { it.isNotEmpty() }?.let { qs ->
+                org.json.JSONArray().apply {
+                    qs.forEach { q ->
+                        put(org.json.JSONObject().put("from", q.baseFrom).put("to", q.baseTo).put("options", RoadOption.encodeList(q.options)).put("chosen", q.chosen))
+                    }
+                }.toString()
+            }
+            TripBackup(
+                start = t.startTime,
+                end = t.endTime,
+                mode = t.mode.id,
+                inferredMode = t.inferredMode.id,
+                confidence = t.confidence.toDouble(),
+                needsReview = t.needsReview,
+                pathStatus = path?.status,
+                basePoly = path?.basePoly,
+                poly = path?.poly,
+                questions = questions,
+                remoteId = t.remoteId,
+            )
+        }
+
+    /**
+     * Brings back trips from a backup, after their dots are restored: each one takes the restored dots in its
+     * time range that aren't in a trip yet, keeps its travel mode and whether it still needs an answer, and
+     * gets its road shape and road questions back so it isn't matched to roads again. Trips that already exist
+     * here are left alone. Returns how many were brought back.
+     */
+    fun restoreTrips(backups: List<TripBackup>): Int {
+        val db = writableDatabase
+        var restored = 0
+        db.beginTransaction()
+        try {
+            for (b in backups.sortedBy { it.start }) {
+                if (b.end <= b.start) continue
+                val free = long("SELECT COUNT(*) FROM points WHERE time >= ${b.start} AND time <= ${b.end} AND trip_id <= 0")
+                val taken = long("SELECT COUNT(*) FROM points WHERE time >= ${b.start} AND time <= ${b.end} AND trip_id > 0")
+                if (free < 2 || taken > 0) continue
+                val id = insertTripRow(db, TravelMode.fromId(b.mode), TravelMode.fromId(b.inferredMode), b.confidence.toFloat(), b.needsReview)
+                db.execSQL("UPDATE points SET trip_id = $id, mode = ${b.mode} WHERE time >= ${b.start} AND time <= ${b.end} AND trip_id <= 0")
+                refreshTrip(db, id, mutableListOf())
+                b.remoteId?.let { db.execSQL("UPDATE trips SET remote_id = ? WHERE id = ?", arrayOf<Any>(it, id)) }
+                // refreshTrip clears road data; put the backed-up shape and answers back.
+                if (b.pathStatus != null) {
+                    db.insertWithOnConflict("trip_paths", null, ContentValues().apply {
+                        put("trip_id", id)
+                        put("status", b.pathStatus)
+                        put("base_poly", b.basePoly)
+                        put("poly", b.poly)
+                        b.poly?.let { poly ->
+                            val pts = Polyline.decode(poly)
+                            if (pts.size >= 2) {
+                                put("min_lat", (pts.indices step 2).minOf { pts[it] }); put("max_lat", (pts.indices step 2).maxOf { pts[it] })
+                                put("min_lon", (1 until pts.size step 2).minOf { pts[it] }); put("max_lon", (1 until pts.size step 2).maxOf { pts[it] })
+                            }
+                        }
+                    }, SQLiteDatabase.CONFLICT_REPLACE)
+                }
+                b.questions?.let { json ->
+                    runCatching {
+                        val a = org.json.JSONArray(json)
+                        for (i in 0 until a.length()) {
+                            val q = a.getJSONObject(i)
+                            db.insert("road_questions", null, ContentValues().apply {
+                                put("trip_id", id)
+                                put("base_from", q.getInt("from"))
+                                put("base_to", q.getInt("to"))
+                                put("options", q.getString("options"))
+                                put("chosen", q.optInt("chosen", -1))
+                            })
+                        }
+                    }
+                }
+                restored++
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        if (restored > 0) changed()
+        return restored
+    }
+
+    fun levelBackups(): List<LevelBackup> =
+        readableDatabase.rawQuery("SELECT area, lat, lon, low, high, decision FROM height_levels", null).use { c ->
+            buildList { while (c.moveToNext()) add(LevelBackup(c.getLong(0), c.getDouble(1), c.getDouble(2), c.getDouble(3), c.getDouble(4), c.getInt(5))) }
+        }
+
+    /** Brings back height answers from a backup; answers already given on this phone win. */
+    fun restoreLevels(levels: List<LevelBackup>) {
+        if (levels.isEmpty()) return
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for (l in levels) {
+                db.insertWithOnConflict("height_levels", null, ContentValues().apply {
+                    put("area", l.area); put("lat", l.lat); put("lon", l.lon); put("low", l.low); put("high", l.high); put("decision", l.decision)
+                }, SQLiteDatabase.CONFLICT_IGNORE)
+                if (l.decision != HeightGrid.ASK) {
+                    db.execSQL("UPDATE height_levels SET decision = ${l.decision} WHERE area = ${l.area} AND decision = ${HeightGrid.ASK}")
+                }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
     }
 
     /** How many dots each local day has (for estimating backup size). */
@@ -776,6 +912,8 @@ class PointStore private constructor(context: Context) :
                 db.execSQL("UPDATE points SET trip_id = $id, mode = ${trip.mode.id} WHERE id IN (${chunk.joinToString(",")})")
             }
             db.setTransactionSuccessful()
+            // Its day's backup now includes the trip.
+            Prefs.addDirtyBackupDays(listOf(dayOf(trip.startTime)))
             return id
         } finally {
             db.endTransaction()
@@ -1118,6 +1256,8 @@ class PointStore private constructor(context: Context) :
         }
         val db = writableDatabase
         db.insertWithOnConflict("trip_paths", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        // The backup keeps road shapes and answers, so the trip's day goes up again.
+        trip(tripId)?.let { Prefs.addDirtyBackupDays(listOf(dayOf(it.startTime))) }
         // Friends get the improved shape on the next sync.
         db.execSQL("UPDATE trips SET uploaded = 0 WHERE id = $tripId")
         changed()
