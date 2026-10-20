@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import io.github.stephenjoy98.heatmap.cloud.StorageUsage
 import io.github.stephenjoy98.heatmap.data.PointStore
 import kotlinx.coroutines.Dispatchers
@@ -150,6 +152,53 @@ fun BackupScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, onB
             }
         }
     }
+}
+
+/** Everything a restore would bring back, line by line, before anything is changed. */
+@Composable
+private fun RestorePreviewDialog(preview: Backup.Preview, onDismiss: () -> Unit, onRestore: () -> Unit) {
+    val p = preview
+    val dayFormat = java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+    fun day(s: String?) = s?.let { runCatching { java.time.LocalDate.parse(it).format(dayFormat) }.getOrNull() } ?: "?"
+    val rows = buildList {
+        if (p.dots > 0) {
+            add(
+                "📍" to "${formatCount(p.dots.toLong())} dots over ${p.days} ${if (p.days == 1) "day" else "days"}, ${day(p.firstDay)} to ${day(p.lastDay)}. " +
+                    if (p.newDots == 0) "This phone has them all already." else "${formatCount(p.newDots.toLong())} aren't on this phone yet."
+            )
+        }
+        if (p.trips > 0) add("🚲" to "${formatCount(p.trips.toLong())} trips with their travel modes, times and road shapes")
+        if (p.roadAnswers > 0) add("🛣️" to "${p.roadAnswers} \"which road?\" ${if (p.roadAnswers == 1) "answer" else "answers"}")
+        if (p.heightAnswers > 0) add("⛰️" to "${p.heightAnswers} \"different heights\" ${if (p.heightAnswers == 1) "answer" else "answers"}")
+        if (p.deletedDots > 0) add("🗑️" to "${formatCount(p.deletedDots.toLong())} deleted dots, kept deleted (and still restorable)")
+        if (p.customModes.isNotEmpty()) add("🏷️" to "Travel modes you added: ${p.customModes.joinToString()}")
+        if (p.places.isNotEmpty()) add("🏠" to "Saved places: ${p.places.joinToString()}")
+        if (p.hasSettings) add("⚙️" to "Your settings: recording, map, theme, units, travel mode names and colours, filters and backup choices")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Restore from backup?") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Your backup holds:", style = MaterialTheme.typography.bodyMedium)
+                rows.forEach { (emoji, text) ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        JoyEmoji(emoji, size = 20)
+                        Spacer(Modifier.width(10.dp))
+                        Text(text, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                Text(
+                    "It's merged into this phone: nothing here is deleted, and trips or answers you already have here are kept. " +
+                        "Your settings are replaced by the ones in the backup.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onRestore) { Text("Restore") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /**
@@ -416,7 +465,7 @@ private fun BackupCard(snackbar: SnackbarHostState) {
     val auto by Prefs.autoBackup.collectAsStateWithLifecycle()
     val every by Prefs.backupEveryHours.collectAsStateWithLifecycle()
     var busy by remember { mutableStateOf<String?>(null) }
-    var confirmRestore by remember { mutableStateOf(false) }
+    var preview by remember { mutableStateOf<Backup.Preview?>(null) }
 
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -437,7 +486,16 @@ private fun BackupCard(snackbar: SnackbarHostState) {
                         busy = null
                     }
                 }) { Text("Back up now") }
-                OutlinedButton(enabled = busy == null, onClick = { confirmRestore = true }) { Text("Restore") }
+                OutlinedButton(enabled = busy == null, onClick = {
+                    // Download the backup and show what it holds before changing anything.
+                    busy = "Checking your backup…"
+                    scope.launch {
+                        runCatching { withContext(Dispatchers.IO) { Backup.preview(context) } }
+                            .onSuccess { if (it.isEmpty) snackbar.showSnackbar("There's nothing in your backup yet") else preview = it }
+                            .onFailure { snackbar.showSnackbar("Couldn't read your backup: ${it.message}") }
+                        busy = null
+                    }
+                }) { Text("Restore…") }
             }
             busy?.let {
                 Spacer(Modifier.height(6.dp))
@@ -469,24 +527,20 @@ private fun BackupCard(snackbar: SnackbarHostState) {
         }
     }
 
-    if (confirmRestore) {
-        AlertDialog(
-            onDismissRequest = { confirmRestore = false },
-            title = { Text("Restore from backup?") },
-            text = { Text("Points from your backup are merged into this phone's history. Nothing here is deleted.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmRestore = false
-                    busy = "Restoring…"
-                    scope.launch {
-                        runCatching { Backup.restore(context) }
-                            .onSuccess { snackbar.showSnackbar("Restored ${formatCount(it.toLong())} points") }
-                            .onFailure { snackbar.showSnackbar("Restore failed: ${it.message}") }
-                        busy = null
-                    }
-                }) { Text("Restore") }
+    preview?.let { p ->
+        RestorePreviewDialog(
+            preview = p,
+            onDismiss = { preview = null },
+            onRestore = {
+                preview = null
+                busy = "Restoring…"
+                scope.launch {
+                    runCatching { Backup.restore(context, p) }
+                        .onSuccess { snackbar.showSnackbar("Restored ${formatCount(it.toLong())} new points") }
+                        .onFailure { snackbar.showSnackbar("Restore failed: ${it.message}") }
+                    busy = null
+                }
             },
-            dismissButton = { TextButton(onClick = { confirmRestore = false }) { Text("Cancel") } },
         )
     }
 }

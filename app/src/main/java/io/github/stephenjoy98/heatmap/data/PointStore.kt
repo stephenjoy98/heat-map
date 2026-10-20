@@ -442,6 +442,10 @@ class PointStore private constructor(context: Context) :
     /** The day (yyyy-MM-dd, local) a time falls on. */
     private fun dayOf(time: Long): String = java.time.Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate().toString()
 
+    /** How many of these times already have a dot on this phone. */
+    fun countExistingTimes(times: List<Long>): Int =
+        times.chunked(500).sumOf { chunk -> long("SELECT COUNT(*) FROM points WHERE time IN (${chunk.joinToString(",")})").toInt() }
+
     /** Local days (yyyy-MM-dd) that have deleted dots. */
     fun daysWithDeleted(): List<String> =
         readableDatabase.rawQuery("SELECT DISTINCT date(time / 1000, 'unixepoch', 'localtime') FROM deleted_points", null)

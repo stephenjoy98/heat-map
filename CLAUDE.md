@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.26.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.27.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -139,7 +139,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   arrays, ≤7000 per doc); `trips_yyyy-MM-dd` (since 2.26.0: trips starting that day as maps s, e, m, im, c, r, ps,
   bp, p, q (road questions JSON), id (remote route id); null fields omitted); `deleted_yyyy-MM-dd` (soft-deleted dots); `levels` (height
   answers); `modes`; `settings` (JSON of the user's prefs, whitelist `Prefs.BACKED_UP_KEYS`; add new user-facing
-  pref keys there). Restore: settings (`Prefs.importSettings` → re-`init`), modes, levels, then deleted dots, dots
+  pref keys there). Restore: `Backup.preview` downloads once and summarises (dialog `RestorePreviewDialog`), then
+  `restore(context, preview)` reuses that download; order: settings (`Prefs.importSettings` → re-`init`), modes, levels, then deleted dots, dots
   and `restoreTrips` inside `synchronized(TripDetector)`, then the detector for leftovers. `createTrip`/
   `saveTripPath` mark the trip's day dirty; Prefs "backup_complete_v2" makes the first 2.26 backup re-upload every
   day (bump the key when per-day backup content grows). 3D ribbons and heatmaps are always drawn on the phone. Shared routes (`users/{uid}/routes`) hold mode + polyline + distance, no times or heights. Friend profile page

@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-10-20
+
+### Added
+- Restore shows a preview first: how many dots (and how many this phone doesn't have yet) over which dates,
+  trips, road and height answers, deleted dots, travel modes, saved places and settings. Nothing changes
+  until you tap Restore.
+
 ## [2.26.0] - 2026-10-20
 
 ### Added

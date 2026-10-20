@@ -2,7 +2,9 @@ package io.github.stephenjoy98.heatmap.cloud
 
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import io.github.stephenjoy98.heatmap.data.SavedPlace
 import io.github.stephenjoy98.heatmap.data.HeightGrid
 import io.github.stephenjoy98.heatmap.data.LevelBackup
 import io.github.stephenjoy98.heatmap.data.TripBackup
@@ -81,19 +83,104 @@ object Backup {
         return days.size
     }
 
-    /** Downloads the backup and merges it into this phone's history. Returns the number of new points. */
-    suspend fun restore(context: Context): Int {
+    /** What a restore would bring back, worked out from the downloaded backup before anything is changed. */
+    class Preview(
+        internal val docs: List<DocumentSnapshot>,
+        val days: Int,
+        val firstDay: String?,
+        val lastDay: String?,
+        val dots: Int,
+        /** Dots this phone doesn't have yet. */
+        val newDots: Int,
+        val trips: Int,
+        val roadAnswers: Int,
+        val deletedDots: Int,
+        val heightAnswers: Int,
+        val customModes: List<String>,
+        val places: List<String>,
+        val hasSettings: Boolean,
+    ) {
+        val isEmpty: Boolean get() = dots == 0 && trips == 0 && !hasSettings
+    }
+
+    private suspend fun download(): List<DocumentSnapshot> {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Sign in to restore")
+        return FirebaseFirestore.getInstance().collection("users").document(uid).collection("backup").get().await().documents
+    }
+
+    private fun isDayDoc(id: String) = id.isNotEmpty() && id[0].isDigit()
+
+    /** Downloads the backup and sums up what restoring it would do. Call off the main thread. */
+    suspend fun preview(context: Context): Preview {
         val store = PointStore.get(context)
-        val docs = FirebaseFirestore.getInstance().collection("users").document(uid).collection("backup").get().await()
+        val docs = download()
+        val dayDocs = docs.filter { isDayDoc(it.id) }
+        val days = dayDocs.map { it.id.substringBefore('_') }.distinct().sorted()
+        var dots = 0
+        var newDots = 0
+        for (d in dayDocs) {
+            val times = (d.get("t") as? List<*>)?.filterIsInstance<Number>()?.map { it.toLong() }.orEmpty()
+            dots += times.size
+            newDots += times.size - store.countExistingTimes(times)
+        }
+        var trips = 0
+        var roadAnswers = 0
+        for (d in docs.filter { it.id.startsWith(TRIPS_PREFIX) }) {
+            val list = (d.get("trips") as? List<*>).orEmpty().filterIsInstance<Map<*, *>>()
+            trips += list.size
+            for (t in list) {
+                val q = t["q"] as? String ?: continue
+                roadAnswers += runCatching {
+                    val a = org.json.JSONArray(q)
+                    (0 until a.length()).count { a.getJSONObject(it).optInt("chosen", -1) >= 0 }
+                }.getOrDefault(0)
+            }
+        }
+        val deletedDots = docs.filter { it.id.startsWith(DELETED_PREFIX) }.sumOf { (it.get("t") as? List<*>)?.size ?: 0 }
+        val heightAnswers = (docs.firstOrNull { it.id == LEVELS_DOC }?.get("levels") as? List<*>).orEmpty()
+            .filterIsInstance<Map<*, *>>().count { ((it["d"] as? Number)?.toInt() ?: HeightGrid.ASK) != HeightGrid.ASK }
+        val customModes = docs.firstOrNull { it.id == MODES_DOC }?.getString("added")?.let { json ->
+            runCatching {
+                val a = org.json.JSONArray(json)
+                (0 until a.length()).map { a.getJSONObject(it).getString("label") }
+            }.getOrNull()
+        }.orEmpty()
+        val settingsJson = docs.firstOrNull { it.id == SETTINGS_DOC }?.getString("json")
+        val places = settingsJson?.let { json ->
+            runCatching { SavedPlace.decode(org.json.JSONObject(json).optJSONObject("saved_places")?.optString("s")).map { it.name } }.getOrNull()
+        }.orEmpty()
+        return Preview(
+            docs = docs,
+            days = days.size,
+            firstDay = days.firstOrNull(),
+            lastDay = days.lastOrNull(),
+            dots = dots,
+            newDots = newDots,
+            trips = trips,
+            roadAnswers = roadAnswers,
+            deletedDots = deletedDots,
+            heightAnswers = heightAnswers,
+            customModes = customModes,
+            places = places,
+            hasSettings = settingsJson != null,
+        )
+    }
+
+    /**
+     * Merges the backup into this phone's history (using [preview]'s download if given, so it isn't fetched
+     * twice). Returns the number of new points.
+     */
+    suspend fun restore(context: Context, preview: Preview? = null): Int {
+        val store = PointStore.get(context)
+        val docs = preview?.docs ?: download()
         var added = 0
         // Settings first: they include the travel modes you renamed, recoloured or deleted.
-        docs.documents.firstOrNull { it.id == SETTINGS_DOC }?.getString("json")?.let { Prefs.importSettings(context, it) }
+        docs.firstOrNull { it.id == SETTINGS_DOC }?.getString("json")?.let { Prefs.importSettings(context, it) }
         // Modes next, so restored dots keep the modes they were travelled by.
-        docs.documents.firstOrNull { it.id == MODES_DOC }?.let { d ->
+        docs.firstOrNull { it.id == MODES_DOC }?.let { d ->
             Prefs.mergeModes(d.getString("added"), d.getLong("next")?.toInt() ?: 0)
         }
-        docs.documents.firstOrNull { it.id == LEVELS_DOC }?.let { d ->
+        docs.firstOrNull { it.id == LEVELS_DOC }?.let { d ->
             @Suppress("UNCHECKED_CAST")
             val list = (d.get("levels") as? List<Map<String, Any?>>).orEmpty()
             store.restoreLevels(list.mapNotNull { m ->
@@ -107,14 +194,14 @@ object Backup {
                 )
             })
         }
-        val tripDocs = docs.documents.filter { it.id.startsWith(TRIPS_PREFIX) }
+        val tripDocs = docs.filter { it.id.startsWith(TRIPS_PREFIX) }
         // Dots and trips go in together, before the trip detector can claim the dots.
         synchronized(TripDetector) {
             // Deleted dots first, so the dots restored next don't bring them back.
-            for (doc in docs.documents) {
+            for (doc in docs) {
                 if (doc.id.startsWith(DELETED_PREFIX)) store.restoreDeleted(decode(doc.data ?: continue))
             }
-            for (doc in docs.documents) {
+            for (doc in docs) {
                 val id = doc.id
                 if (id == MODES_DOC || id == LEVELS_DOC || id == SETTINGS_DOC || id.startsWith(TRIPS_PREFIX) || id.startsWith(DELETED_PREFIX)) continue
                 added += store.insertAll(decode(doc.data ?: continue))
