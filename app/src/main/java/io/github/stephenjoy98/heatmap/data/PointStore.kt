@@ -87,6 +87,12 @@ class FriendRoute(val docId: String, val mode: TravelMode, val poly: String)
 
 class EditablePoint(val id: Long, val time: Long, val lat: Double, val lon: Double, val accuracy: Float)
 
+/** A run of dots with heights: its trip (0 or -1 outside trips), its [HeightGrid] pass and the dots. */
+class ElevationRun(val tripId: Long, val pass: Long, val dots: List<ElevationPoint>)
+
+/** A place recorded at two clearly different heights ([low] and [high], metres above sea level). */
+class LevelQuestion(val area: Long, val lat: Double, val lon: Double, val low: Double, val high: Double)
+
 class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>, val createdTripId: Long = 0)
 
 /** A spot where a lot of time was recorded. */
@@ -137,7 +143,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 8) {
+    SQLiteOpenHelper(context, "points.db", null, 9) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -288,6 +294,20 @@ class PointStore private constructor(context: Context) :
                 )"""
             )
         }
+        if (oldVersion < 9) {
+            // Places where trips were recorded at two clearly different heights, and whether they really were
+            // different levels (a bridge, another floor) or the same one. See HeightGrid.
+            db.execSQL(
+                """CREATE TABLE height_levels (
+                    area INTEGER PRIMARY KEY,
+                    lat REAL NOT NULL,
+                    lon REAL NOT NULL,
+                    low REAL NOT NULL,
+                    high REAL NOT NULL,
+                    decision INTEGER NOT NULL DEFAULT 0
+                )"""
+            )
+        }
     }
 
     private fun changed() = _changes.update { it + 1 }
@@ -365,10 +385,11 @@ class PointStore private constructor(context: Context) :
         long("SELECT COUNT(*) FROM points WHERE ${where(box)}${modeClause(modes)}").toInt()
 
     /** Dots with heights in [box], split into runs at gaps and at changes of trip, with each run's trip id. */
-    fun elevationRunsIn(box: GeoBox, modes: Set<TravelMode>, limit: Int = 60_000): List<Pair<Long, List<ElevationPoint>>> {
-        val runs = ArrayList<Pair<Long, List<ElevationPoint>>>()
+    fun elevationRunsIn(box: GeoBox, modes: Set<TravelMode>, limit: Int = 60_000): List<ElevationRun> {
+        val runs = ArrayList<ElevationRun>()
         var current = ArrayList<ElevationPoint>()
         var currentTrip = 0L
+        var startTime = 0L
         var prevTime = 0L
         var prevLat = 0.0
         var prevLon = 0.0
@@ -383,9 +404,10 @@ class PointStore private constructor(context: Context) :
                 val lon = c.getDouble(2)
                 val trip = c.getLong(5)
                 if (current.isNotEmpty() && (trip != currentTrip || TrackRules.isBreak(prevTime, prevLat, prevLon, time, lat, lon, c.getInt(3)))) {
-                    if (current.size >= 2) runs += currentTrip to current
+                    if (current.size >= 2) runs += ElevationRun(currentTrip, HeightGrid.passOf(currentTrip, startTime), current)
                     current = ArrayList()
                 }
+                if (current.isEmpty()) startTime = time
                 currentTrip = trip
                 current += ElevationPoint(lat, lon, c.getDouble(4))
                 prevTime = time
@@ -393,8 +415,55 @@ class PointStore private constructor(context: Context) :
                 prevLon = lon
             }
         }
-        if (current.size >= 2) runs += currentTrip to current
+        if (current.size >= 2) runs += ElevationRun(currentTrip, HeightGrid.passOf(currentTrip, startTime), current)
         return runs
+    }
+
+    /** Every dot with a height in [box], as samples for a [HeightGrid]. */
+    fun heightSamples(box: GeoBox, limit: Int = 250_000): List<HeightGrid.Sample> =
+        readableDatabase.rawQuery(
+            "SELECT lat, lon, trip_id, time, altitude FROM points WHERE ${where(box)} AND altitude IS NOT NULL LIMIT $limit", null
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(HeightGrid.Sample(c.getDouble(0), c.getDouble(1), HeightGrid.passOf(c.getLong(2), c.getLong(3)), c.getDouble(4)))
+                }
+            }
+        }
+
+    /** The user's answers about levels ([HeightGrid.ASK] while not answered yet), by [Cells] key. */
+    fun levelDecisions(): Map<Long, Int> =
+        readableDatabase.rawQuery("SELECT area, decision FROM height_levels", null).use { c ->
+            buildMap { while (c.moveToNext()) put(c.getLong(0), c.getInt(1)) }
+        }
+
+    /** Adds level questions for these places (ones already known are left alone). */
+    fun addLevelQuestions(candidates: List<HeightGrid.LevelCandidate>) {
+        if (candidates.isEmpty()) return
+        val db = writableDatabase
+        var added = 0
+        for (q in candidates) {
+            val id = db.insertWithOnConflict("height_levels", null, ContentValues().apply {
+                put("area", q.area)
+                put("lat", q.lat)
+                put("lon", q.lon)
+                put("low", q.low)
+                put("high", q.high)
+            }, SQLiteDatabase.CONFLICT_IGNORE)
+            if (id != -1L) added++
+        }
+        if (added > 0) changed()
+    }
+
+    fun openLevelQuestions(): List<LevelQuestion> =
+        readableDatabase.rawQuery("SELECT area, lat, lon, low, high FROM height_levels WHERE decision = ${HeightGrid.ASK} ORDER BY high - low DESC", null).use { c ->
+            buildList { while (c.moveToNext()) add(LevelQuestion(c.getLong(0), c.getDouble(1), c.getDouble(2), c.getDouble(3), c.getDouble(4))) }
+        }
+
+    /** Records whether a place really has different levels ([HeightGrid.DIFFERENT]) or one ([HeightGrid.SAME]). */
+    fun answerLevel(area: Long, decision: Int) {
+        writableDatabase.execSQL("UPDATE height_levels SET decision = $decision WHERE area = $area")
+        changed()
     }
 
     /** All of a trip's dots that have heights, in order. */

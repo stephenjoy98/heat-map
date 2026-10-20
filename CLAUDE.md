@@ -48,7 +48,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.23.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.24.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -75,7 +75,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,
   `BootReceiver`. Manual interval slider is 15 s … 1 day. Fixes worse than `accuracyLimitM` (100 m high
   accuracy / 500 m) are skipped.
-- `data/`: `PointStore` (SQLite, **schema v8**: points incl. altitude, trips, places, friend_routes,
+- `data/`: `PointStore` (SQLite, **schema v9**: points incl. altitude, trips, places, friend_routes,
   trip_paths, road_questions, deleted_points (soft delete), explored_cells/explored_days/explored_state
   (km-explored cache), battery_log (v8: sample/min while recording via `LocationTickerService.sampleBattery`;
   `batteryByInterval` → `BatterySection` in Settings)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,
@@ -98,7 +98,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   `Route3d` (3D route geometry: continuous mitred ribbon, median + 120 m distance smoothing, heights above a
   fixed `PointStore.altitudeBaseline()` (5th percentile, cached 10 min) so they don't change with the view;
   `drape` lays dot heights along a display line; loader `map/Route3dTracks` uses snapped polys / smoothed
-  lines like the 2D map; curtain stops 0.4 m under the ribbon to avoid z-fighting), `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
+  lines like the 2D map; curtain stops 0.4 m under the ribbon to avoid z-fighting). Since 2.24.0 heights come
+  from `data/HeightGrid` (~55×36 m patches; per-pass medians, pass = trip or day for stays; patch height =
+  median of passes). Patches whose passes split by >15 m become `height_levels` rows (schema v9; decision
+  ASK/SAME/DIFFERENT) shown as `LevelQuestionsCard` on the Timeline; DIFFERENT keeps per-pass heights, `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
 - `map/`: `VectorMapSupport.kt` (`VectorMaps`: OpenFreeMap Positron style, dark recolour, terrain hillshade
   from AWS Terrarium DEM declared at tileSize 128 for sharpness, 3D buildings fill-extrusion, 3D route
   layers; `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix,

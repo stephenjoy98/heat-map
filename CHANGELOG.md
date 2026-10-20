@@ -12,6 +12,18 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-10-20
+
+### Changed
+- 3D routes along a way you've travelled many times are drawn at one agreed height, taken from all your trips
+  there, instead of a slightly different height each time (GPS heights wander by 10 m or more between trips).
+
+### Added
+- "Different heights here?" on the Timeline: where your trips were recorded at two clearly different heights
+  (more than 15 m apart), such as a bridge over a road or different floors of a building at home, the app
+  asks whether they're really different levels. "Different levels" keeps each trip at its own height in 3D
+  there; "Same level" draws one.
+
 ## [2.23.0] - 2026-10-20
 
 ### Added

@@ -267,7 +267,7 @@ fun AccountMenu(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                                 Text(
-                                    "How you travelled and which road you took · answer them on the Timeline",
+                                    "How you travelled, which road you took and heights · answer them on the Timeline",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )

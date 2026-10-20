@@ -11,6 +11,12 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.ui.graphics.Color
 import io.github.stephenjoy98.heatmap.data.Polyline
 import io.github.stephenjoy98.heatmap.data.RoadQuestion
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.stephenjoy98.heatmap.data.Cells
+import io.github.stephenjoy98.heatmap.data.LevelQuestion
+import io.github.stephenjoy98.heatmap.data.Prefs
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -220,6 +226,89 @@ fun RoadQuestionsCard(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * "Different heights here?": a place where trips were recorded at two clearly different heights. It might be a
+ * bridge over a road, or a different floor of a building (at home, say), or just GPS heights wandering. The
+ * answer decides whether 3D routes keep the levels apart there or draw one height.
+ */
+@Composable
+fun LevelQuestionsCard(
+    questions: List<LevelQuestion>,
+    onAnswer: (LevelQuestion, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (questions.isEmpty()) return
+    var index by rememberSaveable { mutableIntStateOf(0) }
+    val i = index.coerceIn(0, questions.size - 1)
+    val q = questions[i]
+    val places by Prefs.savedPlaces.collectAsStateWithLifecycle()
+    val place = places.filter { it.distanceTo(q.lat, q.lon) <= it.radiusM + 100 }.minByOrNull { it.distanceTo(q.lat, q.lon) }
+    val outline = MaterialTheme.colorScheme.primary
+    // The map square in question, outlined.
+    val lines = remember(q.area, outline) {
+        val row = Cells.rowOf(q.area)
+        val col = Cells.colOf(q.area)
+        val s = Cells.south(row)
+        val w = Cells.west(col)
+        val n = Cells.south(row + 1)
+        val e = Cells.west(col + 1)
+        listOf(PreviewLine(listOf(LatLng(s, w), LatLng(s, e), LatLng(n, e), LatLng(n, w), LatLng(s, w)), outline, 3f))
+    }
+    ElevatedCard(
+        modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Different heights here?", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (questions.size == 1) "1 place to check" else "${i + 1} of ${questions.size} places to check",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (questions.size > 1) {
+                    Tip("Previous") {
+                        IconButton(onClick = { index = i - 1 }, enabled = i > 0) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
+                        }
+                    }
+                    Tip("Next") {
+                        IconButton(onClick = { index = i + 1 }, enabled = i < questions.size - 1) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                (place?.let { "At ${it.name}, your" } ?: "Your") + " trips through here were recorded at about " +
+                    "${Units.length(q.low)} and about ${Units.length(q.high)} above sea level. " +
+                    (if (place != null) "Were you on different floors, " else "Were you on different levels, like a bridge over a road or another floor, ") +
+                    "or is it just GPS heights wandering?",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.runtime.key(q.area) {
+                TripPreviewLinesMap(lines, Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(12.dp)), interactive = true)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { onAnswer(q, false) }) { Text("Same level") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onAnswer(q, true) }) { Text(if (place != null) "Different floors" else "Different levels") }
+            }
+            Text(
+                "Same level draws one height there; different levels keeps each trip at its own height in 3D.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }

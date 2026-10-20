@@ -135,7 +135,7 @@ private fun AppScaffold(
     val tracking by Prefs.tracking.collectAsStateWithLifecycle()
     val changes by store.changes.collectAsStateWithLifecycle()
     val questions by produceState(0, changes, resumeTick) {
-        value = withContext(Dispatchers.IO) { store.tripsNeedingReview().size + store.openRoadQuestions().size }
+        value = withContext(Dispatchers.IO) { store.tripsNeedingReview().size + store.openRoadQuestions().size + store.openLevelQuestions().size }
     }
 
     // Back, when no page is open: from another tab go to the map; on the map, ask before leaving.

@@ -105,6 +105,8 @@ import androidx.compose.ui.unit.DpOffset
 import io.github.stephenjoy98.heatmap.data.DeleteResult
 import io.github.stephenjoy98.heatmap.data.Trip
 import io.github.stephenjoy98.heatmap.data.RoadQuestion
+import io.github.stephenjoy98.heatmap.data.LevelQuestion
+import io.github.stephenjoy98.heatmap.data.HeightGrid
 import io.github.stephenjoy98.heatmap.roads.RoadSnapper
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -160,6 +162,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     }
     val roadQuestions by produceState(emptyList<Pair<RoadQuestion, Trip?>>(), changes, resumeTick) {
         value = withContext(Dispatchers.IO) { store.openRoadQuestions().take(30).map { it to store.trip(it.tripId) } }
+    }
+    val levelQuestions by produceState(emptyList<LevelQuestion>(), changes, resumeTick) {
+        value = withContext(Dispatchers.IO) { store.openLevelQuestions() }
     }
     // A trip to zoom to once its day has loaded (from "Show on Timeline").
     var focusTrip by remember { mutableStateOf<Long?>(null) }
@@ -562,6 +567,19 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                             onAnswer = { q, choice ->
                                 scope.launch {
                                     withContext(Dispatchers.IO) { RoadSnapper.answer(context, q, choice) }
+                                }
+                            },
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                    }
+                }
+                if (levelQuestions.isNotEmpty()) {
+                    item(key = "levels") {
+                        LevelQuestionsCard(
+                            questions = levelQuestions,
+                            onAnswer = { q, different ->
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { store.answerLevel(q.area, if (different) HeightGrid.DIFFERENT else HeightGrid.SAME) }
                                 }
                             },
                             modifier = Modifier.padding(bottom = 12.dp),
