@@ -121,6 +121,7 @@ private val dataSources = listOf(
     Credit("OpenFreeMap map tiles and OpenMapTiles schema", "© OpenMapTiles, OpenFreeMap", "https://openfreemap.org/"),
     Credit("Terrain Tiles (elevation)", "Mapzen, USGS, NASA SRTM, EU-DEM and others", "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"),
     Credit("Valhalla map matching (FOSSGIS server)", "MIT License; FOSSGIS usage policy", "https://valhalla.openstreetmap.de/"),
+    Credit("JoyPixels emoji artwork (flags and globes)", "JoyPixels Free License, with attribution", "https://www.joypixels.com/licenses"),
 )
 
 /** Who made the app, its open-source licence, and the licences of everything it builds on. */

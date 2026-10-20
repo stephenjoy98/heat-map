@@ -33,6 +33,7 @@ them in the APK.
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) | © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). Credit shown on the map. |
 | [OpenFreeMap](https://openfreemap.org/) tiles, [OpenMapTiles](https://openmaptiles.org/) schema | "OpenFreeMap © OpenMapTiles". Credit shown on the map. |
 | [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Elevation from Mapzen, USGS, NASA SRTM, EU-DEM and others; see the [full attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). |
+| [JoyPixels](https://www.joypixels.com/) emoji artwork (flags and globes in the profile's place lists) | [JoyPixels Free License](https://www.joypixels.com/licenses), which requires attribution (shown under About). Downloaded at runtime; **not** covered by this project's GPL licence. |
 | [Valhalla](https://github.com/valhalla/valhalla) map matching on the FOSSGIS server | Valhalla is MIT-licensed; the public server has a [fair-use policy](https://valhalla.openstreetmap.de/). Only coordinates are sent. |
 
 ## Trademarks

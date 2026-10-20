@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.30.2] - 2026-10-20
+
+### Changed
+- The country, city and continent lists on your profile show JoyPixels flags and globes again.
+
 ## [2.30.1] - 2026-10-20
 
 ### Changed

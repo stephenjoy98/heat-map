@@ -364,6 +364,13 @@ private fun MostVisitedTile(s: ProfileStats, modifier: Modifier) {
 
 private enum class PlaceKind(val title: String) { COUNTRIES("Countries"), CITIES("Cities"), CONTINENTS("Continents") }
 
+private fun continentEmoji(continent: String) = when (continent) {
+    "North America", "South America" -> "🌎"
+    "Asia", "Oceania" -> "🌏"
+    "Antarctica" -> "🐧"
+    else -> "🌍"
+}
+
 
 @Composable
 private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
@@ -448,19 +455,19 @@ private fun PlacesCard(s: ProfileStats, onExplore: () -> Unit) {
 /** A popup listing every country, city or continent visited in the selected period. */
 @Composable
 private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDismiss: () -> Unit) {
-    val icon = when (kind) {
-        PlaceKind.COUNTRIES -> R.drawable.ic_flag
-        PlaceKind.CITIES -> R.drawable.ic_location_city
-        PlaceKind.CONTINENTS -> R.drawable.ic_public
-    }
-    val rows: List<Pair<String, String?>> = when (kind) {
-        PlaceKind.COUNTRIES -> s.countries.map { it.name to Places.continentOf(it.code) }
+    // Each row leads with its flag or globe in JoyPixels artwork: the one place the app still uses emoji.
+    val rows: List<Triple<String, String, String?>> = when (kind) {
+        PlaceKind.COUNTRIES -> s.countries.map { Triple(JoyPixels.flag(it.code), it.name, Places.continentOf(it.code)) }
         PlaceKind.CITIES -> s.cities.map { c ->
-            c.name to listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}", Insights.km(c.km)).joinToString(" · ")
+            Triple(
+                c.countryCode?.let(JoyPixels::flag) ?: "🏙️",
+                c.name,
+                listOfNotNull(c.country, "${c.days} ${if (c.days == 1) "day" else "days"}", Insights.km(c.km)).joinToString(" · "),
+            )
         }
         PlaceKind.CONTINENTS -> s.continents.map { continent ->
             val n = s.countries.count { Places.continentOf(it.code) == continent }
-            continent to "$n ${if (n == 1) "country" else "countries"}"
+            Triple(continentEmoji(continent), continent, "$n ${if (n == 1) "country" else "countries"}")
         }
     }
     // Grows out of the tile that was tapped, and shrinks back into it.
@@ -470,9 +477,9 @@ private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDism
                 Text("${kind.title} · ${rows.size}", style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(12.dp))
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(rows) { (name, detail) ->
+                    items(rows) { (emoji, name, detail) ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            MaterialIcon(icon, 24, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            JoyEmoji(emoji, 28)
                             Spacer(Modifier.width(14.dp))
                             Column {
                                 Text(name, style = MaterialTheme.typography.bodyLarge)

@@ -132,7 +132,7 @@ up to your Google account, and lets you compare explored areas with friends.
   where you spend the most days); **dots captured** with kilometres, trips and areas; **time captured**
   as a total (e.g. 1 day 15 hours, each dot counting for its interval); your most visited city;
   **locations explored** (**km explored**, which counts only ground you're covering for the first time
-  on a ~60 m grid, unlike km travelled; and countries, cities and continents, each tappable for the full list);
+  on a ~60 m grid, unlike km travelled; and countries, cities and continents, each tappable for the full list, with JoyPixels flags and globes);
   and an estimated **carbon footprint**.
   Filter by all time or by year.
 
