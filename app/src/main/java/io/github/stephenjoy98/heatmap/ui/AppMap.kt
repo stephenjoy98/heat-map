@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.unit.Dp
 import android.app.Activity
 import android.content.Context
 import android.graphics.PointF
@@ -163,6 +164,8 @@ fun AppMap(
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
     cacheKey: String? = null,
     onMapLongClick: ((lat: Double, lon: Double) -> Unit)? = null,
+    // How much of the map's bottom is covered (by the tab bar), so the OpenStreetMap credit stays above it.
+    bottomInset: Dp = 0.dp,
     // Loads routes with heights for an area; with 3D buildings on, they're drawn as a 3D route. Runs off
     // the main thread.
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)? = null,
@@ -171,13 +174,16 @@ fun AppMap(
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier)
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset)
 }
 
 /** How the base map looks: theme, terrain shading and 3D buildings (which also tilt the camera). */
 private data class MapLook(val dark: Boolean, val terrain: Boolean = false, val buildings: Boolean = false)
 
 private const val TILT_3D = 45f
+
+// The OpenStreetMap credit sits this far up from the map's bottom, above the recording panel and GPS button.
+private const val ATTRIBUTION_BOTTOM_DP = 180f
 
 // Tilting further than this by hand switches on 3D buildings, and back below the second switches them off.
 private const val AUTO_3D_TILT = 8f
@@ -353,7 +359,7 @@ private class VectorMapHolder(context: Context) {
             m.uiSettings.attributionGravity = Gravity.BOTTOM or Gravity.START
             // Keep the OpenStreetMap credit visible above the recording panel and the accuracy button.
             val dp = context.resources.displayMetrics.density
-            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (180 * dp).toInt())
+            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (ATTRIBUTION_BOTTOM_DP * dp).toInt())
             mapView.setOnTouchListener(TwoFingerTilt(this, dp))
             readyCallbacks.forEach { it(m) }
             readyCallbacks.clear()
@@ -462,8 +468,14 @@ private fun VectorAppMap(
     cacheKey: String?,
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)?,
     modifier: Modifier,
+    bottomInset: Dp,
 ) {
     val holder = rememberVectorMap(cacheKey)
+    val context = LocalContext.current
+    LaunchedEffect(holder, bottomInset) {
+        val dp = context.resources.displayMetrics.density
+        holder.withMap { m -> m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, ((ATTRIBUTION_BOTTOM_DP + bottomInset.value) * dp).toInt()) }
+    }
     val loadRoute3d by rememberUpdatedState(route3d)
     val overlay = holder.overlay
     SideEffect {

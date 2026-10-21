@@ -26,6 +26,8 @@ The app shows the entries since your last version as "What's new" after an updat
 - New versions are no longer downloaded on their own. When one is out, a sheet tells you on the map screen, with
   Later and Download and install now. "Update automatically" in Settings › Updates is now off for everyone; turn it
   back on there if you want it.
+- Switching the map to full screen and back: the hidden controls fly off the edges (easing out) and back in
+  (easing in) instead of fading, the tab bar slides away with them, and the map no longer shakes.
 
 ## [2.36.1] - 2026-10-21
 

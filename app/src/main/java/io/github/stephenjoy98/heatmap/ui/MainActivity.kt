@@ -1,5 +1,11 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
 import android.content.Intent
 import android.content.Context
 import android.app.PendingIntent
@@ -317,8 +323,13 @@ private fun AppScaffold(
                     contentWindowInsets = WindowInsets(0),
                     snackbarHost = { SwipeSnackbarHost(snackbar) },
                     bottomBar = {
-                        // Hidden while the map is full screen.
-                        if (!(tab == MainActivity.TAB_MAP && MapChrome.fullscreen)) NavigationBar {
+                        // Slides away while the map is full screen (easing out), and back (easing in).
+                        val barShown = !(tab == MainActivity.TAB_MAP && MapChrome.fullscreen)
+                        AnimatedVisibility(
+                            visible = barShown,
+                            enter = slideInVertically(tween(FULLSCREEN_MS, easing = EaseIn)) { it },
+                            exit = slideOutVertically(tween(FULLSCREEN_MS, easing = EaseOut)) { it },
+                        ) { NavigationBar {
                             NavigationBarItem(
                                 selected = tab == MainActivity.TAB_MAP,
                                 onClick = { tab = MainActivity.TAB_MAP },
@@ -342,7 +353,7 @@ private fun AppScaffold(
                                 },
                                 label = { Text("Timeline") },
                             )
-                        }
+                        } }
                     },
                 ) { padding ->
                     // No crossfade: map views can't fade like the rest of the UI, so the tabs switch instantly.

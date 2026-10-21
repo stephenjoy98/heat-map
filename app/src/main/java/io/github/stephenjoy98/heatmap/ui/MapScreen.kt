@@ -1,5 +1,13 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import android.Manifest
@@ -123,6 +131,20 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     // Full screen: only the compass, location, zoom, layers and full-screen buttons stay over the map.
     val full = MapChrome.fullscreen
     BackHandler(enabled = full && !LocalCovered.current) { MapChrome.fullscreen = false }
+    // The hidden controls fly out (easing out) and back in (easing in) by moving, never by changing the layout,
+    // so the map and the buttons that stay don't jump. 0 = all shown, 1 = full screen.
+    val hide by animateFloatAsState(
+        if (full) 1f else 0f,
+        tween(FULLSCREEN_MS, easing = if (full) EaseOut else EaseIn),
+        label = "fullscreen",
+    )
+    var topRowPx by remember { mutableIntStateOf(0) }
+    var panelPx by remember { mutableIntStateOf(0) }
+    // The tab bar's height, remembered while it's hidden; the map runs under it so it never changes size.
+    var navPad by remember { mutableStateOf(80.dp) }
+    val barPad = contentPadding.calculateBottomPadding()
+    LaunchedEffect(barPad) { if (barPad > 0.dp) navPad = barPad }
+    val density = LocalDensity.current
     // Live GPS pauses while a page covers the map.
     val covered = LocalCovered.current
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
@@ -151,7 +173,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
         }
     }
 
-    Box(Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding())) {
+    Box(Modifier.fillMaxSize()) {
         AppMap(
             camera = camera,
             layers = layers,
@@ -160,6 +182,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             latest = if (showDot) stats?.latest?.let { LatLng(it.lat, it.lon) } else null,
             cacheKey = "map",
             route3d = route3d,
+            bottomInset = navPad,
         )
         // While the accuracy card is open, touching the map anywhere else closes it. The buttons drawn above
         // this still work as usual.
@@ -183,12 +206,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 .padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            AnimatedVisibility(
-                visible = !full,
-                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            Column(
+                Modifier
+                    .onSizeChanged { topRowPx = it.height }
+                    // Up and off the top of the screen.
+                    .graphicsLayer { translationY = -hide * (size.height + with(density) { 80.dp.toPx() }) },
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 FilterButton(
                     open = filtersOpen,
@@ -217,10 +241,15 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 }
             }
             }
-            }
             // Under the top row, and under the chips when they're out so nothing overlaps: the scale while the
             // map moves on the left, and the compass on the right, under the profile button.
-            Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
+            // In full screen the compass glides up into the top row's place.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, top = 12.dp)
+                    .graphicsLayer { translationY = -hide * (topRowPx + with(density) { 12.dp.toPx() }) },
+            ) {
                 if (!full) ScaleBar(camera, Modifier.align(Alignment.CenterStart))
                 CompassButton(camera, Modifier.align(Alignment.CenterEnd))
             }
@@ -228,8 +257,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
 
         if (layersOpen) MapLayersSheet(onDismiss = { layersOpen = false })
 
-        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navPad).padding(12.dp)) {
+            // The buttons that stay glide down into the space the recording panel and the tabs leave.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { translationY = hide * (panelPx + with(density) { navPad.toPx() }) },
+                verticalAlignment = Alignment.Bottom,
+            ) {
                 // Bottom left: GPS accuracy. Its card grows up out of the button and shrinks back into it.
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     AnimatedVisibility(
@@ -243,7 +278,12 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                             Spacer(Modifier.size(4.dp))
                         }
                     }
-                    if (hasLocation && !full) AccuracyButton(signal) { accuracyOpen = !accuracyOpen }
+                    // Off to the left.
+                    if (hasLocation) {
+                        Box(Modifier.graphicsLayer { translationX = -hide * (size.width + with(density) { 24.dp.toPx() }) }) {
+                            AccuracyButton(signal) { if (!full) accuracyOpen = !accuracyOpen }
+                        }
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
                 // Bottom right, from the corner up: map layers, zoom, then your latest position.
@@ -297,8 +337,12 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     LayersButton(onClick = { layersOpen = true })
                 }
             }
-            AnimatedVisibility(visible = !full, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-            Column {
+            // Down and off the bottom of the screen.
+            Column(
+                Modifier
+                    .onSizeChanged { panelPx = it.height }
+                    .graphicsLayer { translationY = hide * (size.height + with(density) { (navPad + 24.dp).toPx() }) },
+            ) {
             Spacer(Modifier.size(8.dp))
             ControlPanel(
                 tracking = tracking,
@@ -314,7 +358,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 onOpen = { recordingSheet = true },
             )
             }
-            }
         }
     }
 
@@ -325,6 +368,9 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
 object MapChrome {
     var fullscreen by mutableStateOf(false)
 }
+
+/** How long controls take to fly out of or back onto the map when switching full screen. */
+const val FULLSCREEN_MS = 300
 
 /** Material's "filter_list" icon; the core icon set doesn't include it. */
 private val FilterIcon: ImageVector by lazy {
