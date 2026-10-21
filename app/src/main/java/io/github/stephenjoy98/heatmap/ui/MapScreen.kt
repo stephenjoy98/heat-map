@@ -149,6 +149,17 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val covered = LocalCovered.current
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
     val signal = rememberFixQuality(liveFix)
+    // The blue dot: the newer of the last recorded dot and the live GPS fix (if it's reasonably precise), so it
+    // keeps up while you travel; the map glides it between them.
+    val dotAt = run {
+        val rec = stats?.latest
+        val live = liveFix?.takeIf { it.hasAccuracy() && it.accuracy <= 50f }
+        when {
+            live != null && (rec == null || live.time > rec.time) -> LatLng(live.latitude, live.longitude)
+            rec != null -> LatLng(rec.lat, rec.lon)
+            else -> null
+        }
+    }
     // Routes at their recorded heights, for the 3D buildings view.
     val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
@@ -179,7 +190,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             layers = layers,
             modifier = Modifier.fillMaxSize(),
             refreshKey = changes,
-            latest = if (showDot) stats?.latest?.let { LatLng(it.lat, it.lon) } else null,
+            latest = if (showDot) dotAt else null,
             cacheKey = "map",
             route3d = route3d,
             bottomInset = navPad,

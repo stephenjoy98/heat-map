@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.37.1] - 2026-10-21
+
+### Changed
+- The blue dot glides smoothly across the map as you travel instead of jumping from point to point. It also
+  follows the live GPS fix while the map is open, so it keeps up between recorded dots.
+
 ## [2.37.0] - 2026-10-21
 
 ### Added

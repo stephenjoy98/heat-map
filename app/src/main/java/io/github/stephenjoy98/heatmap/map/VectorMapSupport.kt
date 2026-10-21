@@ -1,5 +1,8 @@
 package io.github.stephenjoy98.heatmap.map
 
+import android.animation.ValueAnimator
+import android.os.SystemClock
+import android.view.animation.LinearInterpolator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
@@ -438,9 +441,42 @@ class TileOverlayView(context: Context) : View(context) {
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(66, 133, 244) }
 
+    // Where the dot is drawn: it glides from where it was to each new position over about the time between
+    // positions (linearly, so it keeps moving at a steady pace while you travel) instead of jumping.
+    private var shown: LatLng? = null
+    private var glideFrom: LatLng? = null
+    private var glideTo: LatLng? = null
+    private var lastMoveAt = 0L
+    private val glide = ValueAnimator.ofFloat(0f, 1f).apply {
+        interpolator = LinearInterpolator()
+        addUpdateListener { a ->
+            val from = glideFrom
+            val to = glideTo
+            if (from != null && to != null) {
+                val f = a.animatedFraction.toDouble()
+                shown = LatLng(from.latitude + (to.latitude - from.latitude) * f, from.longitude + (to.longitude - from.longitude) * f)
+                invalidate()
+            }
+        }
+    }
+
     var latest: LatLng? = null
         set(value) {
+            if (value == field) return
             field = value
+            val now = SystemClock.uptimeMillis()
+            val start = shown
+            glide.cancel()
+            if (value == null || start == null || start.distanceTo(value) > MAX_GLIDE_M) {
+                // First fix, or too far to glide (a new trip somewhere else): just put it there.
+                shown = value
+            } else {
+                glideFrom = start
+                glideTo = value
+                glide.duration = (now - lastMoveAt).coerceIn(MIN_GLIDE_MS, MAX_GLIDE_MS)
+                glide.start()
+            }
+            lastMoveAt = now
             invalidate()
         }
 
@@ -480,6 +516,7 @@ class TileOverlayView(context: Context) : View(context) {
     }
 
     fun release() {
+        glide.cancel()
         renderers.values.forEach { it.second.release() }
         renderers.clear()
     }
@@ -503,7 +540,7 @@ class TileOverlayView(context: Context) : View(context) {
         for ((_, renderer) in renderers.values.sortedBy { it.first }) {
             renderer.draw(canvas, zoom, bounds.latitudeNorth, bounds.latitudeSouth, bounds.longitudeEast, bounds.longitudeWest, place)
         }
-        latest?.let {
+        shown?.let {
             val p = projection.toScreenLocation(it)
             canvas.drawCircle(p.x, p.y, 14 * density, halo)
             canvas.drawCircle(p.x, p.y, 7 * density, ring)
@@ -512,4 +549,10 @@ class TileOverlayView(context: Context) : View(context) {
     }
 
     class LayerSpec(val id: String, val source: TileBitmapSource, val alpha: Float, val zIndex: Float)
+
+    private companion object {
+        const val MIN_GLIDE_MS = 300L
+        const val MAX_GLIDE_MS = 2_500L
+        const val MAX_GLIDE_M = 2_000.0
+    }
 }
