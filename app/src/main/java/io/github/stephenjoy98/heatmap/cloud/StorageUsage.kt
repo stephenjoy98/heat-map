@@ -29,7 +29,7 @@ object StorageUsage {
     }
 
     // Must match Backup: dots per backup document, and the arrays each document holds per dot.
-    private const val POINTS_PER_DOC = 7_000
+    private const val POINTS_PER_DOC = 4_000 // Same as Backup.
     private val BACKUP_FIELDS = listOf("t", "la", "lo", "ac", "iv", "at", "md", "al")
     private const val NUMBER_BYTES = 8
     private const val DOC_OVERHEAD = 32
