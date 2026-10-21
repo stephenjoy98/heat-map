@@ -141,7 +141,11 @@ object VectorMaps {
                         }
                     )
                 )
-                is SymbolLayer -> {
+                // Highway shields keep dark numbers on their light badge; recoloured like other labels they
+                // showed as blank grey boxes on the dark map.
+                is SymbolLayer -> if ("shield" in id) {
+                    layer.setProperties(PropertyFactory.textColor("#1F1F1F"), PropertyFactory.iconOpacity(if (dark) 0.85f else 1f))
+                } else {
                     layer.setProperties(PropertyFactory.textColor(p.label), PropertyFactory.textHaloColor(p.halo))
                     if (dark) layer.setProperties(PropertyFactory.iconOpacity(0.6f + 0.3f * vivid))
                 }

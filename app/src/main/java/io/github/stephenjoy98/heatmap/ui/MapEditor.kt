@@ -256,6 +256,7 @@ fun EditPanel(
                                 valueRange = 0f..(pts.size - 1).toFloat(),
                                 modifier = Modifier.padding(horizontal = 8.dp),
                             )
+                            RangeSteppers(state, Modifier.padding(horizontal = 4.dp))
                         }
                         Row(
                             Modifier.fillMaxWidth().padding(start = 12.dp),

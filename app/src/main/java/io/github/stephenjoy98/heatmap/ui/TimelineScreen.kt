@@ -1031,6 +1031,7 @@ private fun RetimePanel(
                         valueRange = 0f..(pts.size - 1).toFloat(),
                         modifier = Modifier.padding(horizontal = 8.dp),
                     )
+                    RangeSteppers(state, Modifier.padding(horizontal = 4.dp))
                 }
                 val flat = entries.flattened()
                 val changes = if (trip != null) {
@@ -1200,6 +1201,7 @@ private fun RouteFixPanel(
                     valueRange = 0f..(pts.size - 1).toFloat(),
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
+                RangeSteppers(state, Modifier.padding(horizontal = 4.dp))
                 ModeChips(selected = mode, onPick = onMode, modifier = Modifier.padding(horizontal = 12.dp))
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -18,6 +18,9 @@ The app shows the entries since your last version as "What's new" after an updat
 - Map colours in the layers sheet: from the standard muted look to vivid, with blue water, green parks,
   brighter roads (yellow main roads on the light map), coloured buildings and clearer labels, for more
   contrast. Set separately for the dark and the light theme.
+- Minus and plus buttons under the time sliders when changing a trip's times, adding a trip, fixing a route or
+  editing dots: each tap moves the start or the end by one dot (times shown to the second), and holding a
+  button keeps going.
 
 ### Fixed
 - Each notification opens its own place again: the recording notification just opens the app, "new version"
@@ -28,6 +31,7 @@ The app shows the entries since your last version as "What's new" after an updat
 - Going back from a Settings section returns to where you were in the list of sections, not the top.
 - Tilting the map into 3D with two fingers works even when the second finger lands a moment after the first.
   Before, that only panned the map unless both fingers touched down at the same time.
+- Highway route numbers show on the dark map again; their badges had turned into blank grey boxes.
 
 ### Changed
 - A new version is offered in a sheet that slides up from the bottom, only on the map screen and once each time
