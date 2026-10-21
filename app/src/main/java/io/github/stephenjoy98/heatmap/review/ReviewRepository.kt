@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.review
 
+import io.github.stephenjoy98.heatmap.data.SatelliteSummary
+
 import android.content.Context
 import io.github.stephenjoy98.heatmap.data.CoarseArea
 import io.github.stephenjoy98.heatmap.data.Place
@@ -27,6 +29,8 @@ class ReviewData(
     val questions: List<Trip>,
     /** New map squares explored in the period, by city, most first. */
     val newAreasByCity: List<Pair<String, Int>> = emptyList(),
+    /** Satellites behind the dots recorded in the period (noted since 2.31.0). */
+    val satellites: SatelliteSummary = SatelliteSummary(emptyList(), 0),
 ) {
     val totalKm: Double get() = kmByMode.values.sum()
 }
@@ -68,6 +72,7 @@ object ReviewRepository {
                 ?.let { LocalDate.parse(it.key) to it.value / 1000.0 },
             questions = store.tripsNeedingReview(),
             newAreasByCity = byCity(areaPlaces, store.cellsByArea(from, to, onlyNew = true)),
+            satellites = store.satelliteUse(from, to),
         )
     }
 

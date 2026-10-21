@@ -50,7 +50,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.30.3**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.31.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -77,7 +77,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,
   `BootReceiver`. Manual interval slider is 15 s … 1 day. Fixes worse than `accuracyLimitM` (100 m high
   accuracy / 500 m) are skipped.
-- `data/`: `PointStore` (SQLite, **schema v9**: points incl. altitude, trips, places, friend_routes,
+- `data/`: `PointStore` (SQLite, **schema v10**: v10 = satellite_use (day, constellation, svid, fixes) + satellite_fixes
+  (day, fixes), filled by `LocationTickerService` from a GnssStatus callback (satellites usedInFix within 15 s of a saved
+  fix, `logSatellites`), read by `satelliteUse(from, to)` → Insights `SatellitesCard`; names in `data/Satellites.kt`;
+  not backed up; points incl. altitude, trips, places, friend_routes,
   trip_paths, road_questions, deleted_points (soft delete), explored_cells/explored_days/explored_state
   (km-explored cache), battery_log (v8: sample/min while recording via `LocationTickerService.sampleBattery`;
   `batteryByInterval` → `BatterySection` in Settings)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,

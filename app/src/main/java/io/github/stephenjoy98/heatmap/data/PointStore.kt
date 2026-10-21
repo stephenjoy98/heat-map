@@ -163,7 +163,7 @@ class RoadQuestion(
 )
 
 class PointStore private constructor(context: Context) :
-    SQLiteOpenHelper(context, "points.db", null, 9) {
+    SQLiteOpenHelper(context, "points.db", null, 10) {
 
     private val _changes = MutableStateFlow(0L)
 
@@ -328,6 +328,20 @@ class PointStore private constructor(context: Context) :
                 )"""
             )
         }
+        if (oldVersion < 10) {
+            // Which satellites each recorded dot was fixed with, counted per day (Insights › Satellites), and how
+            // many dots a day had satellite information at all.
+            db.execSQL(
+                """CREATE TABLE satellite_use (
+                    day INTEGER NOT NULL,
+                    constellation INTEGER NOT NULL,
+                    svid INTEGER NOT NULL,
+                    fixes INTEGER NOT NULL,
+                    PRIMARY KEY (day, constellation, svid)
+                )"""
+            )
+            db.execSQL("CREATE TABLE satellite_fixes (day INTEGER PRIMARY KEY, fixes INTEGER NOT NULL)")
+        }
     }
 
     private fun changed() = _changes.update { it + 1 }
@@ -386,6 +400,8 @@ class PointStore private constructor(context: Context) :
         db.delete("trip_paths", null, null)
         db.delete("road_questions", null, null)
         db.delete("deleted_points", null, null)
+        db.delete("satellite_use", null, null)
+        db.delete("satellite_fixes", null, null)
         invalidateExplored(db)
         changed()
     }
@@ -844,6 +860,53 @@ class PointStore private constructor(context: Context) :
     // ---- Battery ----
 
     /** Records a battery sample taken while recording; samples older than 30 days are dropped. */
+    /** Counts [used] satellites (as [Satellites.key]s) towards the dot recorded at [time]. */
+    fun logSatellites(time: Long, used: Collection<Int>) {
+        if (used.isEmpty()) return
+        val day = java.time.Instant.ofEpochMilli(time).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toEpochDay()
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            // No UPSERT before Android 11's SQLite, so update first and insert when nothing was there.
+            val bump = db.compileStatement("UPDATE satellite_use SET fixes = fixes + 1 WHERE day = ? AND constellation = ? AND svid = ?")
+            val add = db.compileStatement("INSERT INTO satellite_use (day, constellation, svid, fixes) VALUES (?, ?, ?, 1)")
+            for (k in used) {
+                val c = (k / 1000).toLong()
+                val id = (k % 1000).toLong()
+                bump.clearBindings()
+                bump.bindLong(1, day)
+                bump.bindLong(2, c)
+                bump.bindLong(3, id)
+                if (bump.executeUpdateDelete() == 0) {
+                    add.clearBindings()
+                    add.bindLong(1, day)
+                    add.bindLong(2, c)
+                    add.bindLong(3, id)
+                    add.executeInsert()
+                }
+            }
+            db.execSQL("UPDATE satellite_fixes SET fixes = fixes + 1 WHERE day = $day")
+            db.execSQL("INSERT OR IGNORE INTO satellite_fixes (day, fixes) VALUES ($day, 1)")
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** The satellites used for dots recorded between [from] and [to] (ms), most used first. */
+    fun satelliteUse(from: Long, to: Long): SatelliteSummary {
+        val zone = java.time.ZoneId.systemDefault()
+        val first = java.time.Instant.ofEpochMilli(from.coerceAtLeast(0)).atZone(zone).toLocalDate().toEpochDay()
+        val last = java.time.Instant.ofEpochMilli(to).atZone(zone).toLocalDate().toEpochDay()
+        val list = readableDatabase.rawQuery(
+            "SELECT constellation, svid, SUM(fixes) AS n FROM satellite_use WHERE day BETWEEN $first AND $last " +
+                "GROUP BY constellation, svid ORDER BY n DESC",
+            null,
+        ).use { c -> buildList { while (c.moveToNext()) add(SatelliteUse(c.getInt(0), c.getInt(1), c.getLong(2))) } }
+        val fixes = long("SELECT COALESCE(SUM(fixes), 0) FROM satellite_fixes WHERE day BETWEEN $first AND $last")
+        return SatelliteSummary(list, fixes)
+    }
+
     fun logBattery(time: Long, levelPct: Float, chargeUah: Long, charging: Boolean, screenOn: Boolean, intervalMs: Long) {
         val db = writableDatabase
         db.insertWithOnConflict("battery_log", null, ContentValues().apply {

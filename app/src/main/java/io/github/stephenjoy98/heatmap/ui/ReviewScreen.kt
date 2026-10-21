@@ -70,6 +70,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.data.PointStore
+import io.github.stephenjoy98.heatmap.data.Satellites
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Polyline
@@ -149,6 +150,7 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
             item { ModeBreakdown(d) }
             item { StepsCard(d, resumeTick) { refresh++ } }
             if (d.cities.isNotEmpty()) item { CitiesCard(d) }
+            item { SatellitesCard(d) }
             item { InsightsCard(d) }
         }
     }
@@ -257,6 +259,89 @@ private fun StepsCard(d: ReviewData, resumeTick: Int, onChanged: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** Colour for each satellite system's bar. */
+private fun systemColor(constellation: Int): Color = when (constellation) {
+    Satellites.GPS -> ChartColors.Blue
+    Satellites.GALILEO -> ChartColors.Amber
+    Satellites.GLONASS -> ChartColors.Red
+    Satellites.BEIDOU -> ChartColors.Magenta
+    Satellites.QZSS -> ChartColors.Green
+    Satellites.NAVIC -> ChartColors.Orange
+    else -> ChartColors.Grey
+}
+
+/**
+ * Which satellites fixed your position in the period: a bar per system (GPS, Galileo, GLONASS, BeiDou…) with
+ * how many of its satellites were used, and every satellite with its count under "See all satellites".
+ */
+@Composable
+private fun SatellitesCard(d: ReviewData) {
+    val s = d.satellites
+    var showing by remember { mutableStateOf(false) }
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Satellites", style = MaterialTheme.typography.titleMedium)
+            if (s.satellites.isEmpty()) {
+                Text(
+                    "No satellite information for this period yet. Since version 2.31.0 the app notes which satellites " +
+                        "each dot was fixed with; dots from Wi-Fi or mobile networks (at a saved place, say) use none.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                val systems = s.bySystem
+                Text(
+                    "${s.satellites.size} satellites from ${systems.size} ${if (systems.size == 1) "system" else "systems"} " +
+                        "fixed ${formatCount(s.fixes)} of your dots",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val max = systems.maxOf { it.third }.coerceAtLeast(1)
+                systems.forEach { (c, count, fixes) ->
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(Satellites.system(c), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(96.dp))
+                            Box(
+                                Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                            ) {
+                                Box(
+                                    Modifier.fillMaxHeight().fillMaxWidth((fixes.toFloat() / max).coerceIn(0.02f, 1f))
+                                        .background(systemColor(c)),
+                                )
+                            }
+                            Text(
+                                "$count sats",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.width(72.dp).padding(start = 8.dp),
+                            )
+                        }
+                        Text(
+                            "${Satellites.operator(c)} · used ${formatCount(fixes)} times",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                TextButton(onClick = { showing = true }) { Text("See all satellites") }
+            }
+        }
+    }
+    if (showing) {
+        ListDialog(
+            title = "Satellites · ${s.satellites.size}",
+            explanation = "Each satellite your phone used to fix a dot in this period, and how many dots it helped " +
+                "with. A fix usually uses several satellites at once. G is GPS, E Galileo, R GLONASS, C BeiDou, " +
+                "J QZSS, I NavIC and S the correction (SBAS) satellites.",
+            rows = s.satellites.map { u ->
+                "${Satellites.name(u.constellation, u.svid)} · ${Satellites.system(u.constellation)}" to "${formatCount(u.fixes)} times"
+            },
+            empty = "No satellites yet.",
+            onDismiss = { showing = false },
+        )
     }
 }
 

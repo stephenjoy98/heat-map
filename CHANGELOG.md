@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.31.0] - 2026-10-21
+
+### Added
+- Insights › Satellites: which navigation satellites fixed your location in the chosen period, grouped by
+  system (GPS, Galileo, GLONASS, BeiDou, QZSS, NavIC) with how many of each were used and how often, plus a
+  full list of every satellite (G05, E24, R12…) and how many dots it helped with. The app starts noting
+  satellites with this version, so earlier history has none; dots fixed from Wi-Fi or mobile networks (for
+  example while settled at a saved place) don't use satellites.
+
 ## [2.30.3] - 2026-10-21
 
 ### Changed

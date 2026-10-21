@@ -13,7 +13,9 @@ import android.os.BatteryManager
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.location.GnssStatus
 import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -31,6 +33,7 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.Satellites
 import com.google.android.gms.location.DetectedActivity
 import io.github.stephenjoy98.heatmap.data.SavedPlace
 import io.github.stephenjoy98.heatmap.data.PlaceZones
@@ -62,6 +65,19 @@ class LocationTickerService : Service() {
     // Automatic interval: recent fixes, and since when they've stayed in one spot. Worker thread only.
     private val recent = ArrayDeque<Location>()
     private var stillSince = 0L
+
+    // The satellites the GPS chip last said it used for a fix ([Satellites.key]s), and when. Worker thread only.
+    private var usedSatellites: List<Int> = emptyList()
+    private var usedSatellitesAt = 0L
+    private var gnssRegistered = false
+    private val gnssCallback = object : GnssStatus.Callback() {
+        override fun onSatelliteStatusChanged(status: GnssStatus) {
+            usedSatellites = (0 until status.satelliteCount)
+                .filter { status.usedInFix(it) }
+                .map { Satellites.key(status.getConstellationType(it), status.getSvid(it)) }
+            usedSatellitesAt = System.currentTimeMillis()
+        }
+    }
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -108,10 +124,21 @@ class LocationTickerService : Service() {
         PlaceFences.onExit = { handler.post { leavePlace() } }
         PlaceFences.register(this, Prefs.savedPlaces.value)
         requestUpdates()
+        watchSatellites()
         return START_STICKY
     }
 
+    @SuppressLint("MissingPermission") // Checked in onStartCommand.
+    private fun watchSatellites() {
+        if (gnssRegistered) return
+        // Only listens: the GPS chip reports while something (our location requests) has it running.
+        gnssRegistered = runCatching {
+            getSystemService(LocationManager::class.java)?.registerGnssStatusCallback(gnssCallback, handler) == true
+        }.getOrDefault(false)
+    }
+
     override fun onDestroy() {
+        if (gnssRegistered) runCatching { getSystemService(LocationManager::class.java)?.unregisterGnssStatusCallback(gnssCallback) }
         fused.removeLocationUpdates(callback)
         ActivityTracker.stop(this)
         ActivityTracker.onChange = null
@@ -176,7 +203,7 @@ class LocationTickerService : Service() {
         // The fused provider can deliver early (e.g. when another app asks for location); keep the set pace.
         if (location.time - lastSavedAt < intervalMs * 9 / 10) return
 
-        store.insert(
+        val saved = store.insert(
             LocationPoint(
                 time = location.time,
                 lat = location.latitude,
@@ -190,6 +217,10 @@ class LocationTickerService : Service() {
             )
         )
         lastSavedAt = location.time
+        // The satellites behind this fix, if the GPS chip reported them just now (not for Wi-Fi or cell fixes).
+        if (saved && System.currentTimeMillis() - usedSatellitesAt < SATELLITES_FRESH_MS) {
+            runCatching { store.logSatellites(location.time, usedSatellites) }
+        }
         // About once a minute, note the battery, so Settings can show what each interval uses.
         val now = System.currentTimeMillis()
         if (now - lastBatteryAt >= 60_000L) {
@@ -307,6 +338,8 @@ class LocationTickerService : Service() {
             location.hasAltitude() -> location.altitude
             else -> null
         }
+
+        private const val SATELLITES_FRESH_MS = 15_000L
 
         const val CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 1

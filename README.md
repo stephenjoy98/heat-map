@@ -140,6 +140,9 @@ up to your Google account, and lets you compare explored areas with friends.
 - Week / Month / Year / All time: distance (total and per mode), **new areas explored** (~220 m
   squares you'd never visited before), **cities and countries** visited (reverse-geocoded on the
   phone and cached), longest travel day, and **steps from Health Connect**.
+- **Satellites**: which navigation satellites fixed your dots in the period, per system (GPS, Galileo,
+  GLONASS, BeiDou, QZSS, NavIC) with how many satellites and how often each was used, and the full list
+  (G05, E24, R12…) with counts. Recorded from version 2.31.0 on; dots from Wi-Fi or mobile networks use none.
 - **Insights on demand**: tap *Get insights* or ask a question. On first launch (and any time in
   Settings) you choose who writes them:
   - **On-device AI (Gemini Nano)**: runs on the phone through ML Kit's Prompt API / AICore, with
