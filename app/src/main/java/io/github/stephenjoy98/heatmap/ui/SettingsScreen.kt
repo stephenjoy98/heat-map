@@ -219,7 +219,7 @@ fun SettingsScreen(
                 scrollBehavior = scrollBehavior,
             )
         },
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { SwipeSnackbarHost(snackbar) },
     ) { inner ->
         // Opening a section slides it in from the side and the list out the other way (Material's shared axis
         // motion), and back reverses it, instead of the page swapping in a single frame.

@@ -530,7 +530,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     DotsOverlay(camera, edit, Modifier.fillMaxSize())
                     // Map type and 3D buildings, right where you're editing.
                     LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
-                    SnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
+                    SwipeSnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
                 } else if (rangeEditing) {
                     DotsOverlay(camera, retime, Modifier.fillMaxSize())
                     if (fixing != null) RouteLinesOverlay(camera, roads, chosenRoad, vias, Modifier.fillMaxSize())
@@ -724,7 +724,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         }
     }
         // "Undo" after each change to trips and each answer.
-        SnackbarHost(undoSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = contentPadding.calculateBottomPadding()))
+        SwipeSnackbarHost(undoSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = contentPadding.calculateBottomPadding()))
     }
 
     if (layersOpen) {

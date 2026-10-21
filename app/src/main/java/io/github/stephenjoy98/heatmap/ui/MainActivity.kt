@@ -315,7 +315,7 @@ private fun AppScaffold(
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     contentWindowInsets = WindowInsets(0),
-                    snackbarHost = { SnackbarHost(snackbar) },
+                    snackbarHost = { SwipeSnackbarHost(snackbar) },
                     bottomBar = {
                         // Hidden while the map is full screen.
                         if (!(tab == MainActivity.TAB_MAP && MapChrome.fullscreen)) NavigationBar {
@@ -379,7 +379,7 @@ private fun AppScaffold(
                         onBack = back,
                         onExplore = { stack.push(Page.REVIEW) },
                     )
-                    Page.FRIENDS -> Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
+                    Page.FRIENDS -> Scaffold(snackbarHost = { SwipeSnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
                         FriendsScreen(
                             contentPadding = padding,
                             snackbar = snackbar,
@@ -392,7 +392,7 @@ private fun AppScaffold(
                             onBack = back,
                         )
                     }
-                    Page.BACKUP -> Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
+                    Page.BACKUP -> Scaffold(snackbarHost = { SwipeSnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
                         BackupScreen(contentPadding = padding, snackbar = snackbar, onBack = back)
                     }
                     Page.SETTINGS -> SettingsScreen(store = store, resumeTick = resumeTick, onBack = back)

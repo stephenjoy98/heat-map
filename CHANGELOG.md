@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.36.1] - 2026-10-21
+
+### Changed
+- Undo bars and other messages at the bottom of the screen can be swiped away sideways.
+
 ## [2.36.0] - 2026-10-21
 
 ### Added
