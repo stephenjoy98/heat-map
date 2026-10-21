@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.PointF
 import android.view.View
+import android.view.MotionEvent
+import kotlin.math.abs
+import kotlin.math.hypot
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -201,6 +204,112 @@ private fun MapBrightness(holder: VectorMapHolder, dark: Boolean) {
     }
 }
 
+/**
+ * Two-finger tilt that doesn't need both fingers to land at the same moment. MapLibre only starts its own
+ * tilt when the fingers touch down together; a second finger that lands a little later just pans the map.
+ * This watches the map's touches: once two fingers side by side both move up or down, it takes over from
+ * the map's gesture and tilts the camera itself until the fingers lift. Anything else (pans, pinches,
+ * twists) is left to the map.
+ */
+private class TwoFingerTilt(private val holder: VectorMapHolder, density: Float) : View.OnTouchListener {
+    private enum class State { IDLE, WATCHING, PASS, TILTING, DONE }
+
+    private val slop = 12 * density
+    private var state = State.IDLE
+    private val ids = IntArray(2)
+    private val startX = FloatArray(2)
+    private val startY = FloatArray(2)
+    private var lastY = 0f
+
+    override fun onTouch(v: View, e: MotionEvent): Boolean {
+        val m = holder.map
+        if (m == null || !m.uiSettings.isTiltGesturesEnabled) return false
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> state = State.IDLE
+            MotionEvent.ACTION_POINTER_DOWN -> when (state) {
+                State.IDLE -> if (e.pointerCount == 2) {
+                    for (i in 0..1) {
+                        ids[i] = e.getPointerId(i)
+                        startX[i] = e.getX(i)
+                        startY[i] = e.getY(i)
+                    }
+                    state = State.WATCHING
+                }
+                // A third finger: leave it to the map, or keep tilting from where the fingers are now.
+                State.WATCHING -> state = State.PASS
+                State.TILTING -> lastY = averageY(e, skip = -1)
+                else -> Unit
+            }
+            MotionEvent.ACTION_MOVE -> when (state) {
+                State.WATCHING -> decide(e)
+                State.TILTING -> {
+                    val y = averageY(e, skip = -1)
+                    val dy = y - lastY
+                    lastY = y
+                    // Same rate as MapLibre's own tilt: a tenth of a degree per pixel, up tilts further.
+                    val tilt = (m.cameraPosition.tilt - TILT_PER_PIXEL * dy).coerceIn(0.0, MAX_HAND_TILT)
+                    holder.handTilting = true
+                    m.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.tiltTo(tilt))
+                    holder.handTilting = false
+                }
+                else -> Unit
+            }
+            MotionEvent.ACTION_POINTER_UP -> when (state) {
+                State.WATCHING -> state = State.PASS
+                State.TILTING -> if (e.pointerCount - 1 < 2) state = State.DONE else lastY = averageY(e, skip = e.actionIndex)
+                else -> Unit
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val mine = state == State.TILTING || state == State.DONE
+                state = State.IDLE
+                return mine
+            }
+        }
+        return state == State.TILTING || state == State.DONE
+    }
+
+    /** Tilt when both fingers, side by side, move the same way up or down; give up on anything else. */
+    private fun decide(e: MotionEvent) {
+        val a = e.findPointerIndex(ids[0])
+        val b = e.findPointerIndex(ids[1])
+        if (a < 0 || b < 0) {
+            state = State.PASS
+            return
+        }
+        val dx0 = e.getX(a) - startX[0]
+        val dy0 = e.getY(a) - startY[0]
+        val dx1 = e.getX(b) - startX[1]
+        val dy1 = e.getY(b) - startY[1]
+        val sideBySide = abs(startY[0] - startY[1]) < abs(startX[0] - startX[1]) * 1.2f
+        val vertical0 = abs(dy0) > slop && abs(dy0) > abs(dx0) * 1.5f
+        val vertical1 = abs(dy1) > slop && abs(dy1) > abs(dx1) * 1.5f
+        if (sideBySide && vertical0 && vertical1 && (dy0 > 0) == (dy1 > 0)) {
+            state = State.TILTING
+            lastY = averageY(e, skip = -1)
+            // Stop the map's own pan or zoom; from here on the touches are ours.
+            val cancel = MotionEvent.obtain(e).apply { action = MotionEvent.ACTION_CANCEL }
+            holder.mapView.onTouchEvent(cancel)
+            cancel.recycle()
+        } else if (hypot(dx0, dy0) > slop * 3 || hypot(dx1, dy1) > slop * 3) {
+            state = State.PASS
+        }
+    }
+
+    private fun averageY(e: MotionEvent, skip: Int): Float {
+        var sum = 0f
+        var n = 0
+        for (i in 0 until e.pointerCount) {
+            if (i == skip) continue
+            sum += e.getY(i)
+            n++
+        }
+        return if (n == 0) lastY else sum / n
+    }
+}
+
+private const val TILT_PER_PIXEL = 0.1
+private const val MAX_HAND_TILT = 60.0
+
 /** Owns a MapLibre MapView, follows the Compose lifecycle, and hands out the map once it's ready. */
 private class VectorMapHolder(context: Context) {
     val mapView = MapView(context).apply { onCreate(null) }
@@ -218,6 +327,9 @@ private class VectorMapHolder(context: Context) {
     // Whether the current camera move is the user's own gesture, and whether 3D was just switched on by one.
     var gesture = false
     var tiltedByGesture = false
+
+    // True while TwoFingerTilt is tilting the camera, so its moves count as the user's own gesture.
+    var handTilting = false
 
     /** Goes up each time a style finishes loading, so extra layers can be added back. */
     var styleVersion by mutableIntStateOf(0)
@@ -239,6 +351,7 @@ private class VectorMapHolder(context: Context) {
             // Keep the OpenStreetMap credit visible above the recording panel and the accuracy button.
             val dp = context.resources.displayMetrics.density
             m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (160 * dp).toInt())
+            mapView.setOnTouchListener(TwoFingerTilt(this, dp))
             readyCallbacks.forEach { it(m) }
             readyCallbacks.clear()
         }
@@ -372,7 +485,7 @@ private fun VectorAppMap(
                     }
                 }
                 m.addOnCameraMoveStartedListener { reason ->
-                    holder.gesture = reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE
+                    holder.gesture = holder.handTilting || reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE
                     holder.camera?.moving = true
                 }
                 m.addOnCameraMoveListener {

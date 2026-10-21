@@ -26,6 +26,8 @@ The app shows the entries since your last version as "What's new" after an updat
 - Switching Settings between a page per section and one list fades smoothly from one to the other instead of
   jumping.
 - Going back from a Settings section returns to where you were in the list of sections, not the top.
+- Tilting the map into 3D with two fingers works even when the second finger lands a moment after the first.
+  Before, that only panned the map unless both fingers touched down at the same time.
 
 ### Changed
 - A new version is offered in a sheet that slides up from the bottom, only on the map screen and once each time
