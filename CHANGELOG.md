@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.37.0] - 2026-10-21
+
+### Added
+- The compass shows N, E, S and W around its needle; the whole dial turns as you rotate the map, so the
+  letters and the red needle always point the real way.
+- Colour roads too: a switch under Map colours in the layers sheet. Off (the default) keeps roads in the standard
+  colours while water, parks and buildings get the vivid ones.
+
 ## [2.36.1] - 2026-10-21
 
 ### Changed

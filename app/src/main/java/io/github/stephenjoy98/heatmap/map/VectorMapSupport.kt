@@ -107,9 +107,11 @@ object VectorMaps {
      * Paints the map in its dark or light palette, [vivid] of the way (0–1) from the muted standard colours to
      * colourful ones with more contrast. Matches layers on their type and name.
      */
-    fun applyColours(style: Style, dark: Boolean, vivid: Float) {
+    fun applyColours(style: Style, dark: Boolean, vivid: Float, roads: Boolean = true) {
         if (!style.isFullyLoaded) return
         val p = if (dark) darkMuted.blend(darkVivid, vivid) else lightMuted.blend(lightVivid, vivid)
+        // Roads keep the standard (muted) colours unless they're asked for too.
+        val r = if (roads) p else if (dark) darkMuted else lightMuted
         for (layer in style.layers) {
             val id = layer.id.lowercase()
             if (id.startsWith("route-3d") || id.startsWith("map-tint") || id.startsWith("preview") || id.startsWith("terrain")) continue
@@ -133,11 +135,11 @@ object VectorMaps {
                     PropertyFactory.lineColor(
                         when {
                             "water" in id || "river" in id -> p.water
-                            "casing" in id -> p.casing
+                            "casing" in id -> r.casing
                             "boundary" in id || "admin" in id -> p.border
                             "rail" in id -> p.rail
-                            listOf("motorway", "trunk", "primary", "major").any { it in id } -> p.majorRoad
-                            else -> p.minorRoad
+                            listOf("motorway", "trunk", "primary", "major").any { it in id } -> r.majorRoad
+                            else -> r.minorRoad
                         }
                     )
                 )

@@ -130,6 +130,15 @@ object Prefs {
     private val _mapColourLight = MutableStateFlow(0f)
     val mapColourLight: StateFlow<Float> = _mapColourLight
 
+    /** Whether Map colours also recolours roads; off keeps roads in the standard look. */
+    private val _mapColourRoads = MutableStateFlow(false)
+    val mapColourRoads: StateFlow<Boolean> = _mapColourRoads
+
+    fun setMapColourRoads(on: Boolean) {
+        _mapColourRoads.value = on
+        sp.edit().putBoolean("map_colour_roads", on).apply()
+    }
+
     fun setMapColour(dark: Boolean, amount: Float) {
         val v = amount.coerceIn(0f, 1f)
         if (dark) _mapColourDark.value = v else _mapColourLight.value = v
@@ -202,6 +211,7 @@ object Prefs {
         _mapBrightnessLight.value = sp.getFloat("map_brightness_light", 0f)
         _mapColourDark.value = sp.getFloat("map_colour_dark", 0f)
         _mapColourLight.value = sp.getFloat("map_colour_light", 0f)
+        _mapColourRoads.value = sp.getBoolean("map_colour_roads", false)
         _autoUpdate.value = sp.getBoolean("auto_update", true)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
         _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.STABLE)
@@ -503,7 +513,7 @@ object Prefs {
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
-        "show_location_dot",
+        "show_location_dot", "map_colour_roads",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */

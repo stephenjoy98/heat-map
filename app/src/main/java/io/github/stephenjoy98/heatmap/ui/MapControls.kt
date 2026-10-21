@@ -44,6 +44,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 private fun controlColor() = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
@@ -109,17 +116,23 @@ fun ZoomButtons(camera: MapCamera, modifier: Modifier = Modifier) {
     }
 }
 
-/** A two-tone needle: red points north, so it turns opposite to the map's rotation. */
+/**
+ * A compass dial: N, E, S and W around a two-tone needle whose red end points north. The whole dial turns
+ * opposite to the map's rotation, so the needle and letters always show the real directions.
+ */
 @Composable
 internal fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
     val north = Color(0xFFE53935)
     val south = MaterialTheme.colorScheme.onSurfaceVariant
     val pivot = MaterialTheme.colorScheme.surface
+    val letters = MaterialTheme.colorScheme.onSurface
+    val measurer = rememberTextMeasurer()
+    val style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
     Canvas(modifier.rotate(-bearing)) {
         val cx = size.width / 2
         val cy = size.height / 2
-        val half = size.minDimension * 0.32f
-        val waist = size.minDimension * 0.09f
+        val half = size.minDimension * 0.22f
+        val waist = size.minDimension * 0.075f
         drawPath(
             Path().apply {
                 moveTo(cx, cy - half)
@@ -139,6 +152,17 @@ internal fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
             south,
         )
         drawCircle(pivot, radius = waist * 0.45f, center = center)
+        // The letters sit around the edge, each upright relative to the dial, N in the needle's red.
+        val r = size.minDimension * 0.36f
+        listOf("N" to 0f, "E" to 90f, "S" to 180f, "W" to 270f).forEach { (label, angle) ->
+            val text = measurer.measure(label, style.copy(color = if (label == "N") north else letters))
+            val rad = Math.toRadians(angle.toDouble())
+            val x = cx + (r * sin(rad)).toFloat()
+            val y = cy - (r * cos(rad)).toFloat()
+            rotate(angle, pivot = Offset(x, y)) {
+                drawText(text, topLeft = Offset(x - text.size.width / 2f, y - text.size.height / 2f))
+            }
+        }
     }
 }
 

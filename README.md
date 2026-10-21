@@ -103,6 +103,8 @@ up to your Google account, and lets you compare explored areas with friends.
   the road pass through a spot.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
+- **Compass** with N, E, S and W that turns with the map; **Map colours** can leave roads in the standard colours
+  ("Colour roads too" switch).
 - **Undo** after every Timeline change (modes, times, added, joined or fixed trips) and every answered question.
 - **Full screen map** (button above the location button) keeps only the compass, location, zoom and layers
   buttons; **My location** in the layers sheet hides the blue dot.

@@ -29,6 +29,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -129,11 +131,27 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 Text("Vivid", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                "Vivid gives water, parks, roads and buildings their own colours, with more contrast between them.",
+                "Vivid gives water, parks and buildings their own colours, with more contrast between them.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            val roads by Prefs.mapColourRoads.collectAsStateWithLifecycle()
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp).clickable { Prefs.setMapColourRoads(!roads) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Colour roads too", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Brighter roads (yellow main roads on the light map). Off keeps roads in the standard colours.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = roads, onCheckedChange = Prefs::setMapColourRoads)
+            }
             Spacer(Modifier.height(20.dp))
             // Lighter or darker base map, kept separately for the dark and the light map.
             val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()

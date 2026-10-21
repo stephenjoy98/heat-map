@@ -191,13 +191,14 @@ private const val AUTO_FLAT_TILT = 2f
 private fun MapBrightness(holder: VectorMapHolder, dark: Boolean) {
     val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
     val colour by (if (dark) Prefs.mapColourDark else Prefs.mapColourLight).collectAsStateWithLifecycle()
+    val roads by Prefs.mapColourRoads.collectAsStateWithLifecycle()
     // The light style is left exactly as OpenFreeMap draws it until colour is turned up; once recoloured,
     // turning it back down paints the muted palette (a freshly loaded style starts untouched again).
     val recoloured = remember(holder, holder.styleVersion) { booleanArrayOf(false) }
-    LaunchedEffect(holder, holder.styleVersion, colour) {
+    LaunchedEffect(holder, holder.styleVersion, colour, roads) {
         if (dark || colour > 0f || recoloured[0]) {
             recoloured[0] = true
-            holder.withMap { m -> m.style?.let { VectorMaps.applyColours(it, dark, colour) } }
+            holder.withMap { m -> m.style?.let { VectorMaps.applyColours(it, dark, colour, roads) } }
         }
     }
     LaunchedEffect(holder, holder.styleVersion, brightness) {
