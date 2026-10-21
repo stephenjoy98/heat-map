@@ -860,6 +860,10 @@ class PointStore private constructor(context: Context) :
     // ---- Battery ----
 
     /** Records a battery sample taken while recording; samples older than 30 days are dropped. */
+    /** Bumped whenever satellite counts change, so Insights can refresh just that card. */
+    private val _satelliteChanges = MutableStateFlow(0)
+    val satelliteChanges: StateFlow<Int> = _satelliteChanges
+
     /** Counts [used] satellites (as [Satellites.key]s) towards the dot recorded at [time]. */
     fun logSatellites(time: Long, used: Collection<Int>) {
         if (used.isEmpty()) return
@@ -891,6 +895,7 @@ class PointStore private constructor(context: Context) :
         } finally {
             db.endTransaction()
         }
+        _satelliteChanges.update { it + 1 }
     }
 
     /** One day's satellite counts for the backup ([day] as an epoch day): (system, ID, uses) and the day's fixes. */
@@ -923,6 +928,7 @@ class PointStore private constructor(context: Context) :
         } finally {
             db.endTransaction()
         }
+        _satelliteChanges.update { it + 1 }
         changed()
     }
 

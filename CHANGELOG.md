@@ -28,6 +28,10 @@ The app shows the entries since your last version as "What's new" after an updat
   Changing a Recording setting by hand switches back to User. Saved places still slow recording down while
   you're settled, whichever profile is on.
 
+- Insights › Satellites updates live while you look at it, and shows how many satellites are fixing your
+  position right now while you're recording. It doesn't use extra battery: it only listens to what the GPS
+  chip already reports while recording has it on.
+
 ### Fixed
 - "1 sats" now reads "1 sat" in Insights › Satellites.
 

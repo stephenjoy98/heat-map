@@ -85,6 +85,7 @@ import io.github.stephenjoy98.heatmap.review.ReviewData
 import io.github.stephenjoy98.heatmap.review.ReviewPeriod
 import io.github.stephenjoy98.heatmap.review.ReviewRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
@@ -150,7 +151,7 @@ fun ReviewScreen(contentPadding: PaddingValues, resumeTick: Int, onBack: () -> U
             item { ModeBreakdown(d) }
             item { StepsCard(d, resumeTick) { refresh++ } }
             if (d.cities.isNotEmpty()) item { CitiesCard(d) }
-            item { SatellitesCard(d) }
+            item { SatellitesCard(store, d) }
             item { InsightsCard(d) }
         }
     }
@@ -262,6 +263,8 @@ private fun StepsCard(d: ReviewData, resumeTick: Int, onChanged: () -> Unit) {
     }
 }
 
+private const val SATELLITE_REFRESH_MS = 3_000L
+
 /** Colour for each satellite system's bar. */
 private fun systemColor(constellation: Int): Color = when (constellation) {
     Satellites.GPS -> ChartColors.Blue
@@ -278,12 +281,31 @@ private fun systemColor(constellation: Int): Color = when (constellation) {
  * how many of its satellites were used, and every satellite with its count under "See all satellites".
  */
 @Composable
-private fun SatellitesCard(d: ReviewData) {
-    val s = d.satellites
+private fun SatellitesCard(store: PointStore, d: ReviewData) {
+    // Kept up to date while you look: reloaded as recorded dots add satellites (at most every few seconds, the
+    // flow keeps only the latest change while it waits),
+    // without reloading the rest of Insights. Reading the counts back costs next to nothing.
+    val s by produceState(d.satellites, d.period) {
+        val (from, to) = ReviewRepository.range(d.period)
+        store.satelliteChanges.collect {
+            value = withContext(Dispatchers.IO) { store.satelliteUse(from, to) }
+            delay(SATELLITE_REFRESH_MS)
+        }
+    }
+    // What the GPS chip is using right now, while recording keeps it on. Listening adds no battery use.
+    val tracking by Prefs.tracking.collectAsStateWithLifecycle()
+    val live = rememberSatellites(enabled = tracking)
     var showing by remember { mutableStateOf(false) }
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Satellites", style = MaterialTheme.typography.titleMedium)
+            live?.let {
+                Text(
+                    "Right now: ${it.used} of ${it.visible} satellites in view fixing your position",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             if (s.satellites.isEmpty()) {
                 Text(
                     "No satellite information for this period yet. Since version 2.31.0 the app notes which satellites " +
