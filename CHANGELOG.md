@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.33.1] - 2026-10-21
+
+### Fixed
+- Tapping the "new version available" notification opens Settings › Updates, and the "updated" notification
+  opens the full changelog, instead of just opening the app.
+
 ## [2.33.0] - 2026-10-21
 
 ### Added

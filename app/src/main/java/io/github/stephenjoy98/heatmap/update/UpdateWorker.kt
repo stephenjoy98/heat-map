@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.ui.MainActivity
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,7 +27,7 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Updater.downloadAndInstall(context, release, whenAway = true)
         } else if (Prefs.lastUpdateNotified != release.label + release.build) {
             Prefs.lastUpdateNotified = release.label + release.build
-            Updater.notify(context, "Location Ticker ${release.label} is available", "Open Settings › Updates to install it")
+            Updater.notify(context, "Location Ticker ${release.label} is available", "Tap to see what's new and install it", page = MainActivity.PAGE_UPDATES)
         }
         return Result.success()
     }

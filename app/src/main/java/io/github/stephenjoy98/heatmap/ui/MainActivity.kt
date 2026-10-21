@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
     private val invite = MutableStateFlow<String?>(null)
     private val requestedTab = MutableStateFlow<Int?>(null)
     private val openFriends = MutableStateFlow(false)
+    /** A page a notification asked for ([PAGE_UPDATES], [PAGE_CHANGELOG]), waiting to be opened. */
+    private val requestedPage = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +81,7 @@ class MainActivity : ComponentActivity() {
             }
             TickerTheme(dark) {
                 val onboarded by Prefs.onboarded.collectAsStateWithLifecycle()
-                if (onboarded) AppScaffold(invite, requestedTab, openFriends) else OnboardingScreen()
+                if (onboarded) AppScaffold(invite, requestedTab, openFriends, requestedPage) else OnboardingScreen()
             }
         }
     }
@@ -117,10 +119,16 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (intent.hasExtra(EXTRA_TAB)) requestedTab.value = intent.getIntExtra(EXTRA_TAB, TAB_MAP)
+        intent.getStringExtra(EXTRA_PAGE)?.let { requestedPage.value = it }
+        // Handled once: coming back to the activity later shouldn't open it again.
+        intent.removeExtra(EXTRA_PAGE)
     }
 
     companion object {
         const val EXTRA_TAB = "tab"
+        const val EXTRA_PAGE = "page"
+        const val PAGE_UPDATES = "updates"
+        const val PAGE_CHANGELOG = "changelog"
         const val TAB_MAP = 0
         const val TAB_TIMELINE = 1
         const val TAB_REVIEW = 2
@@ -135,6 +143,7 @@ private fun AppScaffold(
     invite: MutableStateFlow<String?>,
     requestedTab: MutableStateFlow<Int?>,
     openFriends: MutableStateFlow<Boolean>,
+    requestedPage: MutableStateFlow<String?>,
 ) {
     val context = LocalContext.current
     val store = remember { PointStore.get(context) }
@@ -153,6 +162,7 @@ private fun AppScaffold(
     var resumeTick by remember { mutableIntStateOf(0) }
     val pendingInvite by invite.collectAsStateWithLifecycle()
     val wantedTab by requestedTab.collectAsStateWithLifecycle()
+    val wantedPage by requestedPage.collectAsStateWithLifecycle()
     val user by Account.user.collectAsStateWithLifecycle()
     val tracking by Prefs.tracking.collectAsStateWithLifecycle()
     val changes by store.changes.collectAsStateWithLifecycle()
@@ -170,6 +180,23 @@ private fun AppScaffold(
             stack.push(Page.FRIENDS)
             openFriends.value = false
         }
+    }
+
+    // From a notification: Settings › Updates for a new version, the changelog after an update.
+    LaunchedEffect(wantedPage) {
+        when (wantedPage) {
+            MainActivity.PAGE_UPDATES -> {
+                SettingsNav.openUpdates = true
+                stack.push(Page.SETTINGS)
+            }
+            MainActivity.PAGE_CHANGELOG -> {
+                // The full changelog replaces the "What's new" popup.
+                Prefs.setLastSeenVersion(BuildConfig.VERSION_NAME)
+                whatsNew = emptyList()
+                stack.push(Page.CHANGELOG)
+            }
+        }
+        requestedPage.value = null
     }
 
     LaunchedEffect(wantedTab) {

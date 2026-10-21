@@ -321,12 +321,15 @@ object Updater {
     }
 
     /** A notification about updates; tapping it opens [tap], or the app. */
-    fun notify(context: Context, title: String, text: String, tap: PendingIntent? = null) {
+    fun notify(context: Context, title: String, text: String, tap: PendingIntent? = null, page: String? = null) {
+        // Opens the app on [page] (MainActivity.PAGE_UPDATES or PAGE_CHANGELOG), or as it was.
         val open = tap ?: PendingIntent.getActivity(
             context,
             0,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_IMMUTABLE,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .apply { if (page != null) putExtra(MainActivity.EXTRA_PAGE, page) },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val n = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_ticker)

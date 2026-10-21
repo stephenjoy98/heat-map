@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -98,6 +99,11 @@ import kotlin.math.abs
 import androidx.annotation.DrawableRes
 import io.github.stephenjoy98.heatmap.R
 import kotlin.math.roundToInt
+
+/** Asks Settings to open a section when it next shows (set by MainActivity for notifications). */
+internal object SettingsNav {
+    var openUpdates by mutableStateOf(false)
+}
 
 /** The sections of Settings, each its own page when settings are shown as pages, listed under [group]. */
 private enum class SettingsPage(val title: String, val summary: String, @DrawableRes val icon: Int, val group: String) {
@@ -146,6 +152,13 @@ fun SettingsScreen(
     // The section open as its own page; null for the list of sections.
     var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
     BackHandler(enabled = asPages && page != null && !LocalCovered.current) { page = null }
+    // Opened from the "new version" notification: straight to Updates.
+    LaunchedEffect(SettingsNav.openUpdates) {
+        if (SettingsNav.openUpdates) {
+            if (asPages) page = SettingsPage.UPDATES
+            SettingsNav.openUpdates = false
+        }
+    }
 
     // A running recorder picks up new settings when it is (re)started.
     fun applyToService() {
