@@ -203,16 +203,23 @@ fun SettingsScreen(
     ) { inner ->
         // Opening a section slides it in from the side and the list out the other way (Material's shared axis
         // motion), and back reverses it, instead of the page swapping in a single frame.
+        // Switching between a page per section and one list fades one layout into the other (Material's fade
+        // through), instead of swapping the whole page in a single frame.
         AnimatedContent(
-            targetState = page.takeIf { asPages },
+            targetState = asPages to page.takeIf { asPages },
             transitionSpec = {
-                val dir = if (targetState != null) 1 else -1
-                (slideInHorizontally(tween(320)) { dir * it / 5 } + fadeIn(tween(320, delayMillis = 60))) togetherWith
-                    (slideOutHorizontally(tween(320)) { -dir * it / 5 } + fadeOut(tween(160)))
+                if (initialState.first != targetState.first) {
+                    fadeIn(tween(240, delayMillis = 90)) togetherWith fadeOut(tween(90))
+                } else {
+                    val dir = if (targetState.second != null) 1 else -1
+                    (slideInHorizontally(tween(320)) { dir * it / 5 } + fadeIn(tween(320, delayMillis = 60))) togetherWith
+                        (slideOutHorizontally(tween(320)) { -dir * it / 5 } + fadeOut(tween(160)))
+                }
             },
             label = "settings page",
-        ) { shown ->
-        fun shows(p: SettingsPage) = !asPages || shown == p
+        ) { (pagesMode, shown) ->
+        // This content's own layout, so the outgoing one keeps showing what it showed while it fades.
+        fun shows(p: SettingsPage) = !pagesMode || shown == p
         Column(
             Modifier
                 .fillMaxSize()
@@ -221,7 +228,7 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
         ) {
-            if (asPages && shown == null) {
+            if (pagesMode && shown == null) {
                 SettingsPage.entries.groupBy { it.group }.forEach { (group, pages) ->
                     Section(group) {
                         pages.forEachIndexed { i, p ->

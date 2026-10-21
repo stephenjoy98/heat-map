@@ -23,6 +23,8 @@ The app shows the entries since your last version as "What's new" after an updat
 - Each notification opens its own place again: the recording notification just opens the app, "new version"
   opens Settings › Updates, "updated" opens the changelog, and trip and road questions open the Timeline's
   Questions tab. Before, after one update notification every notification opened the changelog.
+- Switching Settings between a page per section and one list fades smoothly from one to the other instead of
+  jumping.
 
 ## [2.34.0] - 2026-10-21
 
