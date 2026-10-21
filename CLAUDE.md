@@ -50,7 +50,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.30.2**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.30.3**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -97,7 +97,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   `Prefs.currentMode` (set from `RecordingSheet`, opened by tapping the record tile) tags new dots' `mode`;
   cleared when tracking stops; TripDetector follows a majority of tagged dots.
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
-  `Route3d` (3D route geometry: continuous mitred ribbon, median + 120 m distance smoothing, heights above a
+  `Route3d` (3D route geometry: continuous mitred ribbon, median + 200 m distance smoothing, sloping hops cut into
+  pieces ≤0.15 m apart in height (2.30.3, cap 18k pieces) so slopes don't show as stairs, heights above a
   fixed `PointStore.altitudeBaseline()` (5th percentile, cached 10 min), exaggerated 1.5×. 2.28.0 tried heights above
   the ground (Terrarium DEM) at true scale plus overlap removal; the user found it "barely looks 3D" and it was
   reverted in 2.29.1 — don't redo that without asking;

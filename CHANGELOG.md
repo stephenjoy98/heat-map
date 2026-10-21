@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.30.3] - 2026-10-21
+
+### Changed
+- 3D routes climb and descend in a smooth slope instead of visible steps: sloping stretches are drawn as many
+  short pieces (each about 15 cm higher than the last), and heights are smoothed over about 200 m of route.
+
 ## [2.30.2] - 2026-10-20
 
 ### Changed

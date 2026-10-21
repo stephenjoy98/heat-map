@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.data
 
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -13,7 +15,8 @@ class ElevationPoint(val lat: Double, val lon: Double, val altitude: Double)
  *
  * Heights are measured from one fixed [baseline] (a low point of everything you've recorded), not from what's
  * on screen, so the route keeps the same height however the map is moved. They're smoothed over about
- * 120 m of route first, so GPS height jitter doesn't make the ribbon jump.
+ * 200 m of route first, so GPS height jitter doesn't make the ribbon jump, and slopes are cut into short
+ * pieces so they climb smoothly rather than in steps.
  */
 object Route3d {
     /** One hop of a route: its four corners (lat, lon pairs) and its height above the ground in metres. */
@@ -23,7 +26,11 @@ object Route3d {
     // Flat routes still float just above the ground, so they're visible.
     private const val LIFT_M = 3.0
     private const val HALF_WIDTH_M = 2.5
-    private const val SMOOTH_HALF_WINDOW_M = 60.0
+    private const val SMOOTH_HALF_WINDOW_M = 100.0
+    // Pieces of a sloping hop climb by about this much each (before any thinning for very long histories).
+    private const val STEP_M = 0.15
+    private const val MAX_PIECES = 24
+    private const val MAX_TOTAL_PIECES = 18_000
     private const val MEDIAN_RADIUS = 2
     // Sharp bends would make the mitred corners shoot out; cap how far they reach.
     private const val MAX_MITER = 3.0
@@ -35,21 +42,48 @@ object Route3d {
         val hops = routes.sumOf { it.size - 1 }
         // Thin out very long histories so the map stays responsive.
         val step = max(1, (hops + maxSegments - 1) / maxSegments)
-        val out = ArrayList<Segment>(minOf(hops, maxSegments) + 1)
+        class Hop(val corners: DoubleArray, val h0: Double, val h1: Double)
+        val all = ArrayList<Hop>(minOf(hops, maxSegments) + 1)
         for (route in routes) {
             val pts = if (step == 1) route else route.filterIndexed { i, _ -> i % step == 0 || i == route.lastIndex }
             if (pts.size < 2) continue
             val heights = smooth(pts).map { ((it - baseline) * EXAGGERATION).coerceAtLeast(0.0) + LIFT_M }
             val (left, right) = offsets(pts) ?: continue
             for (i in 0 until pts.size - 1) {
-                out += Segment(
+                all += Hop(
                     doubleArrayOf(
                         left[i * 2], left[i * 2 + 1],
                         left[i * 2 + 2], left[i * 2 + 3],
                         right[i * 2 + 2], right[i * 2 + 3],
                         right[i * 2], right[i * 2 + 1],
                     ),
-                    (heights[i] + heights[i + 1]) / 2,
+                    heights[i],
+                    heights[i + 1],
+                )
+            }
+        }
+        // Each piece of ribbon has a flat top, so a climb would show as stairs. Hops that rise or fall are cut
+        // into short pieces, each at its own height along the slope, so the steps are too small to see. The
+        // step size grows if that would make too many pieces for the map to draw smoothly.
+        val wanted = all.sumOf { ceil(abs(it.h1 - it.h0) / STEP_M).toInt().coerceIn(1, MAX_PIECES) }
+        val stepM = if (wanted > MAX_TOTAL_PIECES) STEP_M * wanted / MAX_TOTAL_PIECES else STEP_M
+        val out = ArrayList<Segment>(minOf(wanted, MAX_TOTAL_PIECES) + all.size)
+        for (hop in all) {
+            val n = ceil(abs(hop.h1 - hop.h0) / stepM).toInt().coerceIn(1, MAX_PIECES)
+            val c = hop.corners
+            for (k in 0 until n) {
+                val t0 = k.toDouble() / n
+                val t1 = (k + 1).toDouble() / n
+                // Corners 0→1 run along the left edge and 3→2 along the right one.
+                fun along(from: Int, to: Int, t: Double, axis: Int) = c[from * 2 + axis] + (c[to * 2 + axis] - c[from * 2 + axis]) * t
+                out += Segment(
+                    doubleArrayOf(
+                        along(0, 1, t0, 0), along(0, 1, t0, 1),
+                        along(0, 1, t1, 0), along(0, 1, t1, 1),
+                        along(3, 2, t1, 0), along(3, 2, t1, 1),
+                        along(3, 2, t0, 0), along(3, 2, t0, 1),
+                    ),
+                    hop.h0 + (hop.h1 - hop.h0) * (t0 + t1) / 2,
                 )
             }
         }
