@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.33.3] - 2026-10-21
+
+### Changed
+- On the About page, the heart, the Claude mark and a new Canadian flag sit level with the words around them.
+
 ## [2.33.2] - 2026-10-21
 
 ### Fixed

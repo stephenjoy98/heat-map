@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -236,12 +237,13 @@ private fun Card(content: @Composable () -> Unit) {
     )
 }
 
-/** "Made with ♥ by @stephenjoy98 with the help of ✳ Claude by Anthropic in Canada". */
+/** "Made with ♥ by @stephenjoy98 with the help of ✳ Claude by Anthropic in 🇨🇦 Canada". */
 @Composable
 private fun MadeWith(onProfile: () -> Unit) {
     val inline = mapOf(
         "heart" to inlineIcon { MaterialIcon(R.drawable.ic_favorite, size = 20, tint = Color(0xFFE53935)) },
         "claude" to inlineIcon { ClaudeMark(Modifier.size(20.dp)) },
+        "canada" to inlineIcon { JoyEmoji("🇨🇦", size = 20) },
     )
     val accent = MaterialTheme.colorScheme.primary
     val text = buildAnnotatedString {
@@ -253,7 +255,9 @@ private fun MadeWith(onProfile: () -> Unit) {
         appendInlineContent("claude", "Claude logo")
         append(" ")
         withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("Claude") }
-        append(" by Anthropic\nin Canada")
+        append(" by Anthropic\nin ")
+        appendInlineContent("canada", "Canadian flag")
+        append(" Canada")
     }
     Text(
         text,
@@ -264,9 +268,13 @@ private fun MadeWith(onProfile: () -> Unit) {
     )
 }
 
+// Centred on the middle of the letters (not the line box), and centred within its space, so each picture sits
+// level with the words around it.
 private fun inlineIcon(content: @Composable () -> Unit) = InlineTextContent(
-    Placeholder(width = 1.3.em, height = 1.3.em, placeholderVerticalAlign = PlaceholderVerticalAlign.Center),
-) { content() }
+    Placeholder(width = 1.3.em, height = 1.3.em, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
+) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+}
 
 /** A simplified drawing of Claude's spark mark: tapered rays of uneven length in Claude's orange. */
 @Composable

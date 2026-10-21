@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.33.2**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.33.3**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -212,7 +212,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   large titles). Prefers OSM, low friction, no API keys.
 - Keep: blue location marker, compass always visible (under the profile button, below open chips), filter
   chips hidden behind the filter button, Review named **Insights**, **Google Material icons, not emoji** (since 2.29.0; the one exception the user asked for: JoyPixels
-  flags/globes in the profile's country/city/continent lists, `JoyEmoji` in ui/JoyEmoji.kt;
+  flags/globes in the profile's country/city/continent lists and the 🇨🇦 on About, `JoyEmoji` in ui/JoyEmoji.kt;
   `MaterialIcon(R.drawable.ic_*)` in ui/MaterialIcon.kt; add icons as vector drawables generated from the npm package
   `@material-design-icons/svg` outlined SVGs — material-icons-extended isn't used, it would bloat the unminified APK),
   neutral near-white accent in the default dark theme (no orange in the UI) but **map elements are never
