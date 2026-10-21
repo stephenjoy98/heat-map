@@ -50,7 +50,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.31.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.31.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -163,7 +163,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   composed so popping never flashes the tabs.
 - `update/` (2.30.0): `Updater` (GitHub releases/latest → `Release`; newer = higher SemVer, or same version with a
   different `<!-- build: sha -->` marker in the notes vs `BuildConfig.BUILD_COMMIT` from CI's GITHUB_SHA; downloads to
-  cacheDir/updates, installs via PackageInstaller session with USER_ACTION_NOT_REQUIRED on 31+; `inForeground` set by
+  cacheDir/updates (re-fetches release details first; 404/size change → retry 4× 30 s apart, because CI's --clobber
+  re-upload briefly removes the asset), installs via PackageInstaller session with USER_ACTION_NOT_REQUIRED on 31+; `inForeground` set by
   MainActivity so auto installs wait until onStop), `InstallReceiver` (pending user action → start confirm intent or
   notify), `UpdateWorker` (6 h periodic + on app open; Prefs `auto_update`, `update_wifi_only`), UI `UpdatesSection`
   (Settings › Updates). BootReceiver notifies "updated to X" on MY_PACKAGE_REPLACED.

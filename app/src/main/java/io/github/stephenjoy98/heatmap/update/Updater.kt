@@ -13,6 +13,7 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.SemVer
 import io.github.stephenjoy98.heatmap.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -34,6 +35,8 @@ object Updater {
     private const val LATEST = "https://api.github.com/repos/stephenjoy98/heat-map/releases/latest"
     const val CHANNEL_ID = "updates"
     private const val NOTIFICATION_ID = 7
+    private const val DOWNLOAD_ATTEMPTS = 4
+    private const val RETRY_DELAY_MS = 30_000L
     private val buildMarker = Regex("""<!--\s*build:\s*([0-9a-f]{7,40})\s*-->""")
 
     class Release(
@@ -118,7 +121,8 @@ object Updater {
             return Release(
                 version = version,
                 build = buildMarker.find(body)?.groupValues?.get(1),
-                notes = body.substringBefore("\n---").replace(buildMarker, "").trim(),
+                // The changelog is wrapped at 110 characters; join each bullet's lines back up for the screen.
+                notes = body.substringBefore("\n---").replace(buildMarker, "").trim().replace(Regex("""\r?\n {2,}"""), " "),
                 apkUrl = url ?: return null,
                 apkSize = size,
                 pageUrl = json.optString("html_url"),
@@ -143,57 +147,92 @@ object Updater {
     fun onMeteredNetwork(context: Context): Boolean =
         context.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true
 
-    /** Downloads [r] (with progress in [state]) and leaves it ready to install. */
+    private class NotFound : Exception("not found")
+
+    /**
+     * Downloads [r] (with progress in [state]) and leaves it ready to install. Each push to GitHub replaces the
+     * release's APK, and while that happens the file briefly isn't there (404). So the latest release details
+     * are fetched first, and a missing file is tried again a few times, a little later, with fresh details.
+     */
     suspend fun download(context: Context, r: Release): File? = lock.withLock {
         withContext(Dispatchers.IO) {
-            val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val file = File(dir, "location-ticker-${r.version}-${r.build ?: "release"}.apk")
-            // Already downloaded (say, the install was cancelled): no need to fetch it again.
-            if (r.apkSize > 0 && file.length() == r.apkSize) {
-                _state.value = State.Ready(r, file)
-                return@withContext file
-            }
-            dir.listFiles()?.forEach { if (it != file) it.delete() } // Older downloads.
-            _state.value = State.Downloading(r, 0f)
-            try {
-                val conn = URL(r.apkUrl).openConnection() as HttpURLConnection
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 30_000
-                conn.instanceFollowRedirects = true
-                conn.setRequestProperty("User-Agent", "LocationTicker/${BuildConfig.VERSION_NAME}")
+            var release = freshen(r)
+            repeat(DOWNLOAD_ATTEMPTS) { attempt ->
                 try {
-                    if (conn.responseCode != 200) throw IllegalStateException("download answered ${conn.responseCode}")
-                    val total = conn.contentLengthLong.takeIf { it > 0 } ?: r.apkSize
-                    conn.inputStream.use { input ->
-                        file.outputStream().use { out ->
-                            val buf = ByteArray(64 * 1024)
-                            var done = 0L
-                            var shown = -1
-                            while (true) {
-                                val n = input.read(buf)
-                                if (n < 0) break
-                                out.write(buf, 0, n)
-                                done += n
-                                val pct = if (total > 0) (done * 100 / total).toInt() else 0
-                                if (pct != shown) {
-                                    shown = pct
-                                    _state.value = State.Downloading(r, pct / 100f)
-                                }
+                    return@withContext fetchApk(context, release)
+                } catch (e: NotFound) {
+                    if (attempt == DOWNLOAD_ATTEMPTS - 1) {
+                        _state.value = State.Failed(
+                            "Version ${release.label} is still being published on GitHub. It'll be tried again soon, or tap Try again in a minute.",
+                            release,
+                        )
+                        return@withContext null
+                    }
+                    _state.value = State.Downloading(release, 0f)
+                    delay(RETRY_DELAY_MS)
+                    release = freshen(release)
+                } catch (e: Exception) {
+                    _state.value = State.Failed("Couldn't download ${release.label}: ${e.message ?: e.javaClass.simpleName}", release)
+                    return@withContext null
+                }
+            }
+            null
+        }
+    }
+
+    /** The latest details for [r]'s version (a new APK link and size after a rebuild), or [r] if they can't be had. */
+    private fun freshen(r: Release): Release =
+        runCatching { fetchLatest() }.getOrNull()?.takeIf { it.version >= r.version } ?: r
+
+    private fun fetchApk(context: Context, r: Release): File {
+        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val file = File(dir, "location-ticker-${r.version}-${r.build ?: "release"}.apk")
+        // Already downloaded (say, the install was cancelled): no need to fetch it again.
+        if (r.apkSize > 0 && file.length() == r.apkSize) {
+            _state.value = State.Ready(r, file)
+            return file
+        }
+        dir.listFiles()?.forEach { if (it != file) it.delete() } // Older downloads.
+        _state.value = State.Downloading(r, 0f)
+        try {
+            val conn = URL(r.apkUrl).openConnection() as HttpURLConnection
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 30_000
+            conn.instanceFollowRedirects = true
+            conn.setRequestProperty("User-Agent", "LocationTicker/${BuildConfig.VERSION_NAME}")
+            try {
+                if (conn.responseCode == 404) throw NotFound()
+                if (conn.responseCode != 200) throw IllegalStateException("GitHub answered ${conn.responseCode}")
+                val total = conn.contentLengthLong.takeIf { it > 0 } ?: r.apkSize
+                conn.inputStream.use { input ->
+                    file.outputStream().use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        var done = 0L
+                        var shown = -1
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                            done += n
+                            val pct = if (total > 0) (done * 100 / total).toInt() else 0
+                            if (pct != shown) {
+                                shown = pct
+                                _state.value = State.Downloading(r, pct / 100f)
                             }
                         }
                     }
-                    if (r.apkSize > 0 && file.length() != r.apkSize) throw IllegalStateException("the download was incomplete")
-                } finally {
-                    conn.disconnect()
                 }
-                _state.value = State.Ready(r, file)
-                file
-            } catch (e: Exception) {
-                file.delete()
-                _state.value = State.Failed("Couldn't download ${r.label}: ${e.message ?: e.javaClass.simpleName}", r)
-                null
+                // A different size means the APK was replaced mid-download: fetch it again.
+                if (r.apkSize > 0 && file.length() != r.apkSize) throw NotFound()
+            } finally {
+                conn.disconnect()
             }
+        } catch (e: Exception) {
+            file.delete()
+            throw e
         }
+        _state.value = State.Ready(r, file)
+        return file
     }
 
     /** Hands the downloaded APK to Android's installer. The app closes and updates once it's installed. */
