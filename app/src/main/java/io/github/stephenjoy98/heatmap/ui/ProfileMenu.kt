@@ -59,6 +59,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -145,7 +147,7 @@ fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier, background
         // clip can cut it off.
         Box {
             val button: @Composable () -> Unit = {
-                IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Avatar(32) }
+                IconButton(onClick = onClick, modifier = Modifier.size(48.dp).semantics { contentDescription = "Account" }) { Avatar(32) }
             }
             if (background != null) {
                 Surface(shape = CircleShape, color = background, shadowElevation = 3.dp) { button() }

@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Emulator smoke test, run by CI on a booted emulator: installs the debug APK, skips onboarding, records a short
+# walk along a street, taps through the main screens and saves a screenshot of each, a screen recording, the
+# UI tree where a tap missed, and the logs. Exits non-zero only if the app crashed.
+#
+#   tools/emulator-smoke.sh <debug.apk> <version> [output dir]
+set -uo pipefail
+
+APK=$1
+VERSION=$2
+OUT=${3:-emulator-output}
+PKG=io.github.stephenjoy98.heatmap
+mkdir -p "$OUT"
+NOTES="$OUT/steps.txt"
+: > "$NOTES"
+
+note() { echo "$*" | tee -a "$NOTES"; }
+
+shot() {
+    sleep "${2:-3}"
+    adb exec-out screencap -p > "$OUT/$1.png" && note "screenshot $1"
+}
+
+# Taps the centre of the first on-screen element whose text (mode text) or content description (mode desc)
+# is exactly $2. Saves the UI tree and notes it if there's no such element.
+tap() {
+    local mode=$1 label=$2
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+    local xy
+    xy=$(python3 -I - "$OUT/.ui.xml" "$mode" "$label" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+path, mode, label = sys.argv[1:4]
+attr = "text" if mode == "text" else "content-desc"
+try:
+    root = ET.parse(path).getroot()
+except Exception:
+    sys.exit(0)
+for node in root.iter("node"):
+    if node.get(attr) == label:
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+)
+    if [ -n "$xy" ]; then
+        # shellcheck disable=SC2086
+        adb shell input tap $xy
+        note "tapped $mode \"$label\" at $xy"
+    else
+        local name
+        name="missing-$(echo "$label" | tr -c 'A-Za-z0-9' '-')"
+        cp "$OUT/.ui.xml" "$OUT/$name.xml" 2>/dev/null
+        note "MISSING $mode \"$label\" (UI tree saved as $name.xml)"
+    fi
+}
+
+back() { adb shell input keyevent KEYCODE_BACK; sleep "${1:-2}"; }
+
+adb wait-for-device
+note "Location Ticker $VERSION on $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
+
+# -g grants the runtime permissions it asks for; background location needs its own grant.
+adb install -r -g "$APK" | tee -a "$NOTES"
+for p in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION ACCESS_BACKGROUND_LOCATION POST_NOTIFICATIONS ACTIVITY_RECOGNITION; do
+    adb shell pm grant "$PKG" "android.permission.$p" > /dev/null 2>&1 || true
+done
+
+# Skip onboarding and "What's new", and don't let the emulator try to update itself.
+cat > "$OUT/.ticker.xml" <<XML
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <boolean name="onboarded" value="true" />
+    <string name="last_seen_version">$VERSION</string>
+    <boolean name="auto_update" value="false" />
+</map>
+XML
+adb push "$OUT/.ticker.xml" /data/local/tmp/ticker.xml > /dev/null
+adb shell chmod 644 /data/local/tmp/ticker.xml
+adb shell run-as "$PKG" mkdir -p shared_prefs
+adb shell run-as "$PKG" cp /data/local/tmp/ticker.xml shared_prefs/ticker.xml || note "couldn't preset settings"
+
+adb logcat -c
+# Start at Surrey Central, BC.
+adb emu geo fix -122.8490 49.1891 > /dev/null
+adb shell screenrecord --time-limit 175 --bit-rate 3000000 /sdcard/run.mp4 &
+REC=$!
+
+adb shell am start -W -n "$PKG/.ui.MainActivity" | tee -a "$NOTES"
+shot 01-map 10
+
+# Record a short walk north along King George Boulevard, a fix every 2 seconds.
+tap desc "Start recording"
+for i in $(seq 0 24); do
+    lat=$(python3 -c "print(f'{49.1891 + $i * 0.00012:.6f}')")
+    adb emu geo fix -122.8490 "$lat" > /dev/null
+    sleep 2
+done
+shot 02-recording 2
+
+tap text "Timeline"
+shot 03-timeline 5
+tap text "Questions"
+shot 04-questions 3
+tap text "Trips"
+sleep 2
+
+tap desc "Account"
+shot 05-account 3
+tap text "Settings"
+shot 06-settings 3
+tap text "General"
+shot 07-settings-general 3
+back
+tap text "Updates"
+shot 08-settings-updates 4
+back
+back
+
+tap text "Insights"
+shot 09-insights 6
+adb shell input swipe 540 1800 540 500 400
+shot 10-insights-lower 2
+adb shell input swipe 540 1800 540 500 400
+shot 11-insights-bottom 2
+back
+
+tap text "Profile"
+shot 12-profile 6
+back
+back
+tap text "Map"
+shot 13-map-after 4
+
+kill "$REC" 2> /dev/null
+wait "$REC" 2> /dev/null
+sleep 3
+adb pull /sdcard/run.mp4 "$OUT/run.mp4" > /dev/null 2>&1 && note "saved run.mp4"
+
+adb logcat -d > "$OUT/logcat.txt"
+adb logcat -d -b crash > "$OUT/crash.txt"
+rm -f "$OUT/.ui.xml" "$OUT/.ticker.xml"
+
+if grep -q "Process: $PKG" "$OUT/crash.txt"; then
+    note "CRASH: see crash.txt"
+    exit 1
+fi
+if ! adb shell pidof "$PKG" > /dev/null; then
+    note "The app isn't running at the end of the test"
+    exit 1
+fi
+note "No crashes"

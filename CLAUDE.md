@@ -32,7 +32,12 @@ travel stats, Insights (AI write-ups), backup and friends.
 - **No Android SDK locally.** CI (`.github/workflows/android.yml`, builds assembleDebug + assembleRelease
   and uploads `location-ticker-<version>-apk`; on pushes to main it also publishes a GitHub release `vX.Y.Z` with that
   version's CHANGELOG entry and `location-ticker-X.Y.Z.apk` + `-debug.apk`, refreshing it if the version didn't change)
-  is the only compiler. Pushes are the test. Watch the PR's check
+  is the only compiler. Pushes are the test. A second job (`emulator`, API 34 google_apis via
+  reactivecircus/android-emulator-runner) runs `tools/emulator-smoke.sh`: installs the debug APK, presets
+  shared_prefs/ticker.xml with run-as (onboarded, last_seen_version, auto_update off), feeds `adb emu geo fix` points,
+  taps through screens by text/content-desc from `uiautomator dump`, saves PNGs + run.mp4 + logcat/crash + steps.txt;
+  fails only on a crash. Results are force-pushed to the **`ci-screenshots`** branch: `git fetch origin ci-screenshots`
+  and look at the PNGs/frames before telling the user a change works. Keep tap labels in the script in sync with UI text. Watch the PR's check
   events; use the GitHub MCP tools (`actions_list`, `actions_get`, `get_job_logs`) — unauthenticated
   api.github.com calls get rate-limited.
 - Network: Maven Central and npm are reachable; **dl.google.com / maven.google.com, gnu.org, OSM tiles,

@@ -18,6 +18,7 @@ The app shows the entries since your last version as "What's new" after an updat
 - Downloading an update no longer fails with "404" when the release is being refreshed on GitHub at that
   moment: the app fetches the release's latest details first and tries again a few times, half a minute apart.
 - "What's new" on the Updates page joins each line of the changelog back up instead of showing ragged breaks.
+- The account button has a name for screen readers such as TalkBack.
 
 ## [2.31.0] - 2026-10-21
 

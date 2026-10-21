@@ -180,7 +180,9 @@ Android asks you to confirm the first update (and to allow Location Ticker to in
 and later, later updates install without asking. Automatic updates can be turned off there.
 
 Every push to `main` builds the APKs in GitHub Actions and publishes (or refreshes) the release for the
-version in `gradle.properties`. Builds of other branches are under **Actions → Android build** as the
+version in `gradle.properties`. A second job runs the debug APK on an Android emulator, taps through the main
+screens and saves screenshots, a screen recording and the logs (artifact `emulator-<version>`, and the
+`ci-screenshots` branch); it fails the run if the app crashes. Builds of other branches are under **Actions → Android build** as the
 artifact `location-ticker-<version>-apk`.
 
 Without any setup the app works fully on OpenStreetMap: recording, heatmap, travel modes, Insights,
