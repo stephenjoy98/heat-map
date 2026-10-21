@@ -98,6 +98,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -217,6 +218,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     val mapEditing = editing || rangeEditing
     // Picking several trips to change their mode together; null when not picking.
     var picked by remember { mutableStateOf<Set<Long>?>(null) }
+    // A section long-pressed on the map, waiting for you to confirm what to do with it.
+    var mapPick by remember { mutableStateOf<MapPick?>(null) }
+    val mapHaptics = LocalHapticFeedback.current
     val select = { ids: List<Long>, on: Boolean ->
         val now = picked.orEmpty()
         picked = if (on) now + ids else now - ids.toSet()
@@ -461,6 +465,17 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     refreshKey = data,
                     cacheKey = "timeline",
                     route3d = route3d,
+                    // Long-press a route to edit that section, after a confirmation.
+                    onMapLongClick = if (mapEditing || picked != null) null else { lat, lon ->
+                        val maxM = maxOf(30.0, tapRadiusPx * camera.metersPerPixel.toDouble())
+                        scope.launch {
+                            val pick = withContext(Dispatchers.IO) { findMapPick(store, period.fromMs, period.toMs, lat, lon, maxM) }
+                            if (pick != null) {
+                                mapHaptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                mapPick = pick
+                            }
+                        }
+                    },
                     onMapClick = when {
                         editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
                         // Tapping a dot moves whichever end of the trip is nearer to it.
@@ -691,6 +706,18 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
 
     if (layersOpen) {
         MapLayersSheet(onDismiss = { layersOpen = false })
+    }
+
+    mapPick?.let { pick ->
+        MapPickDialog(
+            pick = pick,
+            onDismiss = { mapPick = null },
+            onRetime = { retiming = it },
+            onMode = { trip, m -> changeMode(trip, m) },
+            onFix = { startFix(pick.window.first, pick.window.last, pick.trip?.mode ?: pick.prev?.mode ?: TravelMode.UNKNOWN) },
+            onMakeTrip = { adding = pick.window },
+            onJoin = { joinTrips(listOfNotNull(pick.prev, pick.next)) },
+        )
     }
 
     if (picking) {
@@ -996,6 +1023,104 @@ private fun Hint(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
     )
+}
+
+/**
+ * A section long-pressed on the Timeline's map: a [trip], or dots outside any trip (trip null) between [prev]
+ * and [next]. [window] is the stretch of time an edit starts from.
+ */
+private class MapPick(val trip: Trip?, val prev: Trip?, val next: Trip?, val window: LongRange)
+
+/** What's drawn nearest a long-press on the map, or null if no route is close. Call off the main thread. */
+private fun findMapPick(store: PointStore, from: Long, to: Long, lat: Double, lon: Double, maxM: Double): MapPick? {
+    val (time, tripId) = store.sectionNear(from, to, lat, lon, maxM) ?: return null
+    if (tripId > 0) {
+        val trip = store.trip(tripId) ?: return null
+        return MapPick(trip, null, null, trip.startTime..trip.endTime)
+    }
+    val day = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate()
+    val dayStart = day.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val dayEnd = day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+    val near = store.tripsBetween(dayStart - 86_400_000L, dayEnd + 1)
+    val prev = near.lastOrNull { it.endTime <= time }
+    val next = near.firstOrNull { it.startTime >= time }
+    val start = maxOf(dayStart, (prev?.endTime ?: dayStart) + 1)
+    val end = minOf(dayEnd, (next?.startTime ?: dayEnd) - 1)
+    return MapPick(null, prev, next, start..maxOf(start, end))
+}
+
+/** Confirms what to do with a section long-pressed on the map. */
+@Composable
+private fun MapPickDialog(
+    pick: MapPick,
+    onDismiss: () -> Unit,
+    onRetime: (Trip) -> Unit,
+    onMode: (Trip, TravelMode) -> Unit,
+    onFix: () -> Unit,
+    onMakeTrip: () -> Unit,
+    onJoin: () -> Unit,
+) {
+    val trip = pick.trip
+    val prev = pick.prev
+    val next = pick.next
+    // Loose dots between two trips that are close together can join them into one.
+    val canJoin = trip == null && prev != null && next != null && next.startTime - prev.endTime <= 30 * 60_000L
+    fun act(block: () -> Unit) {
+        onDismiss()
+        block()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (trip != null) "Edit this trip?" else "Edit these dots?") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (trip != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Text("${trip.mode.fullLabel} · ${Insights.km(trip.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Text(
+                        "${timeFormat.format(Date(trip.startTime))} – ${timeFormat.format(Date(trip.endTime))} · ${duration(trip.endTime - trip.startTime)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text("How did you travel?", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    ModeChips(selected = trip.mode, onPick = { m -> act { if (m != trip.mode || trip.needsReview) onMode(trip, m) } })
+                } else {
+                    Text(
+                        "Dots from ${timeFormat.format(Date(pick.window.first))} to ${timeFormat.format(Date(pick.window.last))} that aren't " +
+                            "part of any trip. They're drawn grey and have no row on the Timeline.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                if (trip != null) {
+                    PickAction("Change times", Icons.Filled.Edit) { act { onRetime(trip) } }
+                    PickAction("Fix route on the map", Icons.Filled.Place) { act(onFix) }
+                } else {
+                    if (canJoin && prev != null && next != null) PickAction("Join the ${prev.mode.label} and ${next.mode.label} trips around them", null) { act(onJoin) }
+                    PickAction("Make them a trip", Icons.Filled.Add) { act(onMakeTrip) }
+                    PickAction("Join and fix route on the map", Icons.Filled.Place) { act(onFix) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun PickAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) Icon(icon, contentDescription = null) else MaterialIcon(R.drawable.ic_merge)
+        Spacer(Modifier.width(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 /** What an entry is called in the change-times panel. */

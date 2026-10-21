@@ -74,6 +74,7 @@ private val FEATURES = listOf(
     R.drawable.ic_calendar_month to "A Timeline by day, week, month or year, with back-to-back trips grouped",
     R.drawable.ic_edit to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
     R.drawable.ic_merge to "Join several trips into one, with the loose dots between them",
+    R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there",
     R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",
     R.drawable.ic_help_outline to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",
     R.drawable.ic_terrain to "Smooth 3D routes at one agreed height per place, following the same line as the map",

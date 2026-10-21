@@ -103,6 +103,8 @@ up to your Google account, and lets you compare explored areas with friends.
   the road pass through a spot.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
+- **Long-press a route on the Timeline map** to edit that section: confirm its mode, change its times or fix its
+  route; grey dots outside any trip can be made a trip or join the trips around them.
 - **Add a trip** (+ on a day, or long-press a stay › Add a trip here): pick its first and last dot with a
   slider and its mode; overlapping trips are trimmed or split around it.
 - **Long-press a trip** to change how you travelled (walking, cycling, driving, car share, transit) or

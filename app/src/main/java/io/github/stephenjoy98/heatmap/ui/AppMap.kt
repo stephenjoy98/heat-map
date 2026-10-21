@@ -162,6 +162,7 @@ fun AppMap(
     latest: LatLng? = null,
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
     cacheKey: String? = null,
+    onMapLongClick: ((lat: Double, lon: Double) -> Unit)? = null,
     // Loads routes with heights for an area; with 3D buildings on, they're drawn as a 3D route. Runs off
     // the main thread.
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)? = null,
@@ -170,7 +171,7 @@ fun AppMap(
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, cacheKey, route3d, modifier)
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier)
 }
 
 /** How the base map looks: theme, terrain shading and 3D buildings (which also tilt the camera). */
@@ -322,6 +323,7 @@ private class VectorMapHolder(context: Context) {
     val overlay by lazy { TileOverlayView(context) }
     var camera: MapCamera? = null
     var onClick: ((Double, Double) -> Unit)? = null
+    var onLongClick: ((Double, Double) -> Unit)? = null
     var setUp = false
 
     // Whether the current camera move is the user's own gesture, and whether 3D was just switched on by one.
@@ -455,6 +457,7 @@ private fun VectorAppMap(
     refreshKey: Any?,
     latest: LatLng?,
     onMapClick: ((Double, Double) -> Unit)?,
+    onMapLongClick: ((Double, Double) -> Unit)?,
     cacheKey: String?,
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)?,
     modifier: Modifier,
@@ -462,7 +465,10 @@ private fun VectorAppMap(
     val holder = rememberVectorMap(cacheKey)
     val loadRoute3d by rememberUpdatedState(route3d)
     val overlay = holder.overlay
-    SideEffect { holder.onClick = onMapClick }
+    SideEffect {
+        holder.onClick = onMapClick
+        holder.onLongClick = onMapLongClick
+    }
 
     DisposableEffect(camera) {
         holder.camera = camera
@@ -510,6 +516,11 @@ private fun VectorAppMap(
                 m.addOnMapClickListener { p ->
                     holder.onClick?.invoke(p.latitude, p.longitude)
                     false
+                }
+                m.addOnMapLongClickListener { p ->
+                    val handler = holder.onLongClick
+                    handler?.invoke(p.latitude, p.longitude)
+                    handler != null
                 }
             }
             camera.bearing = m.cameraPosition.bearing.toFloat()

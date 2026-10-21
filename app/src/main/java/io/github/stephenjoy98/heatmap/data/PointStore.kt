@@ -8,6 +8,8 @@ import android.database.sqlite.SQLiteOpenHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.math.cos
+import kotlin.math.hypot
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
@@ -758,6 +760,58 @@ class PointStore private constructor(context: Context) :
         ).use { c ->
             buildList { while (c.moveToNext()) add(EditablePoint(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4))) }
         }
+
+    /**
+     * The recorded line nearest to a spot on the map, within [maxM] metres: the time of the nearer dot and
+     * its trip id (-1 for dots outside any trip), or null if nothing is that close. Lines between dots count,
+     * so a long-press on the drawn route finds it even between sparse dots.
+     */
+    fun sectionNear(from: Long, to: Long, lat: Double, lon: Double, maxM: Double): Pair<Long, Long>? {
+        val mPerDegLat = 111_320.0
+        val mPerDegLon = 111_320.0 * cos(Math.toRadians(lat))
+        var best = maxM
+        var found: Pair<Long, Long>? = null
+        readableDatabase.rawQuery(
+            "SELECT time, lat, lon, trip_id FROM points WHERE time >= $from AND time < $to ORDER BY time", null
+        ).use { c ->
+            var pt = 0L
+            var px = 0.0
+            var py = 0.0
+            var pTrip = 0L
+            var first = true
+            while (c.moveToNext()) {
+                val t = c.getLong(0)
+                val x = (c.getDouble(2) - lon) * mPerDegLon
+                val y = (c.getDouble(1) - lat) * mPerDegLat
+                val trip = c.getLong(3)
+                val dHere = hypot(x, y)
+                if (dHere < best) {
+                    best = dHere
+                    found = t to trip
+                }
+                if (!first && trip == pTrip) {
+                    // Distance from the spot (the origin) to the line between this dot and the one before.
+                    val dx = x - px
+                    val dy = y - py
+                    val len2 = dx * dx + dy * dy
+                    if (len2 > 0) {
+                        val k = (-(px * dx + py * dy) / len2).coerceIn(0.0, 1.0)
+                        val d = hypot(px + k * dx, py + k * dy)
+                        if (d < best) {
+                            best = d
+                            found = (if (k < 0.5) pt else t) to trip
+                        }
+                    }
+                }
+                pt = t
+                px = x
+                py = y
+                pTrip = trip
+                first = false
+            }
+        }
+        return found
+    }
 
     /** Deleted points in the range with their row ids, so they can be restored. */
     fun deletedPoints(from: Long, to: Long): List<EditablePoint> =

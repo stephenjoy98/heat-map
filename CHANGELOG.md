@@ -24,6 +24,8 @@ The app shows the entries since your last version as "What's new" after an updat
 - Join trips into one: "Join into one trip" in a group's menu on the Timeline, or Select several trips and tap
   Join. The joined trip runs from the first one's start to the last one's end, takes in the loose dots between
   them (the grey bits on the map) and keeps the mode of the longest one.
+- Long-press a route on the Timeline's map to edit it: a dialog shows which trip you pressed and offers its travel
+  mode, Change times and Fix route. Grey dots outside any trip can be made a trip, or join the trips on either side.
 
 ### Fixed
 - Each notification opens its own place again: the recording notification just opens the app, "new version"
