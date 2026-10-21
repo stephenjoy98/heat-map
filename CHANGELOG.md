@@ -31,6 +31,8 @@ The app shows the entries since your last version as "What's new" after an updat
 - A new version is offered in a sheet that slides up from the bottom, only on the map screen and once each time
   you open the app, instead of a pop-up that could appear anywhere. "What's new" after an update slides up the
   same way. Both slide back down when you're done.
+- The location button does double duty: once the map is on your latest position, tapping it again turns the map
+  north up, like the compass. It shows a compass needle while it does that.
 
 ## [2.34.0] - 2026-10-21
 

@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -232,14 +234,22 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 Spacer(Modifier.width(12.dp))
                 // Bottom right, from the corner up: map layers, zoom, then your latest position.
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Tip("Go to your latest position") {
+                    // Double duty: once the map is on your latest position, the next tap turns it north up.
+                    val latest = stats?.latest
+                    val onLatest = latest != null && !camera.moving && camera.center?.let { (lat, lon) ->
+                        val d = FloatArray(1)
+                        android.location.Location.distanceBetween(lat, lon, latest.lat, latest.lon, d)
+                        d[0] <= maxOf(25f, camera.metersPerPixel * 40f)
+                    } == true
+                    val rotated = ((camera.bearing % 360f) + 360f) % 360f in 1f..359f
+                    val turnsNorth = onLatest && rotated
+                    Tip(if (turnsNorth) "Turn the map back to north" else "Go to your latest position") {
                         Surface(
                             onClick = {
-                                val latest = stats?.latest
-                                if (latest == null) {
-                                    scope.launch { snackbar.showSnackbar("No points recorded yet") }
-                                } else {
-                                    camera.animateTo(latest.lat, latest.lon, 16f)
+                                when {
+                                    latest == null -> scope.launch { snackbar.showSnackbar("No points recorded yet") }
+                                    turnsNorth -> camera.northUp()
+                                    else -> camera.animateTo(latest.lat, latest.lon, 16f)
                                 }
                             },
                             shape = CircleShape,
@@ -248,7 +258,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                             modifier = Modifier.size(48.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position")
+                                if (turnsNorth) {
+                                    CompassNeedle(
+                                        bearing = camera.bearing,
+                                        modifier = Modifier.size(48.dp).semantics { contentDescription = "Turn map north up" },
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position")
+                                }
                             }
                         }
                     }

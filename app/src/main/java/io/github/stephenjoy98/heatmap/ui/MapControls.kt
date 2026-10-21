@@ -111,7 +111,7 @@ fun ZoomButtons(camera: MapCamera, modifier: Modifier = Modifier) {
 
 /** A two-tone needle: red points north, so it turns opposite to the map's rotation. */
 @Composable
-private fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
+internal fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
     val north = Color(0xFFE53935)
     val south = MaterialTheme.colorScheme.onSurfaceVariant
     val pivot = MaterialTheme.colorScheme.surface
