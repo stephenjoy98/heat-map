@@ -117,6 +117,19 @@ class LevelQuestion(val area: Long, val lat: Double, val lon: Double, val low: D
 
 class DeleteResult(val days: Set<String>, val removedRemoteIds: List<String>, val createdTripId: Long = 0)
 
+/**
+ * How trips looked over a stretch of time before an edit on the Timeline, so the edit can be undone: each dot's
+ * trip and mode, and the trips there with their road shapes and road questions.
+ */
+class EditSnapshot internal constructor(
+    internal val from: Long,
+    internal val to: Long,
+    internal val points: List<LongArray>,
+    internal val trips: List<ContentValues>,
+    internal val paths: List<ContentValues>,
+    internal val questions: List<ContentValues>,
+)
+
 /** A spot where a lot of time was recorded. */
 class Spot(val lat: Double, val lon: Double, val hours: Double)
 
@@ -1107,6 +1120,112 @@ class PointStore private constructor(context: Context) :
         } finally {
             db.endTransaction()
             changed()
+        }
+    }
+
+    /**
+     * Remembers how trips look around [start]..[end] (widened to whole trips and an hour either side, which
+     * covers the neighbours an edit can trim or join), so [restore] can undo an edit made there.
+     */
+    fun snapshot(start: Long, end: Long): EditSnapshot {
+        val db = readableDatabase
+        var from = start - 3_600_000L
+        var to = end + 3_600_000L
+        db.rawQuery("SELECT MIN(start_time), MAX(end_time) FROM trips WHERE start_time <= $to AND end_time >= $from", null).use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) {
+                from = minOf(from, c.getLong(0))
+                to = maxOf(to, c.getLong(1))
+            }
+        }
+        val points = db.rawQuery("SELECT id, trip_id, mode FROM points WHERE time >= $from AND time <= $to", null).use { c ->
+            buildList { while (c.moveToNext()) add(longArrayOf(c.getLong(0), c.getLong(1), c.getLong(2))) }
+        }
+        val ids = tripIdsIn(db, from, to)
+        val inIds = ids.joinToString(",").ifEmpty { "-1" }
+        return EditSnapshot(
+            from, to, points,
+            rows(db, "SELECT * FROM trips WHERE id IN ($inIds)"),
+            rows(db, "SELECT * FROM trip_paths WHERE trip_id IN ($inIds)"),
+            rows(db, "SELECT * FROM road_questions WHERE trip_id IN ($inIds)"),
+        )
+    }
+
+    /**
+     * Puts trips back the way [snap] found them, undoing an edit: trips made since are removed and the old ones
+     * come back with their dots, road shapes and answers. Returns the days to back up again and the shared
+     * routes of removed trips.
+     */
+    fun restore(snap: EditSnapshot): DeleteResult {
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        db.beginTransaction()
+        try {
+            val now = tripIdsIn(db, snap.from, snap.to)
+            val old = snap.trips.map { it.getAsLong("id") }.toSet()
+            val inNow = now.joinToString(",").ifEmpty { "-1" }
+            db.rawQuery("SELECT id, start_time, remote_id FROM trips WHERE id IN ($inNow)", null).use { c ->
+                while (c.moveToNext()) {
+                    days += dayOf(c.getLong(1))
+                    // A trip the edit made goes, and so does its shared route.
+                    if (c.getLong(0) !in old && !c.isNull(2)) remoteIds += c.getString(2)
+                }
+            }
+            db.execSQL("DELETE FROM trips WHERE id IN ($inNow)")
+            db.execSQL("DELETE FROM trip_paths WHERE trip_id IN ($inNow)")
+            db.execSQL("DELETE FROM road_questions WHERE trip_id IN ($inNow)")
+            for (row in snap.trips) {
+                val values = ContentValues(row)
+                // Shared again on the next sync; a route the edit removed is shared afresh.
+                values.put("uploaded", 0)
+                if (row.getAsLong("id") !in now) values.putNull("remote_id")
+                db.insertWithOnConflict("trips", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                days += dayOf(row.getAsLong("start_time"))
+            }
+            for (row in snap.paths) db.insertWithOnConflict("trip_paths", null, row, SQLiteDatabase.CONFLICT_REPLACE)
+            for (row in snap.questions) db.insertWithOnConflict("road_questions", null, row, SQLiteDatabase.CONFLICT_REPLACE)
+            val update = db.compileStatement("UPDATE points SET trip_id = ?, mode = ? WHERE id = ?")
+            for ((id, trip, mode) in snap.points.map { Triple(it[0], it[1], it[2]) }) {
+                update.bindLong(1, trip)
+                update.bindLong(2, mode)
+                update.bindLong(3, id)
+                update.executeUpdateDelete()
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
+
+    /** Trips with dots between [from] and [to], or overlapping that time. */
+    private fun tripIdsIn(db: SQLiteDatabase, from: Long, to: Long): Set<Long> {
+        val ids = HashSet<Long>()
+        db.rawQuery("SELECT id FROM trips WHERE start_time <= $to AND end_time >= $from", null).use { c -> while (c.moveToNext()) ids += c.getLong(0) }
+        db.rawQuery("SELECT DISTINCT trip_id FROM points WHERE time >= $from AND time <= $to AND trip_id > 0", null).use { c ->
+            while (c.moveToNext()) ids += c.getLong(0)
+        }
+        return ids
+    }
+
+    /** Every column of the rows a query returns, ready to insert again. */
+    private fun rows(db: SQLiteDatabase, sql: String): List<ContentValues> = db.rawQuery(sql, null).use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                add(ContentValues().apply {
+                    for (i in 0 until c.columnCount) {
+                        val name = c.getColumnName(i)
+                        when (c.getType(i)) {
+                            Cursor.FIELD_TYPE_INTEGER -> put(name, c.getLong(i))
+                            Cursor.FIELD_TYPE_FLOAT -> put(name, c.getDouble(i))
+                            Cursor.FIELD_TYPE_STRING -> put(name, c.getString(i))
+                            Cursor.FIELD_TYPE_BLOB -> put(name, c.getBlob(i))
+                            else -> putNull(name)
+                        }
+                    }
+                })
+            }
         }
     }
 

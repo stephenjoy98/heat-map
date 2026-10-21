@@ -188,6 +188,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     var framedDay by remember { mutableStateOf<LocalDate?>(null) }
     // Undo shows over the map, so it never covers the edit panel's buttons.
     val editSnackbar = remember { SnackbarHostState() }
+    val undoSnackbar = remember { SnackbarHostState() }
+    // Goes up when an answer is undone, so its question comes back to the queue.
+    var questionsReset by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val tapRadiusPx = 32 * context.resources.displayMetrics.density
     var layersOpen by remember { mutableStateOf(false) }
@@ -285,23 +288,38 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         }
     }
     BackHandler(enabled = picked != null && !LocalCovered.current) { picked = null }
-    val changeMode = { trip: Trip, mode: TravelMode ->
+    // Every change to trips can be undone for a while: how trips looked around it is kept, then put back on Undo.
+    val undoable = { label: String, from: Long, to: Long, change: () -> DeleteResult ->
         scope.launch {
-            withContext(Dispatchers.IO) { store.setTripMode(trip.id, mode) }
-            val day = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
-            afterDotEdit(context, DeleteResult(setOf(day), emptyList()))
+            val (snap, result) = withContext(Dispatchers.IO) { store.snapshot(from, to) to change() }
+            afterDotEdit(context, result)
+            undoSnackbar.currentSnackbarData?.dismiss()
+            if (undoSnackbar.showSnackbar(label, actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                afterDotEdit(context, withContext(Dispatchers.IO) { store.restore(snap) })
+                questionsReset++
+            }
         }
         Unit
     }
+    val changeModes = { trips: List<Trip>, mode: TravelMode ->
+        if (trips.isNotEmpty()) {
+            val label = if (trips.size == 1) "Changed to ${mode.fullLabel}" else "${trips.size} trips changed to ${mode.fullLabel}"
+            undoable(label, trips.minOf { it.startTime }, trips.maxOf { it.endTime }) {
+                store.setTripModes(trips.map { it.id }, mode)
+                DeleteResult(trips.map { Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString() }.toSet(), emptyList())
+            }
+        }
+        Unit
+    }
+    val changeMode = { trip: Trip, mode: TravelMode -> changeModes(listOf(trip), mode) }
     // Joins trips into one, from the first one's start to the last one's end, taking in any loose dots
     // between them. It keeps the mode of the longest of them.
     val joinTrips = { trips: List<Trip> ->
         if (trips.size >= 2) {
             val mode = trips.maxBy { it.distanceM }.mode
-            scope.launch {
-                val result = withContext(Dispatchers.IO) { store.addTrip(trips.minOf { it.startTime }, trips.maxOf { it.endTime }, mode) }
-                afterDotEdit(context, result)
-            }
+            val start = trips.minOf { it.startTime }
+            val end = trips.maxOf { it.endTime }
+            undoable("${trips.size} trips joined", start, end) { store.addTrip(start, end, mode) }
         }
         Unit
     }
@@ -352,6 +370,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding())) {
         TopAppBar(
             title = {
@@ -414,13 +433,24 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 onRoad = { q, choice ->
                     scope.launch {
                         withContext(Dispatchers.IO) { RoadSnapper.answer(context, q, choice) }
+                        undoSnackbar.currentSnackbarData?.dismiss()
+                        if (undoSnackbar.showSnackbar("Road saved", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                            withContext(Dispatchers.IO) { RoadSnapper.answer(context, q, -1) }
+                            questionsReset++
+                        }
                     }
                 },
                 onLevel = { q, different ->
                     scope.launch {
                         withContext(Dispatchers.IO) { store.answerLevel(q.area, if (different) HeightGrid.DIFFERENT else HeightGrid.SAME) }
+                        undoSnackbar.currentSnackbarData?.dismiss()
+                        if (undoSnackbar.showSnackbar("Answer saved", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                            withContext(Dispatchers.IO) { store.answerLevel(q.area, HeightGrid.ASK) }
+                            questionsReset++
+                        }
                     }
                 },
+                reset = questionsReset,
                 modifier = Modifier.weight(1f),
             )
         } else {
@@ -566,20 +596,17 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         onSave = { start, end ->
                             val road = roads.getOrNull(chosenRoad)
                             val mode = fixMode
-                            scope.launch {
-                                val result = withContext(Dispatchers.IO) {
-                                    store.addTrip(start, end, mode).also { r ->
-                                        // The road picked becomes the trip's shape; otherwise it's matched to roads as usual.
-                                        if (road != null && r.createdTripId > 0) {
-                                            val n = road.points.size / 2
-                                            val poly = Polyline.encode(DoubleArray(n) { road.points[it * 2] }, DoubleArray(n) { road.points[it * 2 + 1] })
-                                            store.saveTripPath(r.createdTripId, RoadSnapper.STATUS_SNAPPED, poly, poly)
-                                        }
+                            undoable("Route fixed", start, end) {
+                                store.addTrip(start, end, mode).also { r ->
+                                    // The road picked becomes the trip's shape; otherwise it's matched to roads as usual.
+                                    if (road != null && r.createdTripId > 0) {
+                                        val n = road.points.size / 2
+                                        val poly = Polyline.encode(DoubleArray(n) { road.points[it * 2] }, DoubleArray(n) { road.points[it * 2 + 1] })
+                                        store.saveTripPath(r.createdTripId, RoadSnapper.STATUS_SNAPPED, poly, poly)
                                     }
                                 }
-                                afterDotEdit(context, result)
-                                fixing = null
                             }
+                            fixing = null
                         },
                     )
                 }
@@ -597,15 +624,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                 adding = null
                             },
                             onSave = { start, end, mode ->
-                                scope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        if (trip != null) store.retimeTrip(trip.id, start, end)
-                                        else store.addTrip(start, end, mode ?: TravelMode.UNKNOWN)
-                                    }
-                                    afterDotEdit(context, result)
-                                    retiming = null
-                                    adding = null
+                                if (trip != null) {
+                                    undoable("Times changed", minOf(start, trip.startTime), maxOf(end, trip.endTime)) { store.retimeTrip(trip.id, start, end) }
+                                } else {
+                                    undoable("Trip added", start, end) { store.addTrip(start, end, mode ?: TravelMode.UNKNOWN) }
                                 }
+                                retiming = null
+                                adding = null
                             },
                         )
                     }
@@ -643,7 +668,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                         expanded = expanded[entry.start] == true,
                                         onToggle = { expanded[entry.start] = expanded[entry.start] != true },
                                         onClick = { entry.box?.let { frame(camera, it) } },
-                                        onModeAll = { m -> entry.moves.forEach { changeMode(it.trip, m) } },
+                                        onModeAll = { m -> changeModes(entry.moves.map { it.trip }, m) },
                                         onJoin = { joinTrips(entry.moves.map { it.trip }) },
                                         onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
                                         onSectionMode = { mv, m -> changeMode(mv.trip, m) },
@@ -689,12 +714,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                             picked = null
                         },
                         onMode = { mode ->
-                            val trips = data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }
-                            scope.launch {
-                                withContext(Dispatchers.IO) { store.setTripModes(ids, mode) }
-                                val days = trips.map { Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString() }.toSet()
-                                afterDotEdit(context, DeleteResult(days, emptyList()))
-                            }
+                            changeModes(data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }, mode)
                             picked = null
                         },
                         onCancel = { picked = null },
@@ -702,6 +722,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 }
             }
         }
+    }
+        // "Undo" after each change to trips and each answer.
+        SnackbarHost(undoSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = contentPadding.calculateBottomPadding()))
     }
 
     if (layersOpen) {

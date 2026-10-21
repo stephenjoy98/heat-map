@@ -303,7 +303,10 @@ private fun AppScaffold(
     }
 
     val openMenu = { stack.push(Page.ACCOUNT) }
-    LaunchedEffect(tab) { if (tab == MainActivity.TAB_TIMELINE) Attention.seen(Attention.TIMELINE) }
+    LaunchedEffect(tab) {
+        if (tab == MainActivity.TAB_TIMELINE) Attention.seen(Attention.TIMELINE)
+        if (tab != MainActivity.TAB_MAP) MapChrome.fullscreen = false
+    }
 
     CompositionLocalProvider(LocalReviewCount provides questions) {
         PageHost(
@@ -314,7 +317,8 @@ private fun AppScaffold(
                     contentWindowInsets = WindowInsets(0),
                     snackbarHost = { SnackbarHost(snackbar) },
                     bottomBar = {
-                        NavigationBar {
+                        // Hidden while the map is full screen.
+                        if (!(tab == MainActivity.TAB_MAP && MapChrome.fullscreen)) NavigationBar {
                             NavigationBarItem(
                                 selected = tab == MainActivity.TAB_MAP,
                                 onClick = { tab = MainActivity.TAB_MAP },

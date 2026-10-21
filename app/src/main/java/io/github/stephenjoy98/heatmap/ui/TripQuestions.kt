@@ -80,12 +80,14 @@ fun QuestionsPane(
     onRoad: (RoadQuestion, Int) -> Unit,
     onLevel: (LevelQuestion, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    // Goes up when an answer is undone, so answered questions can come back.
+    reset: Int = 0,
 ) {
     val all = remember(trips, roads, levels) {
         trips.map { Question.OfTrip(it) } + roads.map { Question.OfRoad(it.first, it.second) } + levels.map { Question.OfLevel(it) }
     }
     // Answered ones leave at once, without waiting for the list to reload.
-    val answered = remember { mutableStateListOf<String>() }
+    val answered = remember(reset) { mutableStateListOf<String>() }
     val skipped = remember { mutableStateListOf<String>() }
     val open = all.filter { it.key !in answered }
     val queue = open.filter { it.key !in skipped } + skipped.mapNotNull { k -> open.firstOrNull { it.key == k } }

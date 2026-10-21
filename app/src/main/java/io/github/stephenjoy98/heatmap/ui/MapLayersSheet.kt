@@ -99,6 +99,8 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LayerTile("3D buildings", buildings, { Prefs.setBuildings3d(!buildings) }) { drawBuildingsArt(it) }
+                val dot by Prefs.showLocationDot.collectAsStateWithLifecycle()
+                LayerTile("My location", dot, { Prefs.setShowLocationDot(!dot) }) { drawLocationArt(it) }
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -267,6 +269,20 @@ private fun DrawScope.drawBuildingsArt(c: ArtColors) {
     }
     box(w * 0.14f, h * 0.45f, w * 0.26f)
     box(w * 0.5f, h * 0.28f, w * 0.24f)
+}
+
+/** A street corner with the blue dot for where you are on it (grey while it's hidden). */
+private fun DrawScope.drawLocationArt(c: ArtColors) {
+    val w = size.width
+    val h = size.height
+    drawLine(c.line, Offset(0f, h * 0.62f), Offset(w, h * 0.62f), strokeWidth = h * 0.08f)
+    drawLine(c.line, Offset(w * 0.38f, 0f), Offset(w * 0.38f, h), strokeWidth = h * 0.08f)
+    // The map's own blue, not the theme's: map elements keep their colours.
+    val blue = if (c.selected) Color(0xFF1A73E8) else c.accent
+    val centre = Offset(w * 0.38f, h * 0.62f)
+    drawCircle(blue.copy(alpha = 0.25f), radius = h * 0.26f, center = centre)
+    drawCircle(Color.White, radius = h * 0.13f, center = centre)
+    drawCircle(blue, radius = h * 0.1f, center = centre)
 }
 
 /** A map-type picture filling its tile. */

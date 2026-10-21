@@ -103,6 +103,9 @@ up to your Google account, and lets you compare explored areas with friends.
   the road pass through a spot.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
+- **Undo** after every Timeline change (modes, times, added, joined or fixed trips) and every answered question.
+- **Full screen map** (button above the location button) keeps only the compass, location, zoom and layers
+  buttons; **My location** in the layers sheet hides the blue dot.
 - **Red dots and "New" markers**: a red dot on the account button leads to what a notification was about (a new
   version under Settings › Updates, the changelog after an update); "New" marks sections that changed since you
   last opened them.

@@ -27,6 +27,12 @@ The app shows the entries since your last version as "What's new" after an updat
   Settings › Updates for a new version, or on About and its Changelog after an update. They go once you've looked.
 - "New" markers on the sections that gained or changed something since you last opened them (on the Account page,
   Settings sections and the Timeline tab), with a red dot on the account button until you've looked.
+- Undo for every change on the Timeline: changing a trip's mode (one, a group or a selection), its times, adding,
+  joining or fixing trips, and answers to questions. A bar with Undo shows for a few seconds after each one and
+  puts things back as they were, including the question.
+- Hide your location's blue dot: My location in the map layers sheet.
+- Full screen map: the new button above the location button hides the tabs, stats, filters, recording panel and
+  GPS button, leaving the compass, location, zoom and layers buttons. Tap it again, or go back, to bring them back.
 
 ### Fixed
 - Tilting the map into 3D with two fingers works even when the second finger lands a moment after the first.
