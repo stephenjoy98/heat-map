@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.33.2] - 2026-10-21
+
+### Fixed
+- Routes at speed no longer break up or sprout spikes when GPS jumps: a fix that leaps further than anything
+  could travel since the last one (common on highways, near tall buildings and under bridges) is skipped,
+  jumps under 1 km don't split a trip, and a lost signal of up to 10 minutes while driving (a tunnel) carries
+  the same trip on. The whole drive is then snapped to the road in one go. Trips recorded before this
+  version keep their old pieces.
+
 ## [2.33.1] - 2026-10-21
 
 ### Fixed

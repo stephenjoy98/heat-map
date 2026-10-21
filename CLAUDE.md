@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.33.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.33.2**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -90,7 +90,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   `altitudeOf` — MSL on API 34+), `AutoInterval` (vehicle 1 s, cycle 2 s, walk 3 s, unknown 5 s, still 15 s,
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,
   `BootReceiver`. Manual interval slider is 15 s … 1 day. Fixes worse than `accuracyLimitM` (100 m high
-  accuracy / 500 m) are skipped.
+  accuracy / 500 m) are skipped, and (2.33.2) GPS jumps (>150 m at >55 m/s within 60 s of the last saved fix, max 5 in a
+  row) too. `TrackRules.isBreak`: jumps <1 km never break; gaps ≤10 min at 3–45 m/s (tunnels) don't break.
 - `data/`: `PointStore` (SQLite, **schema v10**: v10 = satellite_use (day, constellation, svid, fixes) + satellite_fixes
   (day, fixes), filled by `LocationTickerService` from a GnssStatus callback (satellites usedInFix within 15 s of a saved
   fix, `logSatellites`), read by `satelliteUse(from, to)` → Insights `SatellitesCard`; names in `data/Satellites.kt`;

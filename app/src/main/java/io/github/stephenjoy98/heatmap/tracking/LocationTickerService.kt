@@ -37,6 +37,7 @@ import io.github.stephenjoy98.heatmap.data.Satellites
 import com.google.android.gms.location.DetectedActivity
 import io.github.stephenjoy98.heatmap.data.SavedPlace
 import io.github.stephenjoy98.heatmap.data.PlaceZones
+import io.github.stephenjoy98.heatmap.data.TrackRules
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Units
 import io.github.stephenjoy98.heatmap.ui.MainActivity
@@ -59,6 +60,10 @@ class LocationTickerService : Service() {
     private var intervalMs = 60_000L
     private var maxAccuracyM = 100f
     private var lastSavedAt = 0L
+    private var lastSavedLat = 0.0
+    private var lastSavedLon = 0.0
+    // Fixes skipped in a row as GPS jumps (see record).
+    private var jumpsInRow = 0
     private var lastDetectedAt = 0L
     private var lastBatteryAt = 0L
 
@@ -202,6 +207,18 @@ class LocationTickerService : Service() {
         if (location.hasAccuracy() && location.accuracy > maxAccuracyM) return
         // The fused provider can deliver early (e.g. when another app asks for location); keep the set pace.
         if (location.time - lastSavedAt < intervalMs * 9 / 10) return
+        // A fix that leaps further than anything could travel since the last one is a GPS jump (common at
+        // speed, near tall buildings and under bridges): skip it, so routes don't break or sprout spikes. If
+        // fixes keep landing far away, the phone really is somewhere else, so they're kept again.
+        val dt = (location.time - lastSavedAt) / 1000.0
+        if (lastSavedAt > 0 && dt in 0.0..JUMP_WINDOW_SEC && jumpsInRow < MAX_JUMPS_SKIPPED) {
+            val meters = TrackRules.distanceMeters(lastSavedLat, lastSavedLon, location.latitude, location.longitude)
+            if (meters > JUMP_MIN_M && meters / dt.coerceAtLeast(1.0) > JUMP_SPEED_MPS) {
+                jumpsInRow++
+                return
+            }
+        }
+        jumpsInRow = 0
 
         val saved = store.insert(
             LocationPoint(
@@ -217,6 +234,8 @@ class LocationTickerService : Service() {
             )
         )
         lastSavedAt = location.time
+        lastSavedLat = location.latitude
+        lastSavedLon = location.longitude
         // The satellites behind this fix, if the GPS chip reported them just now (not for Wi-Fi or cell fixes).
         if (saved && System.currentTimeMillis() - usedSatellitesAt < SATELLITES_FRESH_MS) {
             runCatching { store.logSatellites(location.time, usedSatellites) }
@@ -340,6 +359,11 @@ class LocationTickerService : Service() {
         }
 
         private const val SATELLITES_FRESH_MS = 15_000L
+        // Jumps: faster than ~200 km/h, at least 150 m, within a minute of the last fix; at most 5 skipped in a row.
+        private const val JUMP_SPEED_MPS = 55.0
+        private const val JUMP_MIN_M = 150.0
+        private const val JUMP_WINDOW_SEC = 60.0
+        private const val MAX_JUMPS_SKIPPED = 5
 
         const val CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 1
