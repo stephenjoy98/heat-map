@@ -19,6 +19,11 @@ The app shows the entries since your last version as "What's new" after an updat
   brighter roads (yellow main roads on the light map), coloured buildings and clearer labels, for more
   contrast. Set separately for the dark and the light theme.
 
+### Fixed
+- Each notification opens its own place again: the recording notification just opens the app, "new version"
+  opens Settings › Updates, "updated" opens the changelog, and trip and road questions open the Timeline's
+  Questions tab. Before, after one update notification every notification opened the changelog.
+
 ## [2.34.0] - 2026-10-21
 
 ### Added

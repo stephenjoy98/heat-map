@@ -1,6 +1,8 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import android.content.Intent
+import android.content.Context
+import android.app.PendingIntent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -129,6 +131,26 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_PAGE = "page"
         const val PAGE_UPDATES = "updates"
         const val PAGE_CHANGELOG = "changelog"
+        const val PAGE_QUESTIONS = "questions"
+
+        /**
+         * What a notification opens: the app on [page] (or just the app). Each page gets its own request code
+         * and action, so Android keeps their PendingIntents apart; otherwise one notification's page would
+         * replace every other's, since extras don't make intents different.
+         */
+        fun openIntent(context: Context, page: String? = null): PendingIntent {
+            val code = when (page) {
+                PAGE_UPDATES -> 10
+                PAGE_CHANGELOG -> 11
+                PAGE_QUESTIONS -> 12
+                else -> 13
+            }
+            val intent = Intent(context, MainActivity::class.java)
+                .setAction("${context.packageName}.OPEN${page?.let { ".$it" } ?: ""}")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            if (page != null) intent.putExtra(EXTRA_PAGE, page)
+            return PendingIntent.getActivity(context, code, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        }
         const val TAB_MAP = 0
         const val TAB_TIMELINE = 1
         const val TAB_REVIEW = 2
@@ -188,6 +210,12 @@ private fun AppScaffold(
             MainActivity.PAGE_UPDATES -> {
                 SettingsNav.openUpdates = true
                 stack.push(Page.SETTINGS)
+            }
+            MainActivity.PAGE_QUESTIONS -> {
+                TimelineTabs.questions = true
+                tab = MainActivity.TAB_TIMELINE
+                // Questions live on a tab, so close any pages covering it.
+                stack.clear()
             }
             MainActivity.PAGE_CHANGELOG -> {
                 // The full changelog replaces the "What's new" popup.

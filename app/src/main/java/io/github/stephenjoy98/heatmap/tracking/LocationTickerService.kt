@@ -312,11 +312,8 @@ class LocationTickerService : Service() {
     }
 
     private fun buildNotification(last: Location?): Notification {
-        val open = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
+        // Just opens the app, as it was.
+        val open = MainActivity.openIntent(this)
         val stop = PendingIntent.getService(
             this, 1,
             Intent(this, LocationTickerService::class.java).setAction(ACTION_STOP),

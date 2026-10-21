@@ -297,13 +297,8 @@ object RoadSnapper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
-        val open = PendingIntent.getActivity(
-            context, 5,
-            Intent(context, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_REVIEW)
-                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        // Road questions are answered on the Timeline's Questions tab.
+        val open = MainActivity.openIntent(context, MainActivity.PAGE_QUESTIONS)
         val notification = NotificationCompat.Builder(context, TripDetector.QUESTIONS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_ticker)
             .setContentTitle("Which road did you take?")

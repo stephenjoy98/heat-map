@@ -197,13 +197,7 @@ object TripDetector {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
-        val open = PendingIntent.getActivity(
-            context, 3,
-            Intent(context, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_TIMELINE)
-                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val open = MainActivity.openIntent(context, MainActivity.PAGE_QUESTIONS)
         val text = if (pending == 1) "How did you travel on your last trip?" else "$pending trips need a quick answer"
         val notification = NotificationCompat.Builder(context, QUESTIONS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_ticker)

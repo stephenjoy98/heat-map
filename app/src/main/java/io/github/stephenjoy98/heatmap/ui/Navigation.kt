@@ -72,6 +72,13 @@ class PageStack(initial: List<Page>) {
         if (leaving == null) leaving = pages.lastOrNull()
     }
 
+    /** Closes every page at once (no animation), back to the tabs. */
+    fun clear() {
+        pages.clear()
+        entered.clear()
+        leaving = null
+    }
+
     internal fun finishPop() {
         leaving?.let {
             pages.remove(it)
