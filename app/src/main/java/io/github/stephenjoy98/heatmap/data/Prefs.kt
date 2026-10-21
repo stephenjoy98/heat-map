@@ -120,6 +120,18 @@ object Prefs {
     private val _mapBrightnessLight = MutableStateFlow(0f)
     val mapBrightnessLight: StateFlow<Float> = _mapBrightnessLight
 
+    /** How colourful the map is, 0 (muted standard colours) to 1 (vivid), for the dark and light themes. */
+    private val _mapColourDark = MutableStateFlow(0f)
+    val mapColourDark: StateFlow<Float> = _mapColourDark
+    private val _mapColourLight = MutableStateFlow(0f)
+    val mapColourLight: StateFlow<Float> = _mapColourLight
+
+    fun setMapColour(dark: Boolean, amount: Float) {
+        val v = amount.coerceIn(0f, 1f)
+        if (dark) _mapColourDark.value = v else _mapColourLight.value = v
+        sp.edit().putFloat(if (dark) "map_colour_dark" else "map_colour_light", v).apply()
+    }
+
     fun setMapBrightness(dark: Boolean, amount: Float) {
         val v = amount.coerceIn(-MAX_MAP_BRIGHTNESS, MAX_MAP_BRIGHTNESS)
         if (dark) _mapBrightnessDark.value = v else _mapBrightnessLight.value = v
@@ -178,6 +190,8 @@ object Prefs {
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
         _mapBrightnessDark.value = sp.getFloat("map_brightness_dark", 0f)
         _mapBrightnessLight.value = sp.getFloat("map_brightness_light", 0f)
+        _mapColourDark.value = sp.getFloat("map_colour_dark", 0f)
+        _mapColourLight.value = sp.getFloat("map_colour_light", 0f)
         _autoUpdate.value = sp.getBoolean("auto_update", true)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
         _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.STABLE)
@@ -450,7 +464,7 @@ object Prefs {
         "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
-        "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light",
+        "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */

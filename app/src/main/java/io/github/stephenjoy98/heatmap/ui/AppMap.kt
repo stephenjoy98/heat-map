@@ -179,10 +179,23 @@ private const val TILT_3D = 45f
 private const val AUTO_3D_TILT = 8f
 private const val AUTO_FLAT_TILT = 2f
 
-/** The base map drawn lighter or darker, as chosen in the layers sheet (one setting per theme). */
+/**
+ * The base map's colours and brightness, as chosen in the layers sheet (one setting of each per theme): how
+ * colourful it is (muted to vivid), and a lighter or darker sheet over it.
+ */
 @Composable
 private fun MapBrightness(holder: VectorMapHolder, dark: Boolean) {
     val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
+    val colour by (if (dark) Prefs.mapColourDark else Prefs.mapColourLight).collectAsStateWithLifecycle()
+    // The light style is left exactly as OpenFreeMap draws it until colour is turned up; once recoloured,
+    // turning it back down paints the muted palette (a freshly loaded style starts untouched again).
+    val recoloured = remember(holder, holder.styleVersion) { booleanArrayOf(false) }
+    LaunchedEffect(holder, holder.styleVersion, colour) {
+        if (dark || colour > 0f || recoloured[0]) {
+            recoloured[0] = true
+            holder.withMap { m -> m.style?.let { VectorMaps.applyColours(it, dark, colour) } }
+        }
+    }
     LaunchedEffect(holder, holder.styleVersion, brightness) {
         holder.withMap { m -> m.style?.let { VectorMaps.setTint(it, brightness) } }
     }

@@ -49,52 +49,102 @@ object VectorMaps {
     const val STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
     const val ATTRIBUTION = "OpenFreeMap © OpenMapTiles · © OpenStreetMap contributors"
 
-    // Google-style dark palette.
-    private val background = Color.parseColor("#121212")
-    private val landuse = Color.parseColor("#161616")
-    private val park = Color.parseColor("#141A15")
-    private val water = Color.parseColor("#0A0E13")
-    private val building = Color.parseColor("#1C1C1C")
-    private val minorRoad = Color.parseColor("#262626")
-    private val majorRoad = Color.parseColor("#363636")
-    private val rail = Color.parseColor("#242424")
-    private val border = Color.parseColor("#3C3C3C")
-    private val label = Color.parseColor("#8E9196")
+    /** The colours a map style is painted in. */
+    private class Palette(
+        val background: Int,
+        val landuse: Int,
+        val park: Int,
+        val water: Int,
+        val building: Int,
+        val minorRoad: Int,
+        val majorRoad: Int,
+        val casing: Int,
+        val rail: Int,
+        val border: Int,
+        val label: Int,
+        val halo: Int,
+    ) {
+        fun blend(to: Palette, t: Float) = Palette(
+            mix(background, to.background, t), mix(landuse, to.landuse, t), mix(park, to.park, t), mix(water, to.water, t),
+            mix(building, to.building, t), mix(minorRoad, to.minorRoad, t), mix(majorRoad, to.majorRoad, t),
+            mix(casing, to.casing, t), mix(rail, to.rail, t), mix(border, to.border, t), mix(label, to.label, t),
+            mix(halo, to.halo, t),
+        )
+    }
+
+    private fun c(hex: String) = Color.parseColor(hex)
+
+    private fun mix(a: Int, b: Int, t: Float): Int {
+        fun ch(shift: Int) = ((a shr shift and 0xFF) + ((b shr shift and 0xFF) - (a shr shift and 0xFF)) * t).toInt().coerceIn(0, 255)
+        return Color.rgb(ch(16), ch(8), ch(0))
+    }
+
+    // Google-style dark: near-black greys…
+    private val darkMuted = Palette(
+        c("#121212"), c("#161616"), c("#141A15"), c("#0A0E13"), c("#1C1C1C"), c("#262626"), c("#363636"),
+        c("#121212"), c("#242424"), c("#3C3C3C"), c("#8E9196"), c("#121212"),
+    )
+    // …and the same with colour: blue water, green parks, lighter roads and buildings, brighter labels.
+    private val darkVivid = Palette(
+        c("#0F141A"), c("#171C22"), c("#123A22"), c("#0B3358"), c("#2C323A"), c("#3E4650"), c("#7C8794"),
+        c("#0A0D11"), c("#5A4A6E"), c("#7A68A0"), c("#D2D6DC"), c("#0F141A"),
+    )
+    // OpenFreeMap's Positron, near enough…
+    private val lightMuted = Palette(
+        c("#F2F3F0"), c("#EAEAE6"), c("#E2EADB"), c("#C6D6E0"), c("#E3E1DD"), c("#FFFFFF"), c("#FFFFFF"),
+        c("#D9D9D9"), c("#D6D6D6"), c("#C4C4C4"), c("#6B6B6B"), c("#FFFFFF"),
+    )
+    // …and with colour, like Google Maps: blue water, green parks, yellow main roads, warm buildings.
+    private val lightVivid = Palette(
+        c("#F3F1EC"), c("#ECE6DA"), c("#BFE3AE"), c("#8EC5F2"), c("#DCCDBE"), c("#FFFFFF"), c("#FFD873"),
+        c("#B3B3B3"), c("#B39DCB"), c("#A47CC9"), c("#2E2E2E"), c("#FFFFFF"),
+    )
 
     /** Recolours every layer of the light style for dark mode, matching on layer type and name. */
-    fun applyDark(style: Style) {
+    fun applyDark(style: Style) = applyColours(style, dark = true, vivid = 0f)
+
+    /**
+     * Paints the map in its dark or light palette, [vivid] of the way (0–1) from the muted standard colours to
+     * colourful ones with more contrast. Matches layers on their type and name.
+     */
+    fun applyColours(style: Style, dark: Boolean, vivid: Float) {
+        if (!style.isFullyLoaded) return
+        val p = if (dark) darkMuted.blend(darkVivid, vivid) else lightMuted.blend(lightVivid, vivid)
         for (layer in style.layers) {
             val id = layer.id.lowercase()
+            if (id.startsWith("route-3d") || id.startsWith("map-tint") || id.startsWith("preview") || id.startsWith("terrain")) continue
             when (layer) {
-                is BackgroundLayer -> layer.setProperties(PropertyFactory.backgroundColor(background))
+                is FillExtrusionLayer -> if (id == BUILDINGS_LAYER) {
+                    layer.setProperties(PropertyFactory.fillExtrusionColor(mix(if (dark) building3dDark else building3dLight, p.building, vivid)))
+                }
+                is BackgroundLayer -> layer.setProperties(PropertyFactory.backgroundColor(p.background))
                 is FillLayer -> layer.setProperties(
                     PropertyFactory.fillColor(
                         when {
-                            "water" in id -> water
-                            "building" in id -> building
-                            listOf("park", "wood", "grass", "forest", "landcover", "green").any { it in id } -> park
-                            else -> landuse
+                            "water" in id -> p.water
+                            "building" in id -> p.building
+                            listOf("park", "wood", "grass", "forest", "landcover", "green").any { it in id } -> p.park
+                            else -> p.landuse
                         }
                     ),
-                    PropertyFactory.fillOutlineColor(background),
+                    PropertyFactory.fillOutlineColor(p.background),
                 )
                 is LineLayer -> layer.setProperties(
                     PropertyFactory.lineColor(
                         when {
-                            "water" in id || "river" in id -> water
-                            "casing" in id -> background
-                            "boundary" in id || "admin" in id -> border
-                            "rail" in id -> rail
-                            listOf("motorway", "trunk", "primary", "major").any { it in id } -> majorRoad
-                            else -> minorRoad
+                            "water" in id || "river" in id -> p.water
+                            "casing" in id -> p.casing
+                            "boundary" in id || "admin" in id -> p.border
+                            "rail" in id -> p.rail
+                            listOf("motorway", "trunk", "primary", "major").any { it in id } -> p.majorRoad
+                            else -> p.minorRoad
                         }
                     )
                 )
-                is SymbolLayer -> layer.setProperties(
-                    PropertyFactory.textColor(label),
-                    PropertyFactory.textHaloColor(background),
-                    PropertyFactory.iconOpacity(0.6f),
-                )
+                is SymbolLayer -> {
+                    layer.setProperties(PropertyFactory.textColor(p.label), PropertyFactory.textHaloColor(p.halo))
+                    if (dark) layer.setProperties(PropertyFactory.iconOpacity(0.6f + 0.3f * vivid))
+                }
             }
         }
     }

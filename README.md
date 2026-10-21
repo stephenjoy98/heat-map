@@ -41,7 +41,8 @@ up to your Google account, and lets you compare explored areas with friends.
   routes are drawn as an orange ribbon at their recorded height (above a fixed low point of everything
   recorded, exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
   Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off. **Map
-  brightness** in the same sheet makes the base map lighter or darker, kept separately for the dark and light
+  colours** (muted to vivid: blue water, green parks, brighter roads, more contrast) and **map brightness**
+  in the same sheet recolour or lighten/darken the base map, kept separately for the dark and light
   themes (the heatmap, routes and labels aren't changed).
 - A **scale bar** shows while you pan or zoom, in round distances.
 - **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed

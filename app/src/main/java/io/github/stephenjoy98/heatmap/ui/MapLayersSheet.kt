@@ -108,6 +108,31 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(20.dp))
+            // More colour and contrast, kept separately for the dark and the light map.
+            val colour by (if (dark) Prefs.mapColourDark else Prefs.mapColourLight).collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Map colours", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (dark) "For the dark map" else "For the light map",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (colour != 0f) TextButton(onClick = { Prefs.setMapColour(dark, 0f) }) { Text("Reset") }
+            }
+            Slider(value = colour, onValueChange = { Prefs.setMapColour(dark, it) }, valueRange = 0f..1f)
+            Row {
+                Text("Muted", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text("Vivid", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+                "Vivid gives water, parks, roads and buildings their own colours, with more contrast between them.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Spacer(Modifier.height(20.dp))
             // Lighter or darker base map, kept separately for the dark and the light map.
             val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
             Row(verticalAlignment = Alignment.CenterVertically) {

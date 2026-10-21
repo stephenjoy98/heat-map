@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.35.0] - 2026-10-21
+
+### Added
+- Map colours in the layers sheet: from the standard muted look to vivid, with blue water, green parks,
+  brighter roads (yellow main roads on the light map), coloured buildings and clearer labels, for more
+  contrast. Set separately for the dark and the light theme.
+
 ## [2.34.0] - 2026-10-21
 
 ### Added
