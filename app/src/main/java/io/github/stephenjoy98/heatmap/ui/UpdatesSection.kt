@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.stephenjoy98.heatmap.BuildConfig
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.UpdateFrequency
 import io.github.stephenjoy98.heatmap.update.Updater
 import kotlinx.coroutines.launch
 
@@ -50,6 +51,7 @@ internal fun UpdatesSection(resumeTick: Int) {
     val checked by Updater.lastChecked.collectAsStateWithLifecycle()
     val auto by Prefs.autoUpdate.collectAsStateWithLifecycle()
     val wifiOnly by Prefs.updateWifiOnly.collectAsStateWithLifecycle()
+    val frequency by Prefs.updateFrequency.collectAsStateWithLifecycle()
     // Android asks once whether this app may install apps (its own updates).
     val canInstall = remember(resumeTick) { context.packageManager.canRequestPackageInstalls() }
 
@@ -89,7 +91,7 @@ internal fun UpdatesSection(resumeTick: Int) {
                 Spacer(Modifier.height(10.dp))
                 Text("What's new in ${release.label}", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    release.notes.lines().filterNot { it.startsWith("<!--") }.joinToString("\n") { it.removePrefix("### ") }.trim(),
+                    notesText(release),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
@@ -114,7 +116,7 @@ internal fun UpdatesSection(resumeTick: Int) {
                     else -> Unit
                 }
                 val busy = state is Updater.State.Checking || state is Updater.State.Downloading || state is Updater.State.Installing
-                OutlinedButton(enabled = !busy, onClick = { scope.launch { Updater.check(context) } }) { Text("Check now") }
+                OutlinedButton(enabled = !busy, onClick = { scope.launch { Updater.check(context, manual = true) } }) { Text("Check now") }
             }
             if (release != null && release.pageUrl.isNotEmpty()) {
                 TextButton(onClick = { uri.openUri(release.pageUrl) }) { Text("Release page on GitHub") }
@@ -140,6 +142,26 @@ internal fun UpdatesSection(resumeTick: Int) {
                     }
                 }) { Text("Allow") }
             }
+        }
+        ItemDivider()
+        Column(Modifier.padding(16.dp)) {
+            Text("Which updates", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (frequency == UpdateFrequency.EVERY) {
+                    "Every new version, including small fixes (for example 2.31.0 → 2.31.1)."
+                } else {
+                    "Only versions with new features (for example 2.31 → 2.32); fixes come along with the next one. " +
+                        "Check now still finds every version."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            SegmentedChoice(
+                options = listOf(UpdateFrequency.EVERY to "Every update", UpdateFrequency.FEATURES to "New features only"),
+                selected = frequency,
+                onSelect = Prefs::setUpdateFrequency,
+            )
         }
         ItemDivider()
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -171,3 +193,7 @@ internal fun UpdatesSection(resumeTick: Int) {
         }
     }
 }
+
+/** A release's changelog for the screen: headings without their "###", the build marker left out. */
+internal fun notesText(r: Updater.Release): String =
+    r.notes.lines().filterNot { it.startsWith("<!--") }.joinToString("\n") { it.removePrefix("### ") }.trim()

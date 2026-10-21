@@ -111,6 +111,8 @@ object Prefs {
     val autoUpdate: StateFlow<Boolean> = _autoUpdate
     private val _updateWifiOnly = MutableStateFlow(true)
     val updateWifiOnly: StateFlow<Boolean> = _updateWifiOnly
+    private val _updateFrequency = MutableStateFlow(UpdateFrequency.EVERY)
+    val updateFrequency: StateFlow<UpdateFrequency> = _updateFrequency
 
     /** Draw unsnapped routes as smooth curves rather than straight hops between fixes. */
     private val _smoothRoutes = MutableStateFlow(true)
@@ -162,6 +164,7 @@ object Prefs {
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
         _autoUpdate.value = sp.getBoolean("auto_update", true)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
+        _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.EVERY)
         _autoInterval.value = sp.getBoolean("auto_interval", false)
         _powerProfile.value = runCatching { PowerProfile.valueOf(sp.getString("power_profile", null)!!) }.getOrDefault(PowerProfile.USER)
         _liveIntervalSec.value = _intervalSec.value
@@ -430,7 +433,7 @@ object Prefs {
         "interval_sec", "auto_interval", "high_accuracy", "display_mode", "map_theme", "units", "dynamic_color",
         "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
-        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only",
+        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile",
     )
 
@@ -513,6 +516,11 @@ object Prefs {
         sp.edit().putBoolean("auto_update", on).apply()
     }
 
+    fun setUpdateFrequency(f: UpdateFrequency) {
+        _updateFrequency.value = f
+        sp.edit().putString("update_frequency", f.name).apply()
+    }
+
     fun setUpdateWifiOnly(on: Boolean) {
         _updateWifiOnly.value = on
         sp.edit().putBoolean("update_wifi_only", on).apply()
@@ -535,3 +543,6 @@ object Prefs {
 
     private fun <T : Enum<T>> List<T>.byName(name: String?): T? = firstOrNull { it.name == name }
 }
+
+/** Which updates to offer: every one (fixes included), or only versions with new features (minor or major). */
+enum class UpdateFrequency { EVERY, FEATURES }

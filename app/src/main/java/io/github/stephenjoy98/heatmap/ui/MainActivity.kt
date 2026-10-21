@@ -214,6 +214,9 @@ private fun AppScaffold(
         )
     }
 
+    // A newer version, offered with its changelog (not on top of "What's new").
+    if (whatsNew.isEmpty()) UpdateBanner(resumeTick)
+
     if (confirmExit) {
         val activity = context.findActivity()
         AlertDialog(

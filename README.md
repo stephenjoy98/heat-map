@@ -179,7 +179,9 @@ Download the latest APK from the repository's **[Releases](https://github.com/st
 page: each version has its own release (tag `vX.Y.Z`) with its changelog and `location-ticker-X.Y.Z.apk`.
 Install it on Android 8.0+; you'll need to allow installing from unknown sources.
 
-Once installed, the app keeps itself up to date: **Settings › Updates** checks the releases (on opening and
+When the app opens and a newer version is out, it offers it with its changelog (Update now or Later). Under
+**Settings › Updates** you can choose every update or new features only. Once installed, the app keeps itself
+up to date: **Settings › Updates** checks the releases (on opening and
 every 6 hours), downloads a new version (on Wi-Fi only by default) and installs it once you've left the app.
 Android asks you to confirm the first update (and to allow Location Ticker to install apps); on Android 12
 and later, later updates install without asking. Automatic updates can be turned off there.

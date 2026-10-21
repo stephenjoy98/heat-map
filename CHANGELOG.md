@@ -32,6 +32,12 @@ The app shows the entries since your last version as "What's new" after an updat
   position right now while you're recording. It doesn't use extra battery: it only listens to what the GPS
   chip already reports while recording has it on.
 
+- When the app opens and a new version is out, it's offered with its changelog: Update now downloads and
+  installs it there and then (with progress), Later waits until you next open the app (or, with automatic
+  updates on, installs it once you've left the app).
+- Settings › Updates › Which updates: every update, or new features only (2.31 → 2.32, with fixes coming
+  along in the next one). Check now still finds every version.
+
 ### Fixed
 - "1 sats" now reads "1 sat" in Insights › Satellites.
 

@@ -10,7 +10,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import io.github.stephenjoy98.heatmap.BuildConfig
 import io.github.stephenjoy98.heatmap.R
+import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.SemVer
+import io.github.stephenjoy98.heatmap.data.UpdateFrequency
 import io.github.stephenjoy98.heatmap.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -76,8 +78,11 @@ object Updater {
 
     val currentVersion: SemVer? get() = SemVer.parse(BuildConfig.VERSION_NAME)
 
-    /** Asks GitHub for the latest release; returns it if it's newer than this app, else null. */
-    suspend fun check(context: Context): Release? = withContext(Dispatchers.IO) {
+    /**
+     * Asks GitHub for the latest release; returns it if it's newer than this app (and, unless [manual], one the
+     * chosen update frequency wants), else null.
+     */
+    suspend fun check(context: Context, manual: Boolean = false): Release? = withContext(Dispatchers.IO) {
         // Don't knock a finished download or an install in progress back to "available".
         val before = _state.value
         val busy = before is State.Downloading || before is State.Ready || before is State.Installing
@@ -85,7 +90,7 @@ object Updater {
         try {
             val release = fetchLatest()
             _lastChecked.value = System.currentTimeMillis()
-            val newer = release?.takeIf(::isNewer)
+            val newer = release?.takeIf { isNewer(it, followFrequency = !manual) }
             if (!busy) _state.value = if (newer != null) State.Available(newer) else State.UpToDate
             newer
         } catch (e: Exception) {
@@ -132,8 +137,12 @@ object Updater {
         }
     }
 
-    fun isNewer(r: Release): Boolean {
+    fun isNewer(r: Release, followFrequency: Boolean = true): Boolean {
         val mine = currentVersion ?: return false
+        if (followFrequency && Prefs.updateFrequency.value == UpdateFrequency.FEATURES) {
+            // New features only: a higher minor or major version; fixes alone wait for the next one.
+            return r.version.major > mine.major || (r.version.major == mine.major && r.version.minor > mine.minor)
+        }
         return when {
             r.version > mine -> true
             r.version < mine -> false
