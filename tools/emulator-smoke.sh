@@ -212,6 +212,15 @@ back
 tap text "Map"
 shot 15-map-after 4
 
+# Full screen: only the compass, location, zoom, layers and full-screen buttons stay; the second shot is taken
+# mid-animation to catch the controls flying out.
+tap desc "Full screen"
+sleep 0.15
+adb exec-out screencap -p > "$OUT/16a-fullscreen-moving.png"
+shot 16-fullscreen 2
+tap desc "Exit full screen"
+shot 17-fullscreen-exit 2
+
 kill "$REC" 2> /dev/null
 wait "$REC" 2> /dev/null
 sleep 3
