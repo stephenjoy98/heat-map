@@ -57,6 +57,24 @@ PY
 
 back() { adb shell input keyevent KEYCODE_BACK; sleep "${1:-2}"; }
 
+# Prints "x y" for the centre of the first element whose text is exactly $1 (nothing if there's none).
+centre_of() {
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+    python3 -I - "$OUT/.ui.xml" "$1" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(0)
+for node in root.iter("node"):
+    if node.get("text") == sys.argv[2]:
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+}
+
 # Like tap, but scrolls down (up to 5 times) until the element is on screen.
 tap_scrolling() {
     local mode=$1 label=$2 attr
@@ -114,6 +132,21 @@ for i in $(seq 0 24); do
     sleep 2
 done
 shot 02-recording 2
+
+# Map colours: open the layers sheet and drag the colour slider (just above its Muted / Vivid labels) to Vivid.
+tap desc "Map layers"
+shot 02a-layers 2
+read -r mx my <<< "$(centre_of Muted)"
+read -r vx vy <<< "$(centre_of Vivid)"
+if [ -n "${mx:-}" ] && [ -n "${vx:-}" ]; then
+    adb shell input swipe "$mx" $((my - 70)) "$vx" $((vy - 70)) 600
+    note "dragged Map colours to Vivid"
+else
+    note "MISSING the Map colours slider"
+fi
+shot 02b-layers-vivid 2
+back
+shot 02c-map-vivid 4
 
 tap text "Timeline"
 shot 03-timeline 5
