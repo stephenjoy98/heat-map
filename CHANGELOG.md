@@ -17,6 +17,8 @@ The app shows the entries since your last version as "What's new" after an updat
 ### Changed
 - The blue dot glides smoothly across the map as you travel instead of jumping from point to point. It also
   follows the live GPS fix while the map is open, so it keeps up between recorded dots.
+- Long-pressing a route on the Timeline map opens a sheet that slides up from the bottom (full width) instead of
+  a narrow pop-up.
 
 ## [2.37.0] - 2026-10-21
 

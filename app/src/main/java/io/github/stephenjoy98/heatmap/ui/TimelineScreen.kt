@@ -1072,7 +1072,7 @@ private fun findMapPick(store: PointStore, from: Long, to: Long, lat: Double, lo
     return MapPick(null, prev, next, start..maxOf(start, end))
 }
 
-/** Confirms what to do with a section long-pressed on the map. */
+/** Confirms what to do with a section long-pressed on the map, in a sheet that slides up from the bottom. */
 @Composable
 private fun MapPickDialog(
     pick: MapPick,
@@ -1088,50 +1088,55 @@ private fun MapPickDialog(
     val next = pick.next
     // Loose dots between two trips that are close together can join them into one.
     val canJoin = trip == null && prev != null && next != null && next.startTime - prev.endTime <= 30 * 60_000L
-    fun act(block: () -> Unit) {
+    // What was picked runs once the sheet has slid back down.
+    var then by remember { mutableStateOf<(() -> Unit)?>(null) }
+    SlideUpSheet(onClosed = {
         onDismiss()
-        block()
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (trip != null) "Edit this trip?" else "Edit these dots?") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                if (trip != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
-                        Spacer(Modifier.width(8.dp))
-                        Text("${trip.mode.fullLabel} · ${Insights.km(trip.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
-                    }
-                    Text(
-                        "${timeFormat.format(Date(trip.startTime))} – ${timeFormat.format(Date(trip.endTime))} · ${duration(trip.endTime - trip.startTime)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text("How did you travel?", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    ModeChips(selected = trip.mode, onPick = { m -> act { if (m != trip.mode || trip.needsReview) onMode(trip, m) } })
-                } else {
-                    Text(
-                        "Dots from ${timeFormat.format(Date(pick.window.first))} to ${timeFormat.format(Date(pick.window.last))} that aren't " +
-                            "part of any trip. They're drawn grey and have no row on the Timeline.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+        then?.invoke()
+    }) { close ->
+        fun act(block: () -> Unit) {
+            then = block
+            close()
+        }
+        Text(if (trip != null) "Edit this trip?" else "Edit these dots?", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(12.dp))
+        // Scrolls on small screens, keeping Cancel in view.
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+            if (trip != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Text("${trip.mode.fullLabel} · ${Insights.km(trip.distanceM / 1000)}", style = MaterialTheme.typography.titleSmall)
                 }
-                Spacer(Modifier.height(8.dp))
-                if (trip != null) {
-                    PickAction("Change times", Icons.Filled.Edit) { act { onRetime(trip) } }
-                    PickAction("Fix route on the map", Icons.Filled.Place) { act(onFix) }
-                } else {
-                    if (canJoin && prev != null && next != null) PickAction("Join the ${prev.mode.label} and ${next.mode.label} trips around them", null) { act(onJoin) }
-                    PickAction("Make them a trip", Icons.Filled.Add) { act(onMakeTrip) }
-                    PickAction("Join and fix route on the map", Icons.Filled.Place) { act(onFix) }
-                }
+                Text(
+                    "${timeFormat.format(Date(trip.startTime))} – ${timeFormat.format(Date(trip.endTime))} · ${duration(trip.endTime - trip.startTime)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text("How did you travel?", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                ModeChips(selected = trip.mode, onPick = { m -> act { if (m != trip.mode || trip.needsReview) onMode(trip, m) } })
+            } else {
+                Text(
+                    "Dots from ${timeFormat.format(Date(pick.window.first))} to ${timeFormat.format(Date(pick.window.last))} that aren't " +
+                        "part of any trip. They're drawn grey and have no row on the Timeline.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+            Spacer(Modifier.height(8.dp))
+            if (trip != null) {
+                PickAction("Change times", Icons.Filled.Edit) { act { onRetime(trip) } }
+                PickAction("Fix route on the map", Icons.Filled.Place) { act(onFix) }
+            } else {
+                if (canJoin && prev != null && next != null) PickAction("Join the ${prev.mode.label} and ${next.mode.label} trips around them", null) { act(onJoin) }
+                PickAction("Make them a trip", Icons.Filled.Add) { act(onMakeTrip) }
+                PickAction("Join and fix route on the map", Icons.Filled.Place) { act(onFix) }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = close) { Text("Cancel") }
+        }
+    }
 }
 
 @Composable
