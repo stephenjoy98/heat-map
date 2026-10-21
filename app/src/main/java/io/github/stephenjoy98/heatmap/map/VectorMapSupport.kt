@@ -197,6 +197,47 @@ object VectorMaps {
         }
     }
 
+    /**
+     * Makes the base map lighter (positive [amount], up to 1) or darker (negative) by laying a sheet of white
+     * or black over roads, land, water and buildings, under labels, routes and the heatmap (which is drawn
+     * on top of the map separately). 0 removes it.
+     */
+    fun setTint(style: Style, amount: Float) {
+        if (!style.isFullyLoaded) return
+        val layer = style.getLayerAs<FillLayer>(TINT_LAYER)
+        if (amount == 0f) {
+            if (layer != null) style.removeLayer(TINT_LAYER)
+            return
+        }
+        val color = if (amount > 0f) Color.WHITE else Color.BLACK
+        val opacity = kotlin.math.abs(amount).coerceAtMost(1f)
+        if (layer != null) {
+            layer.setProperties(PropertyFactory.fillColor(color), PropertyFactory.fillOpacity(opacity))
+            return
+        }
+        if (style.getSource(TINT_SOURCE) == null) {
+            val world = Polygon.fromLngLats(
+                listOf(
+                    listOf(
+                        Point.fromLngLat(-180.0, -85.0), Point.fromLngLat(180.0, -85.0), Point.fromLngLat(180.0, 85.0),
+                        Point.fromLngLat(-180.0, 85.0), Point.fromLngLat(-180.0, -85.0),
+                    ),
+                ),
+            )
+            style.addSource(GeoJsonSource(TINT_SOURCE, Feature.fromGeometry(world)))
+        }
+        val tint = FillLayer(TINT_LAYER, TINT_SOURCE).withProperties(
+            PropertyFactory.fillColor(color),
+            PropertyFactory.fillOpacity(opacity),
+            PropertyFactory.fillAntialias(false),
+        )
+        val below = firstLayerAbove(style) { id, l -> l is SymbolLayer || id.startsWith("route-3d") }
+        if (below != null) style.addLayerBelow(tint, below) else style.addLayer(tint)
+    }
+
+    private const val TINT_SOURCE = "map-tint"
+    private const val TINT_LAYER = "map-tint"
+
     fun clearRoute3d(style: Style) {
         if (!style.isFullyLoaded) return
         style.removeLayer(ROUTE_RIBBON)

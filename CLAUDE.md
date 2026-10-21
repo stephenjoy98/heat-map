@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.33.3**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.34.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -127,7 +127,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   ASK/SAME/DIFFERENT) asked in the Timeline's Questions tab; DIFFERENT keeps per-pass heights, `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).
 - `map/`: `VectorMapSupport.kt` (`VectorMaps`: OpenFreeMap Positron style, dark recolour, terrain hillshade
   from AWS Terrarium DEM declared at tileSize 128 for sharpness, 3D buildings fill-extrusion, 3D route
-  layers; `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix,
+  layers, `setTint` (2.34.0: world-polygon white/black fill under labels and route-3d layers for Prefs
+  `mapBrightnessDark/Light`, ±0.6, slider in `MapLayersSheet`, applied by `MapBrightness` in AppMap); `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix,
   blue location dot), heat rendering, smoothing, tile sources.
 - `ui/`: `MainActivity` (AppScaffold: tabs **Map** and **Timeline**; `PageHost` page stack for Profile,
   Friends, Backup, Settings, About, Changelog, **Insights** (file still `ReviewScreen.kt`, enum `Page.REVIEW`),

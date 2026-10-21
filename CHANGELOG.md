@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.34.0] - 2026-10-21
+
+### Added
+- Map brightness in the layers sheet (the layers button on the map): make the map lighter or darker, separately
+  for the dark and the light theme. It changes roads, land, water and buildings; your heatmap, routes and
+  place names stay as they are.
+
 ## [2.33.3] - 2026-10-21
 
 ### Changed

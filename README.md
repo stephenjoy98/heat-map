@@ -40,7 +40,9 @@ up to your Google account, and lets you compare explored areas with friends.
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
   routes are drawn as an orange ribbon at their recorded height (above a fixed low point of everything
   recorded, exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
-  Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off.
+  Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off. **Map
+  brightness** in the same sheet makes the base map lighter or darker, kept separately for the dark and light
+  themes (the heatmap, routes and labels aren't changed).
 - A **scale bar** shows while you pan or zoom, in round distances.
 - **Units**: metric (km, m) or imperial (miles, feet) in Settings, used for every distance, height, speed
   and the map scale; it defaults to your region (imperial in the US, UK, Liberia and Myanmar).

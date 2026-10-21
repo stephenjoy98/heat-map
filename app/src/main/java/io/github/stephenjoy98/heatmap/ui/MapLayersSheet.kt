@@ -27,6 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -104,6 +106,35 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                     "with two fingers to change the angle.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(20.dp))
+            // Lighter or darker base map, kept separately for the dark and the light map.
+            val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Map brightness", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (dark) "For the dark map" else "For the light map",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (brightness != 0f) TextButton(onClick = { Prefs.setMapBrightness(dark, 0f) }) { Text("Reset") }
+            }
+            Slider(
+                value = brightness,
+                onValueChange = { Prefs.setMapBrightness(dark, it) },
+                valueRange = -Prefs.MAX_MAP_BRIGHTNESS..Prefs.MAX_MAP_BRIGHTNESS,
+            )
+            Row {
+                Text("Darker", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text("Lighter", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+                "Changes roads, land, water and buildings; your heatmap, routes and the place names stay as they are.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }

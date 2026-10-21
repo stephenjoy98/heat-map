@@ -114,6 +114,20 @@ object Prefs {
     private val _updateFrequency = MutableStateFlow(UpdateFrequency.STABLE)
     val updateFrequency: StateFlow<UpdateFrequency> = _updateFrequency
 
+    /** How much lighter (positive) or darker (negative) the base map is drawn, for the dark and light themes. */
+    private val _mapBrightnessDark = MutableStateFlow(0f)
+    val mapBrightnessDark: StateFlow<Float> = _mapBrightnessDark
+    private val _mapBrightnessLight = MutableStateFlow(0f)
+    val mapBrightnessLight: StateFlow<Float> = _mapBrightnessLight
+
+    fun setMapBrightness(dark: Boolean, amount: Float) {
+        val v = amount.coerceIn(-MAX_MAP_BRIGHTNESS, MAX_MAP_BRIGHTNESS)
+        if (dark) _mapBrightnessDark.value = v else _mapBrightnessLight.value = v
+        sp.edit().putFloat(if (dark) "map_brightness_dark" else "map_brightness_light", v).apply()
+    }
+
+    const val MAX_MAP_BRIGHTNESS = 0.6f
+
     /** Draw unsnapped routes as smooth curves rather than straight hops between fixes. */
     private val _smoothRoutes = MutableStateFlow(true)
     val smoothRoutes: StateFlow<Boolean> = _smoothRoutes
@@ -162,6 +176,8 @@ object Prefs {
         _lastBackup.value = sp.getLong("last_backup", 0L)
         _dynamicColor.value = sp.getBoolean("dynamic_color", true)
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
+        _mapBrightnessDark.value = sp.getFloat("map_brightness_dark", 0f)
+        _mapBrightnessLight.value = sp.getFloat("map_brightness_light", 0f)
         _autoUpdate.value = sp.getBoolean("auto_update", true)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
         _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.STABLE)
@@ -434,7 +450,7 @@ object Prefs {
         "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
-        "power_profile", "user_profile",
+        "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */

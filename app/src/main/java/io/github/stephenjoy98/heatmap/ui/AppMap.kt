@@ -179,6 +179,15 @@ private const val TILT_3D = 45f
 private const val AUTO_3D_TILT = 8f
 private const val AUTO_FLAT_TILT = 2f
 
+/** The base map drawn lighter or darker, as chosen in the layers sheet (one setting per theme). */
+@Composable
+private fun MapBrightness(holder: VectorMapHolder, dark: Boolean) {
+    val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
+    LaunchedEffect(holder, holder.styleVersion, brightness) {
+        holder.withMap { m -> m.style?.let { VectorMaps.setTint(it, brightness) } }
+    }
+}
+
 /** Owns a MapLibre MapView, follows the Compose lifecycle, and hands out the map once it's ready. */
 private class VectorMapHolder(context: Context) {
     val mapView = MapView(context).apply { onCreate(null) }
@@ -389,6 +398,7 @@ private fun VectorAppMap(
     }
 
     LaunchedEffect(look) { holder.setLook(look) }
+    MapBrightness(holder, look.dark)
 
     LaunchedEffect(look.buildings) {
         holder.withMap { m ->
@@ -497,6 +507,7 @@ fun TripPreviewLinesMap(
     val dark = isDarkTheme()
     val all = remember(lines) { lines.flatMap { it.points } }
     val holder = rememberVectorMap()
+    MapBrightness(holder, dark)
     LaunchedEffect(lines, dark) {
         holder.styleLook = null // Reload so the lines are added to a fresh style.
         holder.setLook(MapLook(dark)) { style ->
