@@ -74,7 +74,7 @@ private val FEATURES = listOf(
     R.drawable.ic_calendar_month to "A Timeline by day, week, month or year, with back-to-back trips grouped",
     R.drawable.ic_edit to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
     R.drawable.ic_merge to "Join several trips into one, with the loose dots between them",
-    R.drawable.ic_refresh to "Undo any change on the Timeline or any answer to a question",
+    R.drawable.ic_undo to "Undo any change on the Timeline or any answer to a question",
     R.drawable.ic_fullscreen to "A full-screen map with only its buttons, and the blue location dot can be hidden",
     R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there",
     R.drawable.ic_system_update to "Red dots lead to what a notification was about, and \"New\" marks sections that changed since your last look",
