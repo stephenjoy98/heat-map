@@ -289,14 +289,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                             modifier = Modifier.size(48.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                if (turnsNorth) {
-                                    CompassNeedle(
-                                        bearing = camera.bearing,
-                                        modifier = Modifier.size(48.dp).semantics { contentDescription = "Turn map north up" },
-                                    )
-                                } else {
-                                    Icon(Icons.Filled.LocationOn, contentDescription = "Go to my latest position")
-                                }
+                                Icon(Icons.Filled.LocationOn, contentDescription = if (turnsNorth) "Turn map north up" else "Go to my latest position")
                             }
                         }
                     }

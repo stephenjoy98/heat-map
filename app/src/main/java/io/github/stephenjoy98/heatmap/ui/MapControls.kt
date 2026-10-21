@@ -121,7 +121,7 @@ fun ZoomButtons(camera: MapCamera, modifier: Modifier = Modifier) {
  * opposite to the map's rotation, so the needle and letters always show the real directions.
  */
 @Composable
-internal fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
+private fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
     val north = Color(0xFFE53935)
     val south = MaterialTheme.colorScheme.onSurfaceVariant
     val pivot = MaterialTheme.colorScheme.surface

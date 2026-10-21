@@ -20,6 +20,9 @@ The app shows the entries since your last version as "What's new" after an updat
 - Colour roads too: a switch under Map colours in the layers sheet. Off (the default) keeps roads in the standard
   colours while water, parks and buildings get the vivid ones.
 
+### Changed
+- The location button keeps its own icon; tapping it again once you're there still turns the map north up.
+
 ## [2.36.1] - 2026-10-21
 
 ### Changed
