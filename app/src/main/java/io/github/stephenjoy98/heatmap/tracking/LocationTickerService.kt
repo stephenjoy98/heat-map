@@ -266,7 +266,7 @@ class LocationTickerService : Service() {
         }
         val stillFor = if (stillSince > 0L && last != null) last.time - stillSince else 0L
         val auto = Prefs.autoInterval.value
-        val chosen = if (auto) AutoInterval.choose(activity, speed, stillFor) else autoSec
+        val chosen = if (auto) AutoInterval.choose(activity, speed, stillFor, Prefs.powerProfile.value) else autoSec
         // At a saved place: its slow interval while settled; once moving, often enough to notice leaving
         // (about every 20 s) without tracing every step around the house. Outside, the usual interval.
         val base = if (auto) chosen else Prefs.intervalSec.value

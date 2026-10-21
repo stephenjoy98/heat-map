@@ -12,6 +12,25 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.32.0] - 2026-10-21
+
+### Added
+- Battery profiles under Settings › Battery, each with what it records and how precisely:
+  - **User**: your own Recording settings (interval or automatic, GPS accuracy). They're kept while another
+    profile is on, so choosing User brings them back.
+  - **Performance**: every second in a vehicle or on a bike, 2 s walking, 10 s when still; precise GPS. The
+    most detailed routes and the most battery.
+  - **Default**: every 3 s in a vehicle, 5 s cycling, 8 s walking, a minute when still and 5 minutes after a
+    while; precise GPS.
+  - **Battery saver**: every 10 s in a vehicle, 15 s cycling, 30 s walking, 5 minutes when still and
+    15 minutes after a while, from Wi-Fi and mobile networks. The least battery; routes are rougher.
+
+  Changing a Recording setting by hand switches back to User. Saved places still slow recording down while
+  you're settled, whichever profile is on.
+
+### Fixed
+- "1 sats" now reads "1 sat" in Insights › Satellites.
+
 ## [2.31.1] - 2026-10-21
 
 ### Fixed

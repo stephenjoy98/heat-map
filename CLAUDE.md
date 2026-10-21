@@ -55,7 +55,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.31.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.32.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -77,6 +77,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   max(base, place interval) + balanced accuracy; moving (activity or >0.7 m/s) → auto: max(base, 20 s), fixed:
   base. UI `PlacesSection` (Settings) with full-screen `PlaceEditor` (pin at map centre via `MapCamera.center`),
   suggestions from `PointStore.frequentSpots`.
+- Battery profiles (2.32.0): `data/PowerProfile` (USER/PERFORMANCE/DEFAULT/SAVER: per-activity seconds + highAccuracy),
+  `Prefs.powerProfile`, `applyPowerProfile` (saves the user's interval/auto/accuracy as JSON "user_profile" when leaving
+  USER, restores it on return; built-ins force auto + their accuracy); manual `setIntervalSec`/`setAutoInterval`/
+  `setHighAccuracy` switch back to USER; `AutoInterval.choose(..., profile)`. UI `PowerProfilesSection` on the Battery page.
 - `tracking/`: `LocationTickerService` (foreground service, fused location, records altitude via
   `altitudeOf` — MSL on API 34+), `AutoInterval` (vehicle 1 s, cycle 2 s, walk 3 s, unknown 5 s, still 15 s,
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,

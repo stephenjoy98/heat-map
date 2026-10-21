@@ -163,6 +163,7 @@ object Prefs {
         _autoUpdate.value = sp.getBoolean("auto_update", true)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
         _autoInterval.value = sp.getBoolean("auto_interval", false)
+        _powerProfile.value = runCatching { PowerProfile.valueOf(sp.getString("power_profile", null)!!) }.getOrDefault(PowerProfile.USER)
         _liveIntervalSec.value = _intervalSec.value
         _savedPlaces.value = SavedPlace.decode(sp.getString("saved_places", null))
         _settingsAsPages.value = sp.getBoolean("settings_pages", true)
@@ -176,6 +177,59 @@ object Prefs {
         val clamped = seconds.coerceIn(MIN_INTERVAL_SEC, MAX_INTERVAL_SEC)
         _intervalSec.value = clamped
         sp.edit().putInt("interval_sec", clamped).apply()
+        becameUserProfile()
+    }
+
+    /** The battery profile in use; [PowerProfile.USER] means your own Recording settings. */
+    private val _powerProfile = MutableStateFlow(PowerProfile.USER)
+    val powerProfile: StateFlow<PowerProfile> = _powerProfile
+
+    /** Your own interval, automatic choice and accuracy, kept while another profile is on. */
+    data class UserRecording(val intervalSec: Int, val auto: Boolean, val highAccuracy: Boolean)
+
+    val userRecording: UserRecording
+        get() = if (_powerProfile.value == PowerProfile.USER) {
+            UserRecording(_intervalSec.value, _autoInterval.value, _highAccuracy.value)
+        } else {
+            runCatching {
+                val o = org.json.JSONObject(sp.getString("user_profile", null)!!)
+                UserRecording(o.getInt("i"), o.getBoolean("a"), o.getBoolean("h"))
+            }.getOrElse { UserRecording(_intervalSec.value, false, true) }
+        }
+
+    /**
+     * Switches battery profile. Leaving User keeps your own settings so choosing User again brings them back;
+     * the others turn the automatic interval on with their own pace and accuracy. Restart the recorder after.
+     */
+    fun applyPowerProfile(profile: PowerProfile) {
+        if (profile == _powerProfile.value) return
+        val mine = userRecording
+        if (_powerProfile.value == PowerProfile.USER) {
+            sp.edit().putString(
+                "user_profile",
+                org.json.JSONObject().put("i", mine.intervalSec).put("a", mine.auto).put("h", mine.highAccuracy).toString(),
+            ).apply()
+        }
+        _powerProfile.value = profile
+        val edit = sp.edit().putString("power_profile", profile.name)
+        if (profile == PowerProfile.USER) {
+            _intervalSec.value = mine.intervalSec
+            _autoInterval.value = mine.auto
+            _highAccuracy.value = mine.highAccuracy
+            edit.putInt("interval_sec", mine.intervalSec).putBoolean("auto_interval", mine.auto).putBoolean("high_accuracy", mine.highAccuracy)
+        } else {
+            _autoInterval.value = true
+            _highAccuracy.value = profile.highAccuracy
+            edit.putBoolean("auto_interval", true).putBoolean("high_accuracy", profile.highAccuracy)
+        }
+        edit.apply()
+    }
+
+    /** Changing a Recording setting by hand makes it your own: the profile becomes User. */
+    private fun becameUserProfile() {
+        if (_powerProfile.value == PowerProfile.USER) return
+        _powerProfile.value = PowerProfile.USER
+        sp.edit().putString("power_profile", PowerProfile.USER.name).apply()
     }
 
     fun setTracking(on: Boolean) {
@@ -193,6 +247,7 @@ object Prefs {
     fun setHighAccuracy(on: Boolean) {
         _highAccuracy.value = on
         sp.edit().putBoolean("high_accuracy", on).apply()
+        becameUserProfile()
     }
 
     fun setDisplayMode(mode: DisplayMode) {
@@ -332,6 +387,7 @@ object Prefs {
     fun setAutoInterval(on: Boolean) {
         _autoInterval.value = on
         sp.edit().putBoolean("auto_interval", on).apply()
+        becameUserProfile()
     }
 
     fun setSettingsAsPages(on: Boolean) {
@@ -375,6 +431,7 @@ object Prefs {
         "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only",
+        "power_profile", "user_profile",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */

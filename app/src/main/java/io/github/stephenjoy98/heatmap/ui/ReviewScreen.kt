@@ -314,7 +314,7 @@ private fun SatellitesCard(d: ReviewData) {
                                 )
                             }
                             Text(
-                                "$count sats",
+                                if (count == 1) "1 sat" else "$count sats",
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.width(72.dp).padding(start = 8.dp),
                             )

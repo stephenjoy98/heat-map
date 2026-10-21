@@ -103,7 +103,7 @@ import kotlin.math.roundToInt
 private enum class SettingsPage(val title: String, val summary: String, @DrawableRes val icon: Int, val group: String) {
     RECORDING("Recording", "Automatic or set interval, GPS accuracy", R.drawable.ic_my_location, "Recording"),
     PLACES("Places", "Home, work and other places where recording slows down", R.drawable.ic_home, "Recording"),
-    BATTERY("Battery", "Battery used at each recording interval", R.drawable.ic_battery_charging_full, "Recording"),
+    BATTERY("Battery", "Profiles (Performance, Default, Battery saver) and battery used", R.drawable.ic_battery_charging_full, "Recording"),
     MAP("Map & routes", "Routes or points, smoothing and road snapping", R.drawable.ic_map, "Map and trips"),
     MODES("Travel modes", "Add, rename, recolour and delete modes and sub-modes", R.drawable.ic_directions_bike, "Map and trips"),
     GENERAL("General", "Units, and how Settings are laid out", R.drawable.ic_tune, "App"),
@@ -277,7 +277,10 @@ fun SettingsScreen(
 
             if (shows(SettingsPage.PLACES)) PlacesSection()
 
-            if (shows(SettingsPage.BATTERY)) BatterySection()
+            if (shows(SettingsPage.BATTERY)) {
+                PowerProfilesSection()
+                BatterySection()
+            }
 
             if (shows(SettingsPage.MAP)) Section("Map & routes") {
                 Column(Modifier.padding(16.dp)) {

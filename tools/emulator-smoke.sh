@@ -57,6 +57,22 @@ PY
 
 back() { adb shell input keyevent KEYCODE_BACK; sleep "${1:-2}"; }
 
+# Like tap, but scrolls down (up to 5 times) until the element is on screen.
+tap_scrolling() {
+    local mode=$1 label=$2 attr
+    [ "$mode" = text ] && attr=text || attr=content-desc
+    for _ in 1 2 3 4 5; do
+        adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+        if adb shell cat /sdcard/ui.xml | grep -q "$attr=\"$label\""; then
+            tap "$mode" "$label"
+            return
+        fi
+        adb shell input swipe 540 1700 540 700 300
+        sleep 1
+    done
+    tap "$mode" "$label"
+}
+
 adb wait-for-device
 note "Location Ticker $VERSION on $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
 
@@ -73,6 +89,7 @@ cat > "$OUT/.ticker.xml" <<XML
     <boolean name="onboarded" value="true" />
     <string name="last_seen_version">$VERSION</string>
     <boolean name="auto_update" value="false" />
+    <boolean name="auto_interval" value="true" />
 </map>
 XML
 adb push "$OUT/.ticker.xml" /data/local/tmp/ticker.xml > /dev/null
@@ -112,25 +129,31 @@ shot 06-settings 3
 tap text "General"
 shot 07-settings-general 3
 back
-tap text "Updates"
-shot 08-settings-updates 4
+tap text "Battery"
+shot 08-settings-battery 3
+tap text "Battery saver"
+shot 09-battery-saver 2
+tap text "User"
+back
+tap_scrolling text "Updates"
+shot 10-settings-updates 4
 back
 back
 
 tap text "Insights"
-shot 09-insights 6
+shot 11-insights 6
 adb shell input swipe 540 1800 540 500 400
-shot 10-insights-lower 2
+shot 12-insights-lower 2
 adb shell input swipe 540 1800 540 500 400
-shot 11-insights-bottom 2
+shot 13-insights-bottom 2
 back
 
 tap text "Profile"
-shot 12-profile 6
+shot 14-profile 6
 back
 back
 tap text "Map"
-shot 13-map-after 4
+shot 15-map-after 4
 
 kill "$REC" 2> /dev/null
 wait "$REC" 2> /dev/null

@@ -113,6 +113,11 @@ up to your Google account, and lets you compare explored areas with friends.
   circle, then the usual pace; Android geofencing also reports leaving. Suggested from where you spend the
   most time; stays at them are named on the Timeline.
 - **Settings** as a page per section, or one long list (choose at the top).
+- **Battery profiles** in Settings › Battery: **User** (your own Recording settings, kept while another
+  profile is on), **Performance** (every 1 s in a vehicle or on a bike, 2 s walking, 10 s still; precise GPS),
+  **Default** (3 s vehicle, 5 s cycling, 8 s walking, 1 min still, 5 min after a while; precise GPS) and
+  **Battery saver** (10 s / 15 s / 30 s, 5 min still, 15 min after a while; Wi-Fi and mobile networks).
+  Changing a Recording setting by hand switches back to User.
 - **Battery** in Settings: battery used per hour at each recording interval (last 7 or 30 days, screen off
   or all), measured on battery power while recording.
 - **Travel modes** in Settings: pick each mode's colour with a colour picker or a hex code (reset one or all
