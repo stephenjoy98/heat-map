@@ -186,6 +186,10 @@ fun SettingsScreen(
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // Where the list of sections (and the one long list) were scrolled to, kept outside the page animation so
+    // coming back from a section returns to the same place rather than the top.
+    val sectionsScroll = rememberScrollState()
+    val oneListScroll = rememberScrollState()
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -223,7 +227,13 @@ fun SettingsScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(
+                    when {
+                        !pagesMode -> oneListScroll
+                        shown == null -> sectionsScroll
+                        else -> rememberScrollState()
+                    }
+                )
                 .padding(inner)
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),

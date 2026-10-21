@@ -25,6 +25,7 @@ The app shows the entries since your last version as "What's new" after an updat
   Questions tab. Before, after one update notification every notification opened the changelog.
 - Switching Settings between a page per section and one list fades smoothly from one to the other instead of
   jumping.
+- Going back from a Settings section returns to where you were in the list of sections, not the top.
 
 ## [2.34.0] - 2026-10-21
 
