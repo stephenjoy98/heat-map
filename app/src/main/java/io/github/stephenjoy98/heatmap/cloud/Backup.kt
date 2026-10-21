@@ -32,7 +32,9 @@ import java.time.ZoneId
  *   and deletions, filters and backup choices.
  */
 object Backup {
-    private const val POINTS_PER_DOC = 7_000
+    // Firestore allows 40,000 index entries per document, one per list item: 8 lists of 4,000 dots stay well under.
+    // (7,000 a document failed on busy days once heights were added as an eighth list.)
+    private const val POINTS_PER_DOC = 4_000
     private const val MODES_DOC = "modes"
     private const val LEVELS_DOC = "levels"
     private const val TRIPS_PREFIX = "trips_"
@@ -64,7 +66,7 @@ object Backup {
                 batch.set(col.document(if (i == 0) day else "${day}_$i"), encode(chunk))
             }
             // Remove leftover parts from before an edit made the day smaller (or empty).
-            for (i in chunks.size until chunks.size + 3) batch.delete(col.document(if (i == 0) day else "${day}_$i"))
+            for (i in chunks.size until chunks.size + 6) batch.delete(col.document(if (i == 0) day else "${day}_$i"))
             val deleted = store.deletedForBackup(from, to)
             if (deleted.isEmpty()) batch.delete(col.document(DELETED_PREFIX + day))
             else batch.set(col.document(DELETED_PREFIX + day), encode(deleted.takeLast(POINTS_PER_DOC)))

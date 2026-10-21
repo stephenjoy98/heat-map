@@ -17,6 +17,10 @@ The app shows the entries since your last version as "What's new" after an updat
 ### Changed
 - Undo bars and other messages at the bottom of the screen can be swiped away sideways.
 
+### Fixed
+- Backup failing with "too many index entries" on days with lots of dots (fast recording on a long drive).
+  Each day is now stored in smaller parts.
+
 ## [2.36.0] - 2026-10-21
 
 ### Added

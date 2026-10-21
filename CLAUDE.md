@@ -167,7 +167,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   `Friends` (list cached in Prefs "friends_cache" → `Friends.saved()`), `Account`, `StorageUsage` (phone: file
   sizes + StatFs; cloud: estimated from Firestore's document size rules, since the client can't query usage;
   shown in `StorageCard` on the Backup page). Backup docs: `yyyy-MM-dd[_n]` dots (t, la, lo, ac, iv, at, md, al
-  arrays, ≤7000 per doc); `trips_yyyy-MM-dd` (since 2.26.0: trips starting that day as maps s, e, m, im, c, r, ps,
+  arrays, ≤4000 per doc: Firestore's 40k index entries per doc, one per list item); `trips_yyyy-MM-dd` (since 2.26.0: trips starting that day as maps s, e, m, im, c, r, ps,
   bp, p, q (road questions JSON), id (remote route id); null fields omitted); `deleted_yyyy-MM-dd` (soft-deleted dots); `sats_yyyy-MM-dd` (satellite counts); `levels` (height
   answers); `modes`; `settings` (JSON of the user's prefs, whitelist `Prefs.BACKED_UP_KEYS`; add new user-facing
   pref keys there). Restore: `Backup.preview` downloads once and summarises (dialog `RestorePreviewDialog`), then
