@@ -37,6 +37,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.material3.Button
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -54,34 +58,42 @@ private val releaseDateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.ME
 private fun Release.dateLabel(): String? =
     date?.let { runCatching { LocalDate.parse(it).format(releaseDateFormat) }.getOrDefault(it) }
 
-/** Shown once after an update: the changes in every version since the one the user last saw. */
+/**
+ * Shown once after an update, in a sheet that slides up (and back down when closed): the changes in every
+ * version since the one the user last saw.
+ */
 @Composable
 fun WhatsNewDialog(releases: List<Release>, onDismiss: () -> Unit, onFullChangelog: () -> Unit) {
-    AlertDialog(
-        // As wide as the other full-width cards, rather than the platform's narrow dialog width.
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        onDismissRequest = onDismiss,
-        icon = { MaterialIcon(R.drawable.ic_celebration, size = 32) },
-        title = {
-            Text(if (releases.size == 1) "What's new in ${releases[0].version}" else "What's new since your last update")
-        },
-        text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                releases.forEachIndexed { i, r ->
-                    if (i > 0) Spacer(Modifier.height(16.dp))
-                    ReleaseNotes(r, showHeader = releases.size > 1)
-                }
+    var full by remember { mutableStateOf(false) }
+    SlideUpSheet(onClosed = {
+        onDismiss()
+        if (full) onFullChangelog()
+    }) { close ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MaterialIcon(R.drawable.ic_celebration, size = 28, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                if (releases.size == 1) "What's new in ${releases[0].version}" else "What's new since your last update",
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            releases.forEachIndexed { i, r ->
+                if (i > 0) Spacer(Modifier.height(16.dp))
+                ReleaseNotes(r, showHeader = releases.size > 1)
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Got it") } },
-        dismissButton = {
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = {
-                onDismiss()
-                onFullChangelog()
+                full = true
+                close()
             }) { Text("Full changelog") }
-        },
-    )
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = close) { Text("Got it") }
+        }
+    }
 }
 
 /** One release: an optional version and date header, then each section's items as bullets. */

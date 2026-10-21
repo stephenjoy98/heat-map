@@ -186,7 +186,9 @@ travel stats, Insights (AI write-ups), backup and friends.
   notify), `UpdateWorker` (6 h periodic + on app open; Prefs `auto_update`, `update_wifi_only`), UI `UpdatesSection`
   (Settings › Updates; STABLE_FEATURES ignores patch bumps and rebuilds unless `check(manual = true)`), channel by
   `UpdateFrequency` BETA (newest of /releases incl. pre-releases) / STABLE / STABLE_FEATURES;
-  `UpdateBanner` (dialog on app open with notes, Update now / Later; Later resets on resume). BootReceiver notifies "updated to X" on MY_PACKAGE_REPLACED. **Every notification's tap
+  `UpdateSheet` (ui/UpdateSheet.kt, 2.35.0: `SlideUpSheet` ModalBottomSheet with notes, Update now / Later, only when
+  on the Map tab with no page open, once per session via `UpdatePrompt.offeredThisSession`, reset after 30 min away);
+  `WhatsNewDialog` uses the same `SlideUpSheet` and also waits for the map screen. BootReceiver notifies "updated to X" on MY_PACKAGE_REPLACED. **Every notification's tap
   intent comes from `MainActivity.openIntent(context, page)`** (own request code + action per page: updates, changelog,
   questions, none) — PendingIntents that differ only in extras are the same one, which once made every notification
   open the changelog.

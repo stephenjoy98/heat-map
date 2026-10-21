@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
     private val openFriends = MutableStateFlow(false)
     /** A page a notification asked for ([PAGE_UPDATES], [PAGE_CHANGELOG]), waiting to be opened. */
     private val requestedPage = MutableStateFlow<String?>(null)
+    private var stoppedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,8 +99,15 @@ class MainActivity : ComponentActivity() {
         Updater.inForeground = false
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Back after a while away counts as opening the app again: a new version may be offered once more.
+        if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > NEW_SESSION_AFTER_MS) UpdatePrompt.offeredThisSession = false
+    }
+
     override fun onStop() {
         super.onStop()
+        stoppedAt = System.currentTimeMillis()
         // An update downloaded while you were using the app installs once you leave it.
         if (Prefs.autoUpdate.value) {
             val app = applicationContext
@@ -129,6 +137,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_TAB = "tab"
         const val EXTRA_PAGE = "page"
+        private const val NEW_SESSION_AFTER_MS = 30 * 60_000L
         const val PAGE_UPDATES = "updates"
         const val PAGE_CHANGELOG = "changelog"
         const val PAGE_QUESTIONS = "questions"
@@ -258,7 +267,9 @@ private fun AppScaffold(
     LaunchedEffect(Unit) {
         if (whatsNew.isEmpty()) Prefs.setLastSeenVersion(BuildConfig.VERSION_NAME)
     }
-    if (whatsNew.isNotEmpty()) {
+    // Sheets for "What's new" and a new version slide up only on the map screen, never over another page.
+    val onHome = stack.pages.isEmpty() && tab == MainActivity.TAB_MAP
+    if (whatsNew.isNotEmpty() && onHome) {
         WhatsNewDialog(
             releases = whatsNew,
             onDismiss = {
@@ -269,8 +280,8 @@ private fun AppScaffold(
         )
     }
 
-    // A newer version, offered with its changelog (not on top of "What's new").
-    if (whatsNew.isEmpty()) UpdateBanner(resumeTick)
+    // A newer version, offered with its changelog once per app session (not on top of "What's new").
+    if (whatsNew.isEmpty()) UpdateSheet(onHome)
 
     if (confirmExit) {
         val activity = context.findActivity()
