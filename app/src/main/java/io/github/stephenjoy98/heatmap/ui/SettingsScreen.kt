@@ -160,6 +160,22 @@ fun SettingsScreen(
         }
     }
 
+    // Opening a section (or the whole list) clears its "New" marker, and Updates its new-version dot.
+    val updateWaiting = Attention.updateWaiting()
+    LaunchedEffect(asPages, page) {
+        val open = page
+        when {
+            !asPages -> {
+                Attention.seenAll(Attention.SETTINGS)
+                Attention.updateSeen()
+            }
+            open != null -> {
+                Attention.seen(Attention.settings(open.name))
+                if (open == SettingsPage.UPDATES) Attention.updateSeen()
+            }
+        }
+    }
+
     // A running recorder picks up new settings when it is (re)started.
     fun applyToService() {
         if (tracking) LocationTickerService.start(context)
@@ -252,6 +268,14 @@ fun SettingsScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(p.title, style = MaterialTheme.typography.bodyLarge)
                                     Text(p.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (Attention.isNew(Attention.settings(p.name))) {
+                                    Spacer(Modifier.width(8.dp))
+                                    NewMarker()
+                                }
+                                if (p == SettingsPage.UPDATES && updateWaiting) {
+                                    Spacer(Modifier.width(8.dp))
+                                    AttentionDot()
                                 }
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

@@ -103,6 +103,9 @@ up to your Google account, and lets you compare explored areas with friends.
   the road pass through a spot.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
+- **Red dots and "New" markers**: a red dot on the account button leads to what a notification was about (a new
+  version under Settings › Updates, the changelog after an update); "New" marks sections that changed since you
+  last opened them.
 - **Long-press a route on the Timeline map** to edit that section: confirm its mode, change its times or fix its
   route; grey dots outside any trip can be made a trip or join the trips around them.
 - **Add a trip** (+ on a day, or long-press a stay › Add a trip here): pick its first and last dot with a

@@ -12,12 +12,9 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
-## [2.35.0] - 2026-10-21
+## [2.36.0] - 2026-10-21
 
 ### Added
-- Map colours in the layers sheet: from the standard muted look to vivid, with blue water, green parks,
-  brighter roads (yellow main roads on the light map), coloured buildings and clearer labels, for more
-  contrast. Set separately for the dark and the light theme.
 - Minus and plus buttons under the time sliders when changing a trip's times, adding a trip, fixing a route or
   editing dots: each tap moves the start or the end by one dot (times shown to the second), and holding a
   button keeps going.
@@ -26,14 +23,12 @@ The app shows the entries since your last version as "What's new" after an updat
   them (the grey bits on the map) and keeps the mode of the longest one.
 - Long-press a route on the Timeline's map to edit it: a dialog shows which trip you pressed and offers its travel
   mode, Change times and Fix route. Grey dots outside any trip can be made a trip, or join the trips on either side.
+- Red dots show where something a notification was about is waiting: on the account button, then on Settings and
+  Settings › Updates for a new version, or on About and its Changelog after an update. They go once you've looked.
+- "New" markers on the sections that gained or changed something since you last opened them (on the Account page,
+  Settings sections and the Timeline tab), with a red dot on the account button until you've looked.
 
 ### Fixed
-- Each notification opens its own place again: the recording notification just opens the app, "new version"
-  opens Settings › Updates, "updated" opens the changelog, and trip and road questions open the Timeline's
-  Questions tab. Before, after one update notification every notification opened the changelog.
-- Switching Settings between a page per section and one list fades smoothly from one to the other instead of
-  jumping.
-- Going back from a Settings section returns to where you were in the list of sections, not the top.
 - Tilting the map into 3D with two fingers works even when the second finger lands a moment after the first.
   Before, that only panned the map unless both fingers touched down at the same time.
 - Highway route numbers show on the dark map again; their badges had turned into blank grey boxes.
@@ -44,6 +39,21 @@ The app shows the entries since your last version as "What's new" after an updat
   same way. Both slide back down when you're done.
 - The location button does double duty: once the map is on your latest position, tapping it again turns the map
   north up, like the compass. It shows a compass needle while it does that.
+
+## [2.35.0] - 2026-10-21
+
+### Added
+- Map colours in the layers sheet: from the standard muted look to vivid, with blue water, green parks,
+  brighter roads (yellow main roads on the light map), coloured buildings and clearer labels, for more
+  contrast. Set separately for the dark and the light theme.
+
+### Fixed
+- Each notification opens its own place again: the recording notification just opens the app, "new version"
+  opens Settings › Updates, "updated" opens the changelog, and trip and road questions open the Timeline's
+  Questions tab. Before, after one update notification every notification opened the changelog.
+- Switching Settings between a page per section and one list fades smoothly from one to the other instead of
+  jumping.
+- Going back from a Settings section returns to where you were in the list of sections, not the top.
 
 ## [2.34.0] - 2026-10-21
 

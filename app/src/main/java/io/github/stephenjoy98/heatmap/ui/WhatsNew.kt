@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.material3.Button
 import androidx.compose.runtime.mutableStateOf
@@ -146,6 +147,7 @@ fun ReleaseNotes(release: Release, showHeader: Boolean = true) {
 @Composable
 fun ChangelogScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    LaunchedEffect(Unit) { Attention.changelogSeen() }
     val releases = remember { Changelog.load(context) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(

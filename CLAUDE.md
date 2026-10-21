@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.35.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.36.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -70,6 +70,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   Changelog). If the previous version hasn't been built/installed yet, folding small follow-ups into its
   entry is OK; once the user has it, make a new patch version.
 - Keep README.md and THIRD_PARTY_NOTICES.md in sync with features/dependencies.
+- **Bump `Attention.NEW_IN` (ui/Attention.kt) with each release** for the sections that gained or changed something
+  (keys: profile, friends, backup, insights, timeline, about, `settings/<page>`); their "New" marker shows until opened.
+  Red dots (`AttentionDot`) mark notification subjects: update waiting (Prefs `update_seen`), changelog unread
+  (Prefs `changelog_read`); baseline Prefs `attention_base` = version seen when the feature first ran.
 - **Keep the About page's `FEATURES` list (ui/AboutScreen.kt) in sync with every release**: the user asked
   (2026-10-20) for it to always show everything the app currently supports. Add, reword or drop lines as
   features change.

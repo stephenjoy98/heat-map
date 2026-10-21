@@ -153,6 +153,12 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("ticker", Context.MODE_PRIVATE)
+        // Before the first "New" markers and changelog dots: count from the version the user last saw (a fresh
+        // install starts with nothing marked).
+        if (sp.getString("attention_base", null) == null) {
+            val from = sp.getString("last_seen_version", null) ?: BuildConfig.VERSION_NAME
+            sp.edit().putString("attention_base", from).putString("changelog_read", from).apply()
+        }
         _intervalSec.value = sp.getInt("interval_sec", 60).coerceIn(MIN_INTERVAL_SEC, MAX_INTERVAL_SEC)
         _tracking.value = sp.getBoolean("tracking", false)
         _highAccuracy.value = sp.getBoolean("high_accuracy", true)
@@ -396,6 +402,28 @@ object Prefs {
     fun setLastSeenVersion(version: String) {
         sp.edit().putString("last_seen_version", version).apply()
     }
+
+    // ---- What's waiting to be looked at (see ui/Attention) ----
+
+    /** The version a section was last opened in, so its "New" marker shows only for changes since then. */
+    fun sectionSeen(key: String): String? = sp.getString("seen_$key", null)
+
+    fun setSectionSeen(key: String, version: String) {
+        sp.edit().putString("seen_$key", version).apply()
+    }
+
+    /** The version from which "New" markers count: the one installed when they first appeared, for sections never opened. */
+    val attentionBase: String? get() = sp.getString("attention_base", null)
+
+    /** The version whose changelog was last read, in the "What's new" sheet or on the Changelog page. */
+    var changelogRead: String?
+        get() = sp.getString("changelog_read", null)
+        set(value) = sp.edit().putString("changelog_read", value).apply()
+
+    /** The new version last looked at on Settings › Updates (its label and build), so its dot goes away. */
+    var updateSeen: String?
+        get() = sp.getString("update_seen", null)
+        set(value) = sp.edit().putString("update_seen", value).apply()
 
     fun setShareRoutes(on: Boolean) {
         _shareRoutes.value = on

@@ -75,6 +75,7 @@ private val FEATURES = listOf(
     R.drawable.ic_edit to "Edit trips: change their mode or times, select several, add trips, delete or restore dots",
     R.drawable.ic_merge to "Join several trips into one, with the loose dots between them",
     R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there",
+    R.drawable.ic_system_update to "Red dots lead to what a notification was about, and \"New\" marks sections that changed since your last look",
     R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",
     R.drawable.ic_help_outline to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",
     R.drawable.ic_terrain to "Smooth 3D routes at one agreed height per place, following the same line as the map",
@@ -189,7 +190,7 @@ fun AboutScreen(onBack: () -> Unit, onChangelog: () -> Unit) {
 
             Card {
                 Column {
-                    LinkRow("Changelog", "What's new in each version") { onChangelog() }
+                    LinkRow("Changelog", "What's new in each version", dot = Attention.changelogUnread()) { onChangelog() }
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     LinkRow("GitHub", "@$GITHUB_USER") { uri.openUri(GITHUB_PROFILE) }
                 }
@@ -308,13 +309,14 @@ fun ClaudeMark(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun LinkRow(title: String, value: String, onClick: () -> Unit) {
+private fun LinkRow(title: String, value: String, dot: Boolean = false, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(110.dp))
-        Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        if (dot) AttentionDot()
     }
 }
 

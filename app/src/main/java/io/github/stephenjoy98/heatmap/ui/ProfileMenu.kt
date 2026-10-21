@@ -141,7 +141,12 @@ fun Avatar(size: Int = 32) {
 @Composable
 fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier, background: Color? = null) {
     val pending = LocalReviewCount.current
-    val tip = if (pending > 0) "Your account · $pending waiting for your answer on the Timeline" else "Your account: profile, friends, insights, backup and settings"
+    val waiting = Attention.accountWaiting()
+    val tip = when {
+        pending > 0 -> "Your account · $pending waiting for your answer on the Timeline"
+        waiting -> "Your account · something new to look at"
+        else -> "Your account: profile, friends, insights, backup and settings"
+    }
     Tip(tip, modifier) {
         // The badge sits beside the button, not inside it, so neither the button's nor its background's round
         // clip can cut it off.
@@ -158,6 +163,8 @@ fun ProfileButton(onClick: () -> Unit, modifier: Modifier = Modifier, background
                 Badge(Modifier.align(Alignment.TopEnd)) {
                     Text(if (pending > 99) "99+" else pending.toString())
                 }
+            } else if (waiting) {
+                AttentionDot(Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp))
             }
         }
     }
@@ -294,12 +301,34 @@ fun AccountScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(vertical = 6.dp)) {
-                    MenuRow(Icons.Filled.AccountCircle, "Profile", "Your stats and the places you've explored", onProfile)
-                    MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas", onFriends)
-                    MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history", onBackup)
-                    MenuRow(Icons.Filled.Star, "Insights", "Your stats, steps and write-ups about your travels", onReview)
-                    MenuRow(Icons.Filled.Settings, "Settings", "Recording, places, appearance, map and more", onSettings)
-                    MenuRow(Icons.Filled.Info, "About", "Who made it, open source and licences", onAbout)
+                    // A red dot where a notification's subject waits; "New" where something changed since you last looked.
+                    MenuRow(Icons.Filled.AccountCircle, "Profile", "Your stats and the places you've explored", new = Attention.anyNew(Attention.PROFILE)) {
+                        Attention.seen(Attention.PROFILE)
+                        onProfile()
+                    }
+                    MenuRow(FriendsIcon, "Friends", "Add friends and compare routes and explored areas", new = Attention.anyNew(Attention.FRIENDS)) {
+                        Attention.seen(Attention.FRIENDS)
+                        onFriends()
+                    }
+                    MenuRow(Icons.Filled.Refresh, "Backup", "Back up or restore your location history", new = Attention.anyNew(Attention.BACKUP)) {
+                        Attention.seen(Attention.BACKUP)
+                        onBackup()
+                    }
+                    MenuRow(Icons.Filled.Star, "Insights", "Your stats, steps and write-ups about your travels", new = Attention.anyNew(Attention.INSIGHTS)) {
+                        Attention.seen(Attention.INSIGHTS)
+                        onReview()
+                    }
+                    MenuRow(
+                        Icons.Filled.Settings, "Settings", "Recording, places, appearance, map and more",
+                        dot = Attention.updateWaiting(), new = Attention.anyNew(Attention.SETTINGS), onClick = onSettings,
+                    )
+                    MenuRow(
+                        Icons.Filled.Info, "About", "Who made it, open source and licences",
+                        dot = Attention.changelogUnread(), new = Attention.anyNew(Attention.ABOUT),
+                    ) {
+                        Attention.seen(Attention.ABOUT)
+                        onAbout()
+                    }
                     if (user != null) {
                         HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
                         MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign out", null) {
@@ -312,9 +341,9 @@ fun AccountScreen(
     }
 }
 
-/** A menu row with an icon, title and optional subtitle. */
+/** A menu row with an icon, title and optional subtitle, and a red [dot] or a [new] marker at its end. */
 @Composable
-internal fun MenuRow(icon: ImageVector, title: String, subtitle: String?, onClick: () -> Unit) {
+internal fun MenuRow(icon: ImageVector, title: String, subtitle: String?, dot: Boolean = false, new: Boolean = false, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -324,11 +353,19 @@ internal fun MenuRow(icon: ImageVector, title: String, subtitle: String?, onClic
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(20.dp))
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             subtitle?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+        if (new) {
+            Spacer(Modifier.width(8.dp))
+            NewMarker()
+        }
+        if (dot) {
+            Spacer(Modifier.width(8.dp))
+            AttentionDot()
         }
     }
 }

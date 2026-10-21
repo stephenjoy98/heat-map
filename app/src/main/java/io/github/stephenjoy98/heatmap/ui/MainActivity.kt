@@ -274,6 +274,7 @@ private fun AppScaffold(
             releases = whatsNew,
             onDismiss = {
                 Prefs.setLastSeenVersion(BuildConfig.VERSION_NAME)
+                Attention.changelogSeen()
                 whatsNew = emptyList()
             },
             onFullChangelog = { stack.push(Page.CHANGELOG) },
@@ -302,6 +303,7 @@ private fun AppScaffold(
     }
 
     val openMenu = { stack.push(Page.ACCOUNT) }
+    LaunchedEffect(tab) { if (tab == MainActivity.TAB_TIMELINE) Attention.seen(Attention.TIMELINE) }
 
     CompositionLocalProvider(LocalReviewCount provides questions) {
         PageHost(
@@ -324,7 +326,13 @@ private fun AppScaffold(
                                 onClick = { tab = MainActivity.TAB_TIMELINE },
                                 icon = {
                                     // Questions wait on the Timeline's Questions tab.
-                                    BadgedBox(badge = { if (questions > 0) Badge { Text(if (questions > 99) "99+" else questions.toString()) } }) {
+                                    // Otherwise "New" while it has changes you haven't opened it to see.
+                                    BadgedBox(
+                                        badge = {
+                                            if (questions > 0) Badge { Text(if (questions > 99) "99+" else questions.toString()) }
+                                            else if (Attention.isNew(Attention.TIMELINE)) NewMarker()
+                                        },
+                                    ) {
                                         Icon(Icons.Filled.DateRange, contentDescription = null)
                                     }
                                 },
