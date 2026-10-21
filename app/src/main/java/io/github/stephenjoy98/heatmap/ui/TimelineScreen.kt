@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.ModeColors
 import io.github.stephenjoy98.heatmap.data.PeriodStat
@@ -285,6 +286,18 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             withContext(Dispatchers.IO) { store.setTripMode(trip.id, mode) }
             val day = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
             afterDotEdit(context, DeleteResult(setOf(day), emptyList()))
+        }
+        Unit
+    }
+    // Joins trips into one, from the first one's start to the last one's end, taking in any loose dots
+    // between them. It keeps the mode of the longest of them.
+    val joinTrips = { trips: List<Trip> ->
+        if (trips.size >= 2) {
+            val mode = trips.maxBy { it.distanceM }.mode
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { store.addTrip(trips.minOf { it.startTime }, trips.maxOf { it.endTime }, mode) }
+                afterDotEdit(context, result)
+            }
         }
         Unit
     }
@@ -616,6 +629,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                         onToggle = { expanded[entry.start] = expanded[entry.start] != true },
                                         onClick = { entry.box?.let { frame(camera, it) } },
                                         onModeAll = { m -> entry.moves.forEach { changeMode(it.trip, m) } },
+                                        onJoin = { joinTrips(entry.moves.map { it.trip }) },
                                         onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
                                         onSectionMode = { mv, m -> changeMode(mv.trip, m) },
                                         onSectionRetime = { mv -> retiming = mv.trip },
@@ -629,7 +643,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                 item {
                                     Hint(
                                         "Long-press a trip to change how you travelled or when it started and ended. " +
-                                            "Trips in a row in the same mode are shown together: long-press to see each part."
+                                            "Trips in a row in the same mode are shown together: long-press to see each part. To make several trips one, " +
+                                            "pick Join into one trip from a group's menu, or Select them and tap Join."
                                     )
                                 }
                             }
@@ -654,6 +669,10 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 picked?.let { ids ->
                     SelectionBar(
                         count = ids.size,
+                        onJoin = {
+                            joinTrips(data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids })
+                            picked = null
+                        },
                         onMode = { mode ->
                             val trips = data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }
                             scope.launch {
@@ -784,6 +803,7 @@ private fun GroupRow(
     onToggle: () -> Unit,
     onClick: () -> Unit,
     onModeAll: (TravelMode) -> Unit,
+    onJoin: () -> Unit,
     onSectionClick: (DayEntry.Move) -> Unit,
     onSectionMode: (DayEntry.Move, TravelMode) -> Unit,
     onSectionRetime: (DayEntry.Move) -> Unit,
@@ -843,6 +863,14 @@ private fun GroupRow(
                     if (m != group.mode || group.needsReview) onModeAll(m)
                 }
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                DropdownMenuItem(
+                    text = { Text("Join into one trip") },
+                    leadingIcon = { MaterialIcon(R.drawable.ic_merge) },
+                    onClick = {
+                        menu = false
+                        onJoin()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text("Join parts and fix route") },
                     leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
@@ -1087,9 +1115,9 @@ private fun RetimePanel(
     }
 }
 
-/** While picking trips: how many are picked, and a menu to change all of their modes at once. */
+/** While picking trips: how many are picked, joining them into one, and a menu to change all of their modes at once. */
 @Composable
-private fun SelectionBar(count: Int, onMode: (TravelMode) -> Unit, onCancel: () -> Unit) {
+private fun SelectionBar(count: Int, onJoin: () -> Unit, onMode: (TravelMode) -> Unit, onCancel: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Surface(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -1105,6 +1133,7 @@ private fun SelectionBar(count: Int, onMode: (TravelMode) -> Unit, onCancel: () 
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
+            TextButton(onClick = onJoin, enabled = count >= 2) { Text("Join") }
             Box {
                 Button(onClick = { menu = true }, enabled = count > 0) { Text("Change mode") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {

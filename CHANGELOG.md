@@ -21,6 +21,9 @@ The app shows the entries since your last version as "What's new" after an updat
 - Minus and plus buttons under the time sliders when changing a trip's times, adding a trip, fixing a route or
   editing dots: each tap moves the start or the end by one dot (times shown to the second), and holding a
   button keeps going.
+- Join trips into one: "Join into one trip" in a group's menu on the Timeline, or Select several trips and tap
+  Join. The joined trip runs from the first one's start to the last one's end, takes in the loose dots between
+  them (the grey bits on the map) and keeps the mode of the longest one.
 
 ### Fixed
 - Each notification opens its own place again: the recording notification just opens the app, "new version"
