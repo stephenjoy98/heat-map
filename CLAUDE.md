@@ -80,7 +80,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 - `data/`: `PointStore` (SQLite, **schema v10**: v10 = satellite_use (day, constellation, svid, fixes) + satellite_fixes
   (day, fixes), filled by `LocationTickerService` from a GnssStatus callback (satellites usedInFix within 15 s of a saved
   fix, `logSatellites`), read by `satelliteUse(from, to)` → Insights `SatellitesCard`; names in `data/Satellites.kt`;
-  not backed up; points incl. altitude, trips, places, friend_routes,
+  backed up as `sats_yyyy-MM-dd` (c, s, n lists + f fixes; restore keeps the max per satellite/day); points incl. altitude, trips, places, friend_routes,
   trip_paths, road_questions, deleted_points (soft delete), explored_cells/explored_days/explored_state
   (km-explored cache), battery_log (v8: sample/min while recording via `LocationTickerService.sampleBattery`;
   `batteryByInterval` → `BatterySection` in Settings)), `Prefs` (StateFlows), `Units` (metric/imperial, Compose state), `Changelog` + `SemVer`,
@@ -147,7 +147,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   sizes + StatFs; cloud: estimated from Firestore's document size rules, since the client can't query usage;
   shown in `StorageCard` on the Backup page). Backup docs: `yyyy-MM-dd[_n]` dots (t, la, lo, ac, iv, at, md, al
   arrays, ≤7000 per doc); `trips_yyyy-MM-dd` (since 2.26.0: trips starting that day as maps s, e, m, im, c, r, ps,
-  bp, p, q (road questions JSON), id (remote route id); null fields omitted); `deleted_yyyy-MM-dd` (soft-deleted dots); `levels` (height
+  bp, p, q (road questions JSON), id (remote route id); null fields omitted); `deleted_yyyy-MM-dd` (soft-deleted dots); `sats_yyyy-MM-dd` (satellite counts); `levels` (height
   answers); `modes`; `settings` (JSON of the user's prefs, whitelist `Prefs.BACKED_UP_KEYS`; add new user-facing
   pref keys there). Restore: `Backup.preview` downloads once and summarises (dialog `RestorePreviewDialog`), then
   `restore(context, preview)` reuses that download; order: settings (`Prefs.importSettings` → re-`init`), modes, levels, then deleted dots, dots

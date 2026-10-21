@@ -20,6 +20,8 @@ The app shows the entries since your last version as "What's new" after an updat
   full list of every satellite (G05, E24, R12…) and how many dots it helped with. The app starts noting
   satellites with this version, so earlier history has none; dots fixed from Wi-Fi or mobile networks (for
   example while settled at a saved place) don't use satellites.
+- Satellite counts are backed up with the rest of your history and come back with a restore (the restore
+  preview lists them).
 
 ## [2.30.3] - 2026-10-21
 

@@ -174,6 +174,9 @@ private fun RestorePreviewDialog(preview: Backup.Preview, onDismiss: () -> Unit,
         if (p.trips > 0) add(R.drawable.ic_directions_bike to "${formatCount(p.trips.toLong())} trips with their travel modes, times and road shapes")
         if (p.roadAnswers > 0) add(R.drawable.ic_add_road to "${p.roadAnswers} \"which road?\" ${if (p.roadAnswers == 1) "answer" else "answers"}")
         if (p.heightAnswers > 0) add(R.drawable.ic_terrain to "${p.heightAnswers} \"different heights\" ${if (p.heightAnswers == 1) "answer" else "answers"}")
+        if (p.satellites > 0) {
+            add(R.drawable.ic_explore to "Satellite counts for ${p.satelliteDays} ${if (p.satelliteDays == 1) "day" else "days"}, ${p.satellites} different satellites")
+        }
         if (p.deletedDots > 0) add(R.drawable.ic_delete to "${formatCount(p.deletedDots.toLong())} deleted dots, kept deleted (and still restorable)")
         if (p.customModes.isNotEmpty()) add(R.drawable.ic_label to "Travel modes you added: ${p.customModes.joinToString()}")
         if (p.places.isNotEmpty()) add(R.drawable.ic_home to "Saved places: ${p.places.joinToString()}")

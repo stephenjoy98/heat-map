@@ -893,6 +893,39 @@ class PointStore private constructor(context: Context) :
         }
     }
 
+    /** One day's satellite counts for the backup ([day] as an epoch day): (system, ID, uses) and the day's fixes. */
+    fun satelliteDay(day: Long): Pair<List<SatelliteUse>, Long> {
+        val list = readableDatabase.rawQuery(
+            "SELECT constellation, svid, fixes FROM satellite_use WHERE day = $day", null,
+        ).use { c -> buildList { while (c.moveToNext()) add(SatelliteUse(c.getInt(0), c.getInt(1), c.getLong(2))) } }
+        return list to long("SELECT COALESCE(SUM(fixes), 0) FROM satellite_fixes WHERE day = $day")
+    }
+
+    /**
+     * Puts a backed-up day's satellite counts back. Where this phone already counted that day (recording since
+     * the reinstall), the larger count wins, so nothing is counted twice.
+     */
+    fun restoreSatelliteDay(day: Long, uses: List<SatelliteUse>, fixes: Long) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for (u in uses) {
+                db.execSQL(
+                    "INSERT OR IGNORE INTO satellite_use (day, constellation, svid, fixes) VALUES ($day, ${u.constellation}, ${u.svid}, 0)"
+                )
+                db.execSQL(
+                    "UPDATE satellite_use SET fixes = MAX(fixes, ${u.fixes}) WHERE day = $day AND constellation = ${u.constellation} AND svid = ${u.svid}"
+                )
+            }
+            db.execSQL("INSERT OR IGNORE INTO satellite_fixes (day, fixes) VALUES ($day, 0)")
+            db.execSQL("UPDATE satellite_fixes SET fixes = MAX(fixes, $fixes) WHERE day = $day")
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+    }
+
     /** The satellites used for dots recorded between [from] and [to] (ms), most used first. */
     fun satelliteUse(from: Long, to: Long): SatelliteSummary {
         val zone = java.time.ZoneId.systemDefault()

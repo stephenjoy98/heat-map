@@ -159,7 +159,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Storage** on the Backup page: space used and free on the phone (exact) and in the cloud (estimated from
   what's uploaded, against the free Firebase plan's 1 GiB).
 - **Backup** of the full history to your private Firestore area, automatically (whenever you open the app, plus every 6 or 12 hours, daily or weekly) and on demand, with **Restore**
-  that merges into the current phone's history.
+  that merges into the current phone's history. Along with your dots it keeps your trips and their modes,
+  "which road?" and height answers, deleted dots, travel modes, settings and satellite counts.
 - **Friends** via an 8-character **ID**, a **QR code**, or a shared invite link
   (`locationticker://friend/ABCD2345`). Scan with the built-in Google code scanner.
 - **Compare** with a friend: both heatmaps on one map (yours orange, theirs blue), plus **Shared

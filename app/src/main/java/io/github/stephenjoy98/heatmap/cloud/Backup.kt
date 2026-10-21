@@ -13,6 +13,7 @@ import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
+import io.github.stephenjoy98.heatmap.data.SatelliteUse
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.time.ZoneId
@@ -24,6 +25,7 @@ import java.time.ZoneId
  * - `trips_yyyy-MM-dd`: the trips that start that day, with their travel mode, whether they still need an
  *   answer, their road-snapped shape and "which road?" answers.
  * - `deleted_yyyy-MM-dd`: dots you deleted that day, so they stay deleted (and can still be restored).
+ * - `sats_yyyy-MM-dd`: which satellites fixed that day's dots and how often (Insights › Satellites).
  * - `levels`: answers to "different heights here?".
  * - `modes`: the travel modes you added.
  * - `settings`: everything you've set up: recording, map, theme, units, places, travel mode names, colours
@@ -35,6 +37,7 @@ object Backup {
     private const val LEVELS_DOC = "levels"
     private const val TRIPS_PREFIX = "trips_"
     private const val DELETED_PREFIX = "deleted_"
+    private const val SATS_PREFIX = "sats_"
     private const val SETTINGS_DOC = "settings"
 
     /** Uploads every day that changed since the last backup. Returns the number of days uploaded. */
@@ -68,6 +71,20 @@ object Backup {
             val trips = store.tripBackups(from, to)
             if (trips.isEmpty()) batch.delete(col.document(TRIPS_PREFIX + day))
             else batch.set(col.document(TRIPS_PREFIX + day), mapOf("trips" to trips.map(::encodeTrip)))
+            val (sats, satFixes) = store.satelliteDay(date.toEpochDay())
+            if (sats.isEmpty()) {
+                batch.delete(col.document(SATS_PREFIX + day))
+            } else {
+                batch.set(
+                    col.document(SATS_PREFIX + day),
+                    mapOf(
+                        "c" to sats.map { it.constellation },
+                        "s" to sats.map { it.svid },
+                        "n" to sats.map { it.fixes },
+                        "f" to satFixes,
+                    ),
+                )
+            }
             batch.commit().await()
         }
         // The travel modes you added, so a restore knows them.
@@ -96,6 +113,9 @@ object Backup {
         val roadAnswers: Int,
         val deletedDots: Int,
         val heightAnswers: Int,
+        /** Days with satellite counts, and how many different satellites they name. */
+        val satelliteDays: Int,
+        val satellites: Int,
         val customModes: List<String>,
         val places: List<String>,
         val hasSettings: Boolean,
@@ -139,6 +159,12 @@ object Backup {
         val deletedDots = docs.filter { it.id.startsWith(DELETED_PREFIX) }.sumOf { (it.get("t") as? List<*>)?.size ?: 0 }
         val heightAnswers = (docs.firstOrNull { it.id == LEVELS_DOC }?.get("levels") as? List<*>).orEmpty()
             .filterIsInstance<Map<*, *>>().count { ((it["d"] as? Number)?.toInt() ?: HeightGrid.ASK) != HeightGrid.ASK }
+        val satDocs = docs.filter { it.id.startsWith(SATS_PREFIX) }
+        val satellites = satDocs.flatMap { d ->
+            val c = (d.get("c") as? List<*>)?.filterIsInstance<Number>().orEmpty()
+            val s = (d.get("s") as? List<*>)?.filterIsInstance<Number>().orEmpty()
+            c.zip(s) { a, b -> a.toInt() * 1000 + b.toInt() }
+        }.toSet().size
         val customModes = docs.firstOrNull { it.id == MODES_DOC }?.getString("added")?.let { json ->
             runCatching {
                 val a = org.json.JSONArray(json)
@@ -160,6 +186,8 @@ object Backup {
             roadAnswers = roadAnswers,
             deletedDots = deletedDots,
             heightAnswers = heightAnswers,
+            satelliteDays = satDocs.size,
+            satellites = satellites,
             customModes = customModes,
             places = places,
             hasSettings = settingsJson != null,
@@ -203,7 +231,9 @@ object Backup {
             }
             for (doc in docs) {
                 val id = doc.id
-                if (id == MODES_DOC || id == LEVELS_DOC || id == SETTINGS_DOC || id.startsWith(TRIPS_PREFIX) || id.startsWith(DELETED_PREFIX)) continue
+                if (id == MODES_DOC || id == LEVELS_DOC || id == SETTINGS_DOC || id.startsWith(TRIPS_PREFIX) ||
+                    id.startsWith(DELETED_PREFIX) || id.startsWith(SATS_PREFIX)
+                ) continue
                 added += store.insertAll(decode(doc.data ?: continue))
             }
             for (doc in tripDocs) {
@@ -211,6 +241,14 @@ object Backup {
                 val list = (doc.get("trips") as? List<Map<String, Any?>>).orEmpty()
                 store.restoreTrips(list.mapNotNull(::decodeTrip))
             }
+        }
+        for (doc in docs.filter { it.id.startsWith(SATS_PREFIX) }) {
+            val day = runCatching { LocalDate.parse(doc.id.removePrefix(SATS_PREFIX)).toEpochDay() }.getOrNull() ?: continue
+            val c = (doc.get("c") as? List<*>)?.filterIsInstance<Number>().orEmpty()
+            val s = (doc.get("s") as? List<*>)?.filterIsInstance<Number>().orEmpty()
+            val n = (doc.get("n") as? List<*>)?.filterIsInstance<Number>().orEmpty()
+            val uses = c.indices.filter { it < s.size && it < n.size }.map { SatelliteUse(c[it].toInt(), s[it].toInt(), n[it].toLong()) }
+            store.restoreSatelliteDay(day, uses, (doc.get("f") as? Number)?.toLong() ?: 0L)
         }
         // Dots without a backed-up trip (from older backups) are sorted into trips as usual.
         TripDetector.process(context)
