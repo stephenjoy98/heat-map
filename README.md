@@ -176,7 +176,8 @@ up to your Google account, and lets you compare explored areas with friends.
 ## Install
 
 Download the latest APK from the repository's **[Releases](https://github.com/stephenjoy98/heat-map/releases)**
-page: each version has its own release (tag `vX.Y.Z`) with its changelog and `location-ticker-X.Y.Z.apk`.
+page. Stable versions are tagged `vX.Y.Z` and list every change since the previous stable release; beta builds
+(pre-releases tagged `vX.Y.Z-beta.N`, newest three kept) carry changes before they're released.
 Install it on Android 8.0+; you'll need to allow installing from unknown sources.
 
 When the app opens and a newer version is out, it offers it with its changelog (Update now or Later). Under
@@ -186,8 +187,9 @@ every 6 hours), downloads a new version (on Wi-Fi only by default) and installs 
 Android asks you to confirm the first update (and to allow Location Ticker to install apps); on Android 12
 and later, later updates install without asking. Automatic updates can be turned off there.
 
-Every push to `main` builds the APKs in GitHub Actions and publishes (or refreshes) the release for the
-version in `gradle.properties`. A second job runs the debug APK on an Android emulator, taps through the main
+Every push to `main` builds the APKs in GitHub Actions and publishes them as a beta. A stable release is
+made by running the workflow with **stable** ticked (Actions › Android build › Run workflow) or by pushing a
+commit whose message contains `[stable]`. A second job runs the debug APK on an Android emulator, taps through the main
 screens and saves screenshots, a screen recording and the logs (artifact `emulator-<version>`, and the
 `ci-screenshots` branch); it fails the run if the app crashes. Builds of other branches are under **Actions → Android build** as the
 artifact `location-ticker-<version>-apk`.

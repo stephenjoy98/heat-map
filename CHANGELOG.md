@@ -12,6 +12,20 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.33.0] - 2026-10-21
+
+### Added
+- Beta and stable updates. New changes now come out first as beta builds; once they've been tried out they're
+  released as a stable version with everything since the last one. Under Settings › Updates › Which updates:
+  - **Stable** (recommended): tried-out releases, small fixes included.
+  - **Stable, new features only**: only stable releases with new features.
+  - **Beta**: every build as soon as it's made, for trying the newest changes early.
+
+  The Updates page shows when you're running a beta build.
+
+### Changed
+- The release page for each stable version lists every change since the previous stable release.
+
 ## [2.32.0] - 2026-10-21
 
 ### Added

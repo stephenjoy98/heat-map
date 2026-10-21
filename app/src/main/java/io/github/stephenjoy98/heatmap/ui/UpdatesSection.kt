@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -77,7 +80,11 @@ internal fun UpdatesSection(resumeTick: Int) {
 
     Section("Updates") {
         Column(Modifier.padding(16.dp)) {
-            Text("Location Ticker ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Location Ticker ${BuildConfig.VERSION_NAME}" +
+                    (if (BuildConfig.CHANNEL == "beta") " · beta ${BuildConfig.BUILD_NUMBER}" else ""),
+                style = MaterialTheme.typography.bodyLarge,
+            )
             Text(
                 status,
                 style = MaterialTheme.typography.bodySmall,
@@ -144,23 +151,45 @@ internal fun UpdatesSection(resumeTick: Int) {
             }
         }
         ItemDivider()
-        Column(Modifier.padding(16.dp)) {
-            Text("Which updates", style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.padding(top = 14.dp, bottom = 6.dp)) {
+            Text("Which updates", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp))
+            listOf(
+                Triple(UpdateFrequency.STABLE, "Stable", "Tried-out releases, every one including small fixes. Recommended."),
+                Triple(
+                    UpdateFrequency.STABLE_FEATURES,
+                    "Stable, new features only",
+                    "Only stable releases with new features (2.31 → 2.32); fixes come along with the next one.",
+                ),
+                Triple(
+                    UpdateFrequency.BETA,
+                    "Beta",
+                    "Every build as soon as it's made, with the newest changes before they're released. Expect more " +
+                        "updates and the odd rough edge.",
+                ),
+            ).forEach { (f, title, text) ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .selectable(selected = frequency == f, role = Role.RadioButton) {
+                            Prefs.setUpdateFrequency(f)
+                            scope.launch { Updater.check(context) }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    RadioButton(selected = frequency == f, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = MaterialTheme.typography.bodyMedium)
+                        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             Text(
-                if (frequency == UpdateFrequency.EVERY) {
-                    "Every new version, including small fixes (for example 2.31.0 → 2.31.1)."
-                } else {
-                    "Only versions with new features (for example 2.31 → 2.32); fixes come along with the next one. " +
-                        "Check now still finds every version."
-                },
+                "With new features only, Check now still finds every stable version.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            SegmentedChoice(
-                options = listOf(UpdateFrequency.EVERY to "Every update", UpdateFrequency.FEATURES to "New features only"),
-                selected = frequency,
-                onSelect = Prefs::setUpdateFrequency,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
         ItemDivider()
@@ -196,4 +225,4 @@ internal fun UpdatesSection(resumeTick: Int) {
 
 /** A release's changelog for the screen: headings without their "###", the build marker left out. */
 internal fun notesText(r: Updater.Release): String =
-    r.notes.lines().filterNot { it.startsWith("<!--") }.joinToString("\n") { it.removePrefix("### ") }.trim()
+    r.notes.lines().filterNot { it.startsWith("<!--") }.joinToString("\n") { it.removePrefix("### ").removePrefix("## ") }.trim()

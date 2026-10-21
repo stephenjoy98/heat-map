@@ -111,7 +111,7 @@ object Prefs {
     val autoUpdate: StateFlow<Boolean> = _autoUpdate
     private val _updateWifiOnly = MutableStateFlow(true)
     val updateWifiOnly: StateFlow<Boolean> = _updateWifiOnly
-    private val _updateFrequency = MutableStateFlow(UpdateFrequency.EVERY)
+    private val _updateFrequency = MutableStateFlow(UpdateFrequency.STABLE)
     val updateFrequency: StateFlow<UpdateFrequency> = _updateFrequency
 
     /** Draw unsnapped routes as smooth curves rather than straight hops between fixes. */
@@ -164,7 +164,7 @@ object Prefs {
         _smoothRoutes.value = sp.getBoolean("smooth_routes", true)
         _autoUpdate.value = sp.getBoolean("auto_update", true)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
-        _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.EVERY)
+        _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.STABLE)
         _autoInterval.value = sp.getBoolean("auto_interval", false)
         _powerProfile.value = runCatching { PowerProfile.valueOf(sp.getString("power_profile", null)!!) }.getOrDefault(PowerProfile.USER)
         _liveIntervalSec.value = _intervalSec.value
@@ -544,5 +544,9 @@ object Prefs {
     private fun <T : Enum<T>> List<T>.byName(name: String?): T? = firstOrNull { it.name == name }
 }
 
-/** Which updates to offer: every one (fixes included), or only versions with new features (minor or major). */
-enum class UpdateFrequency { EVERY, FEATURES }
+/**
+ * Which updates to offer: [BETA], every build as soon as it's made (newest changes, may have rough edges);
+ * [STABLE], releases that have been tried out first; [STABLE_FEATURES], only stable releases with new
+ * features (minor or major versions).
+ */
+enum class UpdateFrequency { BETA, STABLE, STABLE_FEATURES }

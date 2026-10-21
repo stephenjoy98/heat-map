@@ -48,6 +48,9 @@ android {
         versionName = appVersion
         // The commit this was built from (set by CI), so the updater can tell a rebuilt release apart.
         buildConfigField("String", "BUILD_COMMIT", "\"${System.getenv("GITHUB_SHA").orEmpty()}\"")
+        // "beta" or "stable" for CI builds (see the workflow), "dev" for builds made anywhere else.
+        buildConfigField("String", "CHANNEL", "\"${System.getenv("BUILD_CHANNEL") ?: "dev"}\"")
+        buildConfigField("String", "BUILD_NUMBER", "\"${System.getenv("GITHUB_RUN_NUMBER").orEmpty()}\"")
     }
 
     signingConfigs {

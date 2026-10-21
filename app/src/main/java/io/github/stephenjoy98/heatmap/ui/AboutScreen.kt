@@ -83,7 +83,7 @@ private val FEATURES = listOf(
     R.drawable.ic_explore to "Which satellites (GPS, Galileo, GLONASS, BeiDou…) fixed your location, and how often",
     R.drawable.ic_cloud to "Automatic backups of your dots, trips, answers and settings, with storage used on the phone and in the cloud",
     R.drawable.ic_group to "Friends: their profiles, a map of where they've been, and comparisons with yours",
-    R.drawable.ic_system_update to "Updates itself from its GitHub releases, automatically or when you choose",
+    R.drawable.ic_system_update to "Updates itself from its GitHub releases: stable, new features only or beta, automatically or when you choose",
 )
 
 /** The app's launcher icon, as installed. */

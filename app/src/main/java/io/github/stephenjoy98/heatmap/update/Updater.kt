@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -34,7 +35,8 @@ import java.net.URL
  * installed itself, Android 12 and later let later updates install without asking.
  */
 object Updater {
-    private const val LATEST = "https://api.github.com/repos/stephenjoy98/heat-map/releases/latest"
+    private const val RELEASES = "https://api.github.com/repos/stephenjoy98/heat-map/releases"
+    private const val LATEST = "$RELEASES/latest"
     const val CHANNEL_ID = "updates"
     private const val NOTIFICATION_ID = 7
     private const val DOWNLOAD_ATTEMPTS = 4
@@ -43,13 +45,15 @@ object Updater {
 
     class Release(
         val version: SemVer,
+        /** The beta build number, or null for a stable release. */
+        val beta: Int?,
         val build: String?,
         val notes: String,
         val apkUrl: String,
         val apkSize: Long,
         val pageUrl: String,
     ) {
-        val label: String get() = version.toString()
+        val label: String get() = if (beta != null) "$version beta $beta" else version.toString()
     }
 
     sealed interface State {
@@ -99,47 +103,72 @@ object Updater {
         }
     }
 
+    /**
+     * The release to offer: on the Beta channel the newest one, beta or stable (GitHub lists them newest
+     * first); otherwise the latest stable release.
+     */
     private fun fetchLatest(): Release? {
-        val conn = URL(LATEST).openConnection() as HttpURLConnection
+        val beta = Prefs.updateFrequency.value == UpdateFrequency.BETA
+        val text = get(if (beta) "$RELEASES?per_page=20" else LATEST) ?: return null
+        if (!beta) return parse(JSONObject(text))
+        val list = JSONArray(text)
+        for (i in 0 until list.length()) {
+            val json = list.getJSONObject(i)
+            if (json.optBoolean("draft")) continue
+            parse(json)?.let { return it }
+        }
+        return null
+    }
+
+    /** The body of a GitHub API answer, or null for 404 (no releases yet). */
+    private fun get(url: String): String? {
+        val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 15_000
         conn.setRequestProperty("Accept", "application/vnd.github+json")
         conn.setRequestProperty("User-Agent", "LocationTicker/${BuildConfig.VERSION_NAME}")
         try {
-            if (conn.responseCode == 404) return null // No releases yet.
+            if (conn.responseCode == 404) return null
             if (conn.responseCode != 200) throw IllegalStateException("GitHub answered ${conn.responseCode}")
-            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-            val version = SemVer.parse(json.optString("tag_name").removePrefix("v")) ?: return null
-            val body = json.optString("body")
-            // The release APK, or the debug one when this is a debug build (both are signed with the same key).
-            val wanted = if (BuildConfig.DEBUG) "location-ticker-$version-debug.apk" else "location-ticker-$version.apk"
-            val assets = json.optJSONArray("assets") ?: return null
-            var url: String? = null
-            var size = 0L
-            for (i in 0 until assets.length()) {
-                val a = assets.getJSONObject(i)
-                if (a.optString("name") == wanted) {
-                    url = a.optString("browser_download_url")
-                    size = a.optLong("size")
-                }
-            }
-            return Release(
-                version = version,
-                build = buildMarker.find(body)?.groupValues?.get(1),
-                // The changelog is wrapped at 110 characters; join each bullet's lines back up for the screen.
-                notes = body.substringBefore("\n---").replace(buildMarker, "").trim().replace(Regex("""\r?\n {2,}"""), " "),
-                apkUrl = url ?: return null,
-                apkSize = size,
-                pageUrl = json.optString("html_url"),
-            )
+            return conn.inputStream.bufferedReader().use { it.readText() }
         } finally {
             conn.disconnect()
         }
     }
 
+    /** A release from GitHub's JSON: tag vX.Y.Z (stable) or vX.Y.Z-beta.N, with this build type's APK. */
+    private fun parse(json: JSONObject): Release? {
+        val tag = json.optString("tag_name").removePrefix("v")
+        val version = SemVer.parse(tag.substringBefore('-')) ?: return null
+        val beta = Regex("""-beta\.(\d+)$""").find(tag)?.groupValues?.get(1)?.toIntOrNull()
+        val body = json.optString("body")
+        // The release APK, or the debug one when this is a debug build (both are signed with the same key).
+        val wanted = if (BuildConfig.DEBUG) "location-ticker-$version-debug.apk" else "location-ticker-$version.apk"
+        val assets = json.optJSONArray("assets") ?: return null
+        var url: String? = null
+        var size = 0L
+        for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            if (a.optString("name") == wanted) {
+                url = a.optString("browser_download_url")
+                size = a.optLong("size")
+            }
+        }
+        return Release(
+            version = version,
+            beta = beta,
+            build = buildMarker.find(body)?.groupValues?.get(1),
+            // The changelog is wrapped at 110 characters; join each bullet's lines back up for the screen.
+            notes = body.substringBefore("\n---").replace(buildMarker, "").trim().replace(Regex("""\r?\n {2,}"""), " "),
+            apkUrl = url ?: return null,
+            apkSize = size,
+            pageUrl = json.optString("html_url"),
+        )
+    }
+
     fun isNewer(r: Release, followFrequency: Boolean = true): Boolean {
         val mine = currentVersion ?: return false
-        if (followFrequency && Prefs.updateFrequency.value == UpdateFrequency.FEATURES) {
+        if (followFrequency && Prefs.updateFrequency.value == UpdateFrequency.STABLE_FEATURES) {
             // New features only: a higher minor or major version; fixes alone wait for the next one.
             return r.version.major > mine.major || (r.version.major == mine.major && r.version.minor > mine.minor)
         }

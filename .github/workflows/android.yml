@@ -2,7 +2,13 @@ name: Android build
 
 on:
   push:
+  # Run by hand (or by Claude) to publish the current main as a stable release.
   workflow_dispatch:
+    inputs:
+      stable:
+        description: Publish this build as a stable release (otherwise a beta)
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -34,6 +40,17 @@ jobs:
             echo "No GOOGLE_SERVICES_JSON secret; building without Firebase"
           fi
 
+      # Every push to main is a beta. A stable release is made on purpose: run the workflow with "stable"
+      # ticked, or push a commit whose message contains [stable].
+      - name: Choose the release channel
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          STABLE_INPUT: ${{ inputs.stable }}
+        run: |
+          if [ "$STABLE_INPUT" = "true" ] || printf '%s' "$COMMIT_MESSAGE" | grep -q '\[stable\]'; then ch=stable; else ch=beta; fi
+          echo "BUILD_CHANNEL=$ch" >> "$GITHUB_ENV"
+          echo "Channel: $ch"
+
       - name: Build APKs
         run: ./gradlew --no-daemon assembleDebug assembleRelease
 
@@ -48,36 +65,46 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
 
-      # On main, publish the build as a GitHub release for its version: tag vX.Y.Z, that version's CHANGELOG
-      # entry as the notes, and the APKs attached. Pushing again without a version bump refreshes the same
-      # release's notes and APKs instead of making a new one.
+      # On main, publish the build. A beta is a pre-release tagged vX.Y.Z-beta.N (N = run number), with the
+      # changes since the last stable release; only the newest few betas are kept. A stable release is tagged
+      # vX.Y.Z, marked latest, with every changelog entry since the previous stable release. A stable re-run of
+      # the same version refreshes its APKs and notes. The build marker lets the app's updater tell builds apart.
       - name: Publish release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.name }}
         run: |
           set -euo pipefail
-          tag="v$VERSION"
-          awk -v v="$VERSION" '
-            index($0, "## [" v "]") == 1 { on = 1; next }
-            on && /^## \[/ { exit }
-            on { print }
-          ' CHANGELOG.md > notes.md
+          last_stable=$(gh release list --exclude-pre-releases --exclude-drafts --limit 20 --json tagName -q '.[].tagName' \
+            | grep -vx "v$VERSION" | head -n1 | sed 's/^v//' || true)
+          python3 -I tools/release_notes.py CHANGELOG.md "$VERSION" "$last_stable" > notes.md
+          if [ "$BUILD_CHANNEL" = stable ]; then
+            tag="v$VERSION"
+            title="Location Ticker $VERSION"
+          else
+            tag="v$VERSION-beta.$GITHUB_RUN_NUMBER"
+            title="Location Ticker $VERSION beta $GITHUB_RUN_NUMBER"
+            printf 'Beta build: the newest changes before they go into a stable release.\n\n%s\n' "$(cat notes.md)" > notes.md
+          fi
           printf '\n---\nInstall **location-ticker-%s.apk** (signed release build). The debug build is for testing.\n' "$VERSION" >> notes.md
-          # Lets the app's updater spot a rebuild of the same version (hidden when the notes are shown).
           printf '\n<!-- build: %s -->\n' "$GITHUB_SHA" >> notes.md
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/location-ticker-$VERSION.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "dist/location-ticker-$VERSION-debug.apk"
           if gh release view "$tag" > /dev/null 2>&1; then
-            # APKs first, then the notes (with the build marker), so the app never sees a marker for APKs
-            # that didn't upload.
+            # APKs first, then the notes with the build marker, so the app never sees a marker for APKs that
+            # didn't upload.
             gh release upload "$tag" dist/*.apk --clobber
-            gh release edit "$tag" --title "Location Ticker $VERSION" --notes-file notes.md
+            gh release edit "$tag" --title "$title" --notes-file notes.md
+          elif [ "$BUILD_CHANNEL" = stable ]; then
+            gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --title "$title" --notes-file notes.md --latest
           else
-            gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --title "Location Ticker $VERSION" --notes-file notes.md --latest
+            gh release create "$tag" dist/*.apk --target "$GITHUB_SHA" --title "$title" --notes-file notes.md --prerelease --latest=false
           fi
+          # Keep the three newest betas.
+          gh release list --limit 100 --json tagName,isPrerelease -q '.[] | select(.isPrerelease) | .tagName' \
+            | tail -n +4 | while read -r old; do gh release delete "$old" --yes --cleanup-tag; done
 
   # Installs the debug APK on an Android emulator, taps through the main screens and saves screenshots, a
   # screen recording and the logs (tools/emulator-smoke.sh). Results are uploaded as an artifact and pushed to
