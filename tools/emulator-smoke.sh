@@ -21,10 +21,32 @@ shot() {
     adb exec-out screencap -p > "$OUT/$1.png" && note "screenshot $1"
 }
 
+# The emulator itself sometimes shows "… isn't responding" (often the launcher); tap Wait so it doesn't block.
+dismiss_system_dialogs() {
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    if adb shell cat /sdcard/ui.xml | grep -q "isn't responding\|keeps stopping"; then
+        local xy
+        xy=$(adb shell cat /sdcard/ui.xml | python3 -I -c "
+import re, sys
+for m in re.finditer(r'text=\"(Wait|Close app|OK)\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]', sys.stdin.read()):
+    x1, y1, x2, y2 = map(int, m.groups()[1:])
+    print((x1 + x2) // 2, (y1 + y2) // 2)
+    break
+")
+        if [ -n "$xy" ]; then
+            # shellcheck disable=SC2086
+            adb shell input tap $xy
+            note "dismissed a system 'not responding' dialog"
+            sleep 2
+        fi
+    fi
+}
+
 # Taps the centre of the first on-screen element whose text (mode text) or content description (mode desc)
 # is exactly $2. Saves the UI tree and notes it if there's no such element.
 tap() {
     local mode=$1 label=$2
+    dismiss_system_dialogs
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
     local xy
@@ -122,6 +144,8 @@ adb shell screenrecord --time-limit 175 --bit-rate 3000000 /sdcard/run.mp4 &
 REC=$!
 
 adb shell am start -W -n "$PKG/.ui.MainActivity" | tee -a "$NOTES"
+sleep 5
+dismiss_system_dialogs
 shot 01-map 10
 
 # Record a short walk north along King George Boulevard, a fix every 2 seconds.
