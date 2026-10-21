@@ -212,7 +212,12 @@ object Prefs {
         _mapColourDark.value = sp.getFloat("map_colour_dark", 0f)
         _mapColourLight.value = sp.getFloat("map_colour_light", 0f)
         _mapColourRoads.value = sp.getBoolean("map_colour_roads", false)
-        _autoUpdate.value = sp.getBoolean("auto_update", true)
+        // Updates aren't downloaded on their own any more: the app offers them and you choose (asked 2026-10-21).
+        // Turn automatic updates off once for everyone who had them on by default.
+        if (!sp.getBoolean("auto_update_off_v1", false)) {
+            sp.edit().putBoolean("auto_update", false).putBoolean("auto_update_off_v1", true).apply()
+        }
+        _autoUpdate.value = sp.getBoolean("auto_update", false)
         _updateWifiOnly.value = sp.getBoolean("update_wifi_only", true)
         _updateFrequency.value = runCatching { UpdateFrequency.valueOf(sp.getString("update_frequency", null)!!) }.getOrDefault(UpdateFrequency.STABLE)
         _autoInterval.value = sp.getBoolean("auto_interval", false)

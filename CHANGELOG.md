@@ -23,6 +23,9 @@ The app shows the entries since your last version as "What's new" after an updat
 ### Changed
 - The location button keeps its own icon; tapping it again once you're there still turns the map north up.
 - The map's OpenStreetMap info button sits a little higher, clear of the GPS signal button.
+- New versions are no longer downloaded on their own. When one is out, a sheet tells you on the map screen, with
+  Later and Download and install now. "Update automatically" in Settings › Updates is now off for everyone; turn it
+  back on there if you want it.
 
 ## [2.36.1] - 2026-10-21
 

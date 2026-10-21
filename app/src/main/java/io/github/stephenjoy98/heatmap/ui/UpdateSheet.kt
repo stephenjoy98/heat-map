@@ -65,8 +65,8 @@ fun SlideUpSheet(onClosed: () -> Unit, content: @Composable ColumnScope.(close: 
 
 /**
  * Offers a newer version (see [Updater]) with its changelog, in a sheet that slides up on the map screen
- * ([onHome]) once per app session: Update now downloads and installs it, showing progress; Later slides it
- * away until the app is next opened (or, with automatic updates on, until it installs once you've left the app).
+ * ([onHome]) once per app session. Nothing is downloaded until you tap "Download and install now", which
+ * shows progress; Later slides it away until the app is next opened.
  */
 @Composable
 fun UpdateSheet(onHome: Boolean) {
@@ -108,7 +108,14 @@ fun UpdateSheet(onHome: Boolean) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             MaterialIcon(R.drawable.ic_system_update, size = 28, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
-            Text("Location Ticker ${release.label} is available", style = MaterialTheme.typography.titleLarge)
+            Column {
+                Text("A new version is available", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Location Ticker ${release.label} · you have ${io.github.stephenjoy98.heatmap.BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Spacer(Modifier.height(12.dp))
         when (val s = state) {
@@ -139,7 +146,8 @@ fun UpdateSheet(onHome: Boolean) {
             Spacer(Modifier.height(12.dp))
             Text(
                 if (auto) "Later installs it on its own once you've left the app (on Wi-Fi, if you chose that)."
-                else "You can update any time from Settings › Updates.",
+                else "Nothing is downloaded until you choose to. Later asks again next time you open the app; you can " +
+                    "also update from Settings › Updates.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -157,7 +165,15 @@ fun UpdateSheet(onHome: Boolean) {
                         if (ready != null) Updater.install(context, ready.release, ready.file)
                         else Updater.downloadAndInstall(context, release, whenAway = false)
                     }
-                }) { Text(if (state is Updater.State.Failed) "Try again" else "Update now") }
+                }) {
+                    Text(
+                        when (state) {
+                            is Updater.State.Failed -> "Try again"
+                            is Updater.State.Ready -> "Install now"
+                            else -> "Download and install now"
+                        }
+                    )
+                }
             }
         }
     }
