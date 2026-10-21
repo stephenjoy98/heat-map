@@ -353,7 +353,7 @@ private class VectorMapHolder(context: Context) {
             m.uiSettings.attributionGravity = Gravity.BOTTOM or Gravity.START
             // Keep the OpenStreetMap credit visible above the recording panel and the accuracy button.
             val dp = context.resources.displayMetrics.density
-            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (160 * dp).toInt())
+            m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, (180 * dp).toInt())
             mapView.setOnTouchListener(TwoFingerTilt(this, dp))
             readyCallbacks.forEach { it(m) }
             readyCallbacks.clear()
