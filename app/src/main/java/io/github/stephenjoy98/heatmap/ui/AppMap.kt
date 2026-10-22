@@ -207,7 +207,6 @@ private const val AUTO_FLAT_TILT = 2f
  */
 @Composable
 private fun MapBrightness(holder: VectorMapHolder, dark: Boolean) {
-    val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
     val colour by (if (dark) Prefs.mapColourDark else Prefs.mapColourLight).collectAsStateWithLifecycle()
     val roads by Prefs.mapColourRoads.collectAsStateWithLifecycle()
     // The light style is left exactly as OpenFreeMap draws it until colour is turned up; once recoloured,
@@ -219,8 +218,9 @@ private fun MapBrightness(holder: VectorMapHolder, dark: Boolean) {
             holder.withMap { m -> m.style?.let { VectorMaps.applyColours(it, dark, colour, roads) } }
         }
     }
-    LaunchedEffect(holder, holder.styleVersion, brightness) {
-        holder.withMap { m -> m.style?.let { VectorMaps.setTint(it, brightness) } }
+    // Map brightness was removed from the layers sheet in 2.40.0 (it cluttered it); clear any tint left from before.
+    LaunchedEffect(holder, holder.styleVersion) {
+        holder.withMap { m -> m.style?.let { VectorMaps.setTint(it, 0f) } }
     }
 }
 

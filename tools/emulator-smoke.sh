@@ -157,9 +157,11 @@ for i in $(seq 0 24); do
 done
 shot 02-recording 2
 
-# Map colours: open the layers sheet and drag the colour slider (just above its Muted / Vivid labels) to Vivid.
+# Map colours: open the layers sheet, unfold Map colours and drag the colour slider (just above its Muted / Vivid labels) to Vivid.
 tap desc "Map layers"
 shot 02a-layers 2
+# Map colours is folded away: open it first.
+tap text "Map colours"
 read -r mx my <<< "$(centre_of Muted)"
 read -r vx vy <<< "$(centre_of Vivid)"
 if [ -n "${mx:-}" ] && [ -n "${vx:-}" ]; then

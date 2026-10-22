@@ -1,5 +1,13 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import kotlin.math.roundToInt
 import androidx.compose.foundation.BorderStroke
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
@@ -104,83 +112,57 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 val dot by Prefs.showLocationDot.collectAsStateWithLifecycle()
                 LayerTile("My location", dot, { Prefs.setShowLocationDot(!dot) }) { drawLocationArt(it) }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "3D buildings tilt the map and show your routes at the heights they were recorded at. Drag up or down " +
-                    "with two fingers to change the angle.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Spacer(Modifier.height(20.dp))
-            // More colour and contrast, kept separately for the dark and the light map.
+            // Map colours, folded away until you want it: muted to vivid, and whether roads join in.
+            var coloursOpen by remember { mutableStateOf(false) }
             val colour by (if (dark) Prefs.mapColourDark else Prefs.mapColourLight).collectAsStateWithLifecycle()
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Map colours", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (dark) "For the dark map" else "For the light map",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (colour != 0f) TextButton(onClick = { Prefs.setMapColour(dark, 0f) }) { Text("Reset") }
-            }
-            Slider(value = colour, onValueChange = { Prefs.setMapColour(dark, it) }, valueRange = 0f..1f)
-            Row {
-                Text("Muted", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                Text("Vivid", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text(
-                "Vivid gives water, parks and buildings their own colours, with more contrast between them.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            val roads by Prefs.mapColourRoads.collectAsStateWithLifecycle()
             Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp).clickable { Prefs.setMapColourRoads(!roads) },
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { coloursOpen = !coloursOpen }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Colour roads too", style = MaterialTheme.typography.bodyLarge)
+                    Text("Map colours", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Brighter roads (yellow main roads on the light map). Off keeps roads in the standard colours.",
+                        when {
+                            colour <= 0f -> "Standard"
+                            colour >= 1f -> "Vivid"
+                            else -> "${(colour * 100).roundToInt()}% vivid"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.width(12.dp))
-                Switch(checked = roads, onCheckedChange = Prefs::setMapColourRoads)
+                Icon(
+                    if (coloursOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (coloursOpen) "Hide map colours" else "Show map colours",
+                )
             }
-            Spacer(Modifier.height(20.dp))
-            // Lighter or darker base map, kept separately for the dark and the light map.
-            val brightness by (if (dark) Prefs.mapBrightnessDark else Prefs.mapBrightnessLight).collectAsStateWithLifecycle()
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Map brightness", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (dark) "For the dark map" else "For the light map",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            AnimatedVisibility(visible = coloursOpen) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (dark) "For the dark map" else "For the light map",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (colour != 0f) TextButton(onClick = { Prefs.setMapColour(dark, 0f) }) { Text("Reset") }
+                    }
+                    Slider(value = colour, onValueChange = { Prefs.setMapColour(dark, it) }, valueRange = 0f..1f)
+                    Row {
+                        Text("Muted", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        Text("Vivid", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    val roads by Prefs.mapColourRoads.collectAsStateWithLifecycle()
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp).clickable { Prefs.setMapColourRoads(!roads) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Colour roads too", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Switch(checked = roads, onCheckedChange = Prefs::setMapColourRoads)
+                    }
                 }
-                if (brightness != 0f) TextButton(onClick = { Prefs.setMapBrightness(dark, 0f) }) { Text("Reset") }
             }
-            Slider(
-                value = brightness,
-                onValueChange = { Prefs.setMapBrightness(dark, it) },
-                valueRange = -Prefs.MAX_MAP_BRIGHTNESS..Prefs.MAX_MAP_BRIGHTNESS,
-            )
-            Row {
-                Text("Darker", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                Text("Lighter", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text(
-                "Changes roads, land, water and buildings; your heatmap, routes and the place names stay as they are.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
         }
     }
 }

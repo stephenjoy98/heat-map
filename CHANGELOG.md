@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.40.0] - 2026-10-22
+
+### Changed
+- A tidier map layers sheet: Map colours folds away under its own row (tap it to show the slider and "Colour roads
+  too"), and the long 3D buildings explanation is gone.
+
+### Removed
+- Map brightness. Any brightness you'd set is cleared, so the map shows at its normal brightness.
+
 ## [2.39.1] - 2026-10-22
 
 ### Changed
