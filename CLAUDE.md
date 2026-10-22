@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.38.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.39.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -135,7 +135,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   untouched at 0; Prefs `mapColourDark/Light`; roads only with Prefs `map_colour_roads`, else muted), `setTint` (2.34.0: world-polygon white/black fill under labels and route-3d layers for Prefs
   `mapBrightnessDark/Light`, ±0.6, slider in `MapLayersSheet`, applied by `MapBrightness` in AppMap); `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix,
   blue location dot that glides linearly between positions over the time between them (2.37.1; MapScreen feeds
-  the newer of the last recorded dot and the live fix ≤50 m)), heat rendering, smoothing, tile sources.
+  the newer of the last recorded dot and the live fix ≤50 m; `heading` arrow from the live fix's bearing when >1 m/s)),
+  heat rendering, smoothing, tile sources.
 - `ui/`: `MainActivity` (AppScaffold: tabs **Map** and **Timeline**; `PageHost` page stack for Profile,
   Friends, Backup, Settings, About, Changelog, **Insights** (file still `ReviewScreen.kt`, enum `Page.REVIEW`),
   Compare; back = pop page → Map tab → exit confirm), `Navigation.kt` (PageStack, predictive back,
@@ -143,7 +144,9 @@ travel stats, Insights (AI write-ups), backup and friends.
   bearing, cameraTick, metersPerPixel, moving, projector; per-activity `VectorMapCache` keeps each tab's map
   alive via `cacheKey`; tilt >8° by hand turns 3D on, <2° turns it off; 3D route loader), `MapScreen`
   (filter button + chips, stats, profile button, scale bar + compass under the top row, accuracy button
-  bottom-left, location/zoom/layers bottom-right, record panel), `TimelineScreen` (also hosts **Edit dots**
+  bottom-left, location/zoom/layers bottom-right, record panel; long-press location = follow me (`following`:
+  `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; `MapCamera.panTick`
+  from MapLibre's OnMoveListener stops it)), `TimelineScreen` (also hosts **Edit dots**
   with range slider, soft delete/restore, undo snackbar over the map, layers button; long-press a trip row
   for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);

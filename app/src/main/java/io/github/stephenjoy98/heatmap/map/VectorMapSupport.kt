@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
@@ -460,6 +461,15 @@ class TileOverlayView(context: Context) : View(context) {
         }
     }
 
+    /** Which way you're heading (degrees from north): a small arrow by the dot; null for none. */
+    var heading: Float? = null
+        set(value) {
+            if (value == field) return
+            field = value
+            invalidate()
+        }
+    private val arrow = Path()
+
     var latest: LatLng? = null
         set(value) {
             if (value == field) return
@@ -542,6 +552,18 @@ class TileOverlayView(context: Context) : View(context) {
         }
         shown?.let {
             val p = projection.toScreenLocation(it)
+            heading?.let { h ->
+                // A small triangle just outside the dot, pointing where you're going (allowing for map rotation).
+                canvas.save()
+                canvas.rotate(h - map.cameraPosition.bearing.toFloat(), p.x, p.y)
+                arrow.reset()
+                arrow.moveTo(p.x, p.y - 15 * density)
+                arrow.lineTo(p.x + 6 * density, p.y - 8 * density)
+                arrow.lineTo(p.x - 6 * density, p.y - 8 * density)
+                arrow.close()
+                canvas.drawPath(arrow, dot)
+                canvas.restore()
+            }
             canvas.drawCircle(p.x, p.y, 14 * density, halo)
             canvas.drawCircle(p.x, p.y, 7 * density, ring)
             canvas.drawCircle(p.x, p.y, 5 * density, dot)

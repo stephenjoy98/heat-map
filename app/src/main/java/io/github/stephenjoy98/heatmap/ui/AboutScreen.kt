@@ -77,6 +77,7 @@ private val FEATURES = listOf(
     R.drawable.ic_undo to "Undo any change on the Timeline or any answer to a question",
     R.drawable.ic_fullscreen to "A full-screen map with only its buttons, and the blue location dot can be hidden",
     R.drawable.ic_explore to "A speedometer and a compass that turns the map north, then tilts it into 3D",
+    R.drawable.ic_navigation to "Follow me: long-press the location button to keep your dot centred while you travel",
     R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there",
     R.drawable.ic_system_update to "Red dots lead to what a notification was about, and \"New\" marks sections that changed since your last look",
     R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",

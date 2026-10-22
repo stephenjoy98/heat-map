@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.39.0] - 2026-10-22
+
+### Added
+- Follow me: long-press the location button and the map keeps your blue dot in the middle, gliding along under
+  it as you travel. The button turns into an arrow while it's on; drag the map or tap the button to stop.
+- While you're moving, a small arrow by the blue dot points the way you're heading.
+
 ## [2.38.0] - 2026-10-22
 
 ### Added

@@ -1,5 +1,11 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseIn
@@ -101,6 +107,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resumeTick: Int, onOpenProfile: () -> Unit) {
     val context = LocalContext.current
@@ -151,6 +158,11 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val signal = rememberFixQuality(liveFix)
     // For the speedometer: the live fix's speed while it's recent.
     val speed = liveFix?.takeIf { it.hasSpeed() && System.currentTimeMillis() - it.time < 15_000 }?.speed
+    // Follow me (long-press the location button): the map glides along with the dot, until you drag it.
+    var following by rememberSaveable { mutableStateOf(false) }
+    var lastFollowAt by remember { mutableLongStateOf(0L) }
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(camera.panTick) { following = false }
     // The blue dot: the newer of the last recorded dot and the live GPS fix (if it's reasonably precise), so it
     // keeps up while you travel; the map glides it between them.
     val dotAt = run {
@@ -162,6 +174,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             else -> null
         }
     }
+    // The arrow on the dot: which way you're going, while you're moving.
+    val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
     // Routes at their recorded heights, for the 3D buildings view.
     val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
@@ -196,7 +210,21 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             cacheKey = "map",
             route3d = route3d,
             bottomInset = navPad,
+            heading = heading,
         )
+        // While following, keep the dot in the middle: the map glides as long as the dot does between positions.
+        LaunchedEffect(dotAt, following) {
+            val at = dotAt ?: return@LaunchedEffect
+            if (!following) return@LaunchedEffect
+            val now = android.os.SystemClock.uptimeMillis()
+            if (lastFollowAt == 0L) {
+                // Just started: fly in close to you first.
+                camera.animateTo(at.latitude, at.longitude, 17f)
+            } else {
+                camera.glideTo(at.latitude, at.longitude, (now - lastFollowAt).coerceIn(300L, 2_500L).toInt())
+            }
+            lastFollowAt = now
+        }
         // While the accuracy card is open, touching the map anywhere else closes it. The buttons drawn above
         // this still work as usual.
         if (accuracyOpen) {
@@ -334,23 +362,51 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     } == true
                     val rotated = ((camera.bearing % 360f) + 360f) % 360f in 1f..359f
                     val turnsNorth = onLatest && rotated
-                    Tip(if (turnsNorth) "Turn the map back to north" else "Go to your latest position") {
-                        Surface(
-                            onClick = {
-                                when {
-                                    latest == null -> scope.launch { snackbar.showSnackbar("No points recorded yet") }
-                                    turnsNorth -> camera.northUp()
-                                    else -> camera.animateTo(latest.lat, latest.lon, 16f)
+                    // Long-press: follow me, keeping the dot in the middle while the map moves under it. Tap stops it.
+                    // (No tooltip here: a long-press is the follow gesture.)
+                    Surface(
+                        shape = CircleShape,
+                        color = if (following) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                        contentColor = if (following) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                        shadowElevation = 3.dp,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                onClick = {
+                                    when {
+                                        following -> following = false
+                                        latest == null -> scope.launch { snackbar.showSnackbar("No points recorded yet") }
+                                        turnsNorth -> camera.northUp()
+                                        else -> camera.animateTo(latest.lat, latest.lon, 16f)
+                                    }
+                                },
+                                onLongClick = {
+                                    val at = dotAt
+                                    if (at == null) {
+                                        scope.launch { snackbar.showSnackbar("No position yet") }
+                                    } else {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        lastFollowAt = 0L
+                                        following = true
+                                        scope.launch {
+                                            snackbar.currentSnackbarData?.dismiss()
+                                            snackbar.showSnackbar("Following you. Drag the map or tap the button to stop.")
+                                        }
+                                    }
+                                },
+                            )
+                            .semantics {
+                                contentDescription = when {
+                                    following -> "Following you; tap to stop"
+                                    turnsNorth -> "Turn map north up; long-press to follow you"
+                                    else -> "Go to my latest position; long-press to follow you"
                                 }
                             },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                            shadowElevation = 3.dp,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.LocationOn, contentDescription = if (turnsNorth) "Turn map north up" else "Go to my latest position")
-                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (following) MaterialIcon(R.drawable.ic_navigation) else Icon(Icons.Filled.LocationOn, contentDescription = null)
                         }
                     }
                     ZoomButtons(camera)

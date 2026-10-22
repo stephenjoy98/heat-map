@@ -90,7 +90,8 @@ class MapLayer(val id: String, val source: TileBitmapSource, val alpha: Float = 
 
 /** Moves the camera of an [AppMap], whichever engine it uses. */
 class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom: Float) {
-    internal class Command(val lat: Double, val lon: Double, val zoom: Float, val animate: Boolean)
+    // zoom NaN keeps the current zoom; durationMs > 0 glides there at a steady pace (for following you).
+    internal class Command(val lat: Double, val lon: Double, val zoom: Float, val animate: Boolean, val durationMs: Int = 0)
 
     internal enum class Action { ZOOM_IN, ZOOM_OUT, NORTH_UP }
 
@@ -145,6 +146,15 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
     fun animateTo(lat: Double, lon: Double, zoom: Float) {
         commands.tryEmit(Command(lat, lon, zoom, animate = true))
     }
+
+    /** Glides the map's middle to a spot at a steady pace over [durationMs], keeping the zoom. */
+    fun glideTo(lat: Double, lon: Double, durationMs: Int) {
+        commands.tryEmit(Command(lat, lon, Float.NaN, animate = true, durationMs = durationMs))
+    }
+
+    /** Goes up each time the map is dragged by hand, so a "follow me" mode knows to stop. */
+    var panTick by mutableIntStateOf(0)
+        internal set
 }
 
 @Composable
@@ -164,6 +174,8 @@ fun AppMap(
     onMapClick: ((lat: Double, lon: Double) -> Unit)? = null,
     cacheKey: String? = null,
     onMapLongClick: ((lat: Double, lon: Double) -> Unit)? = null,
+    // Which way you're heading, in degrees from north, for an arrow on the location dot; null hides it.
+    heading: Float? = null,
     // How much of the map's bottom is covered (by the tab bar), so the OpenStreetMap credit stays above it.
     bottomInset: Dp = 0.dp,
     // Loads routes with heights for an area; with 3D buildings on, they're drawn as a 3D route. Runs off
@@ -174,7 +186,7 @@ fun AppMap(
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset)
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading)
 }
 
 /** How the base map looks: theme, terrain shading and 3D buildings (which also tilt the camera). */
@@ -469,6 +481,7 @@ private fun VectorAppMap(
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)?,
     modifier: Modifier,
     bottomInset: Dp,
+    heading: Float?,
 ) {
     val holder = rememberVectorMap(cacheKey)
     val context = LocalContext.current
@@ -530,6 +543,13 @@ private fun VectorAppMap(
                     holder.onClick?.invoke(p.latitude, p.longitude)
                     false
                 }
+                m.addOnMoveListener(object : MapLibreMap.OnMoveListener {
+                    override fun onMoveBegin(detector: org.maplibre.android.gestures.MoveGestureDetector) {
+                        holder.camera?.let { it.panTick++ }
+                    }
+                    override fun onMove(detector: org.maplibre.android.gestures.MoveGestureDetector) = Unit
+                    override fun onMoveEnd(detector: org.maplibre.android.gestures.MoveGestureDetector) = Unit
+                })
                 m.addOnMapLongClickListener { p ->
                     val handler = holder.onLongClick
                     handler?.invoke(p.latitude, p.longitude)
@@ -565,6 +585,7 @@ private fun VectorAppMap(
     SideEffect {
         overlay.setLayers(layers.map { TileOverlayView.LayerSpec(it.id, it.source, it.alpha, it.zIndex) })
         overlay.latest = latest?.let { MLatLng(it.latitude, it.longitude) }
+        overlay.heading = heading
     }
 
     LaunchedEffect(refreshKey) {
@@ -600,8 +621,13 @@ private fun VectorAppMap(
     LaunchedEffect(camera) {
         camera.commands.collect { c ->
             holder.withMap { m ->
-                val update = org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(MLatLng(c.lat, c.lon), c.zoom.toVectorZoom())
-                if (c.animate) m.animateCamera(update, 600) else m.moveCamera(update)
+                val update = if (c.zoom.isNaN()) org.maplibre.android.camera.CameraUpdateFactory.newLatLng(MLatLng(c.lat, c.lon))
+                else org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(MLatLng(c.lat, c.lon), c.zoom.toVectorZoom())
+                when {
+                    c.durationMs > 0 -> m.easeCamera(update, c.durationMs, false)
+                    c.animate -> m.animateCamera(update, 600)
+                    else -> m.moveCamera(update)
+                }
             }
         }
     }
