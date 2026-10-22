@@ -35,6 +35,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -158,6 +159,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val signal = rememberFixQuality(liveFix)
     // For the speedometer: the live fix's speed while it's recent.
     val speed = liveFix?.takeIf { it.hasSpeed() && System.currentTimeMillis() - it.time < 15_000 }?.speed
+    // For the altimeter: height above sea level (on Android 14 and later; above the GPS ellipsoid before that).
+    val altitude = liveFix?.takeIf { System.currentTimeMillis() - it.time < 60_000 }?.let { LocationTickerService.altitudeOf(it) }
     // Follow me (long-press the location button): the map glides along with the dot, until you drag it.
     var following by rememberSaveable { mutableStateOf(false) }
     var lastFollowAt by remember { mutableLongStateOf(0L) }
@@ -291,15 +294,20 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     .padding(start = 12.dp, end = 12.dp, top = 12.dp)
                     .graphicsLayer { translationY = -hide * (topRowPx + with(density) { 12.dp.toPx() }) },
             ) {
-                // Speed on the left, opposite the compass; the scale shows beside it while the map moves.
-                Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                // On the left, opposite the compass: height, with speed below it. The scale shows beside the height
+                // while the map moves.
+                Row(Modifier.align(Alignment.TopStart), verticalAlignment = Alignment.Top) {
                     if (hasLocation) {
-                        Speedometer(speed)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Altimeter(altitude)
+                            Spacer(Modifier.height(12.dp))
+                            Speedometer(speed)
+                        }
                         Spacer(Modifier.width(12.dp))
                     }
-                    if (!full) ScaleBar(camera)
+                    if (!full) ScaleBar(camera, Modifier.padding(top = 14.dp))
                 }
-                CompassButton(camera, Modifier.align(Alignment.CenterEnd))
+                CompassButton(camera, Modifier.align(Alignment.TopEnd))
             }
         }
 

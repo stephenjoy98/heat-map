@@ -18,6 +18,12 @@ The app shows the entries since your last version as "What's new" after an updat
 - Follow me: long-press the location button and the map keeps your blue dot in the middle, gliding along under
   it as you travel. The button turns into an arrow while it's on; drag the map or tap the button to stop.
 - While you're moving, a small arrow by the blue dot points the way you're heading.
+- An altimeter on the map: your height above sea level from GPS (m or ft), on the left with the speedometer now
+  below it.
+
+### Changed
+- The speedometer shrinks to a small dot when you're not moving (under 1 km/h or mph) and grows back into the
+  badge when you are.
 
 ## [2.38.0] - 2026-10-22
 

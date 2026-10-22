@@ -105,7 +105,8 @@ up to your Google account, and lets you compare explored areas with friends.
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
 - **Follow me**: long-press the location button to keep your dot in the middle of the map while you travel; an
   arrow on the dot shows your heading.
-- **Speedometer** on the map (left, opposite the compass) from GPS; tapping the **compass** when north up tilts the
+- **Altimeter and speedometer** on the map (left, opposite the compass) from GPS; the speedometer shrinks to a dot
+  when you're still; tapping the **compass** when north up tilts the
   map into 3D and back.
 - **Compass** with N, E, S and W that turns with the map; **Map colours** can leave roads in the standard colours
   ("Colour roads too" switch).

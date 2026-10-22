@@ -1,5 +1,10 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 import io.github.stephenjoy98.heatmap.data.Prefs
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.roundToInt
@@ -111,24 +116,62 @@ fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
 }
 
 /**
- * Your speed from GPS in a round badge like the compass, in km/h or mph as chosen in Settings; a dash when
- * there's no recent fix with a speed.
+ * Your speed from GPS in a round badge like the compass, in km/h or mph as chosen in Settings. Below 1 (or with
+ * no recent speed) it shrinks to a small dot, a touch smaller than the blue location dot, and grows back into
+ * the badge once you're moving. It keeps a 48 dp slot either way, so nothing around it moves.
  */
 @Composable
 fun Speedometer(speedMs: Float?, modifier: Modifier = Modifier) {
-    val kmh = speedMs?.let { if (it < 0.5f) 0.0 else it * 3.6 }
-    val value = kmh?.let { (if (Units.imperial) it / 1.609344 else it).roundToInt().toString() } ?: "–"
+    val perHour = speedMs?.let { it * 3.6 / (if (Units.imperial) 1.609344 else 1.0) }
+    val value = perHour?.roundToInt() ?: 0
+    val moving = value >= 1
     val unit = if (Units.imperial) "mph" else "km/h"
-    Tip("Your speed, from GPS", modifier) {
+    val size by animateDpAsState(if (moving) 48.dp else 10.dp, tween(250), label = "speedometer")
+    val textAlpha by animateFloatAsState(if (moving) 1f else 0f, tween(if (moving) 250 else 120), label = "speed text")
+    val color by animateColorAsState(if (moving) controlColor() else MaterialTheme.colorScheme.onSurfaceVariant, tween(250), label = "speed colour")
+    Tip(if (moving) "Your speed, from GPS" else "Your speed shows here once you're moving", modifier) {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Surface(
+                shape = CircleShape,
+                color = color,
+                shadowElevation = if (moving) 3.dp else 1.dp,
+                modifier = Modifier.size(size).semantics { contentDescription = if (moving) "$value $unit" else "Not moving" },
+            ) {
+                if (size > 32.dp) {
+                    Column(
+                        Modifier.fillMaxSize().alpha(textAlpha),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(value.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(unit, fontSize = 9.sp, lineHeight = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Your height above sea level from GPS, in m or ft as chosen in Settings, in a badge like the compass. */
+@Composable
+fun Altimeter(meters: Double?, modifier: Modifier = Modifier) {
+    val value = meters?.let { Units.lengthValue(it).toString() } ?: "–"
+    Tip("Your height above sea level, from GPS", modifier) {
         Surface(
             shape = CircleShape,
             color = controlColor(),
             shadowElevation = 3.dp,
-            modifier = Modifier.size(48.dp).semantics { contentDescription = if (kmh == null) "Speed unknown" else "$value $unit" },
+            modifier = Modifier.size(48.dp).semantics { contentDescription = if (meters == null) "Height unknown" else "$value ${Units.shortUnit} above sea level" },
         ) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text(unit, fontSize = 9.sp, lineHeight = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    value,
+                    fontSize = if (value.length >= 4) 13.sp else 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(Units.shortUnit, fontSize = 9.sp, lineHeight = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
