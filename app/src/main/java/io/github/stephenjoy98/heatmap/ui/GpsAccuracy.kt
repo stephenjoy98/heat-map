@@ -113,7 +113,7 @@ fun rememberLiveFix(hasPermission: Boolean, detailed: Boolean): Location? {
     DisposableEffect(hasPermission, detailed, lifecycleOwner) {
         if (!hasPermission) return@DisposableEffect onDispose { }
         val client = LocationServices.getFusedLocationProviderClient(context)
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, if (detailed) 2_000L else 5_000L).build()
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, if (detailed) 1_000L else 2_000L).build()
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { fix = it }

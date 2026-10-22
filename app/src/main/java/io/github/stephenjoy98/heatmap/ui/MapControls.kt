@@ -1,5 +1,9 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Prefs
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -79,18 +83,52 @@ fun LayersButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** A compass that follows the map's rotation; tap to turn the map north up. */
+/**
+ * A compass that follows the map's rotation. Tap it to turn the map north up; once it's north up, a tap tilts
+ * the map into 3D, and the next one lays it flat again.
+ */
 @Composable
 fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
-    Tip("Turn the map back to north", modifier) {
+    val tilted by Prefs.buildings3d.collectAsStateWithLifecycle()
+    val rotated = ((camera.bearing % 360f) + 360f) % 360f in 1f..359f
+    val action = when {
+        rotated -> "Turn the map back to north"
+        tilted -> "Lay the map flat"
+        else -> "Tilt the map into 3D"
+    }
+    Tip(action, modifier) {
         Surface(
-            onClick = { camera.northUp() },
+            onClick = { if (rotated) camera.northUp() else Prefs.setBuildings3d(!tilted) },
             shape = CircleShape,
             color = controlColor(),
             shadowElevation = 3.dp,
-            modifier = Modifier.size(48.dp).semantics { contentDescription = "Compass: turn map north up" },
+            modifier = Modifier.size(48.dp).semantics { contentDescription = "Compass: $action" },
         ) {
             CompassNeedle(bearing = camera.bearing, modifier = Modifier.size(48.dp))
+        }
+    }
+}
+
+/**
+ * Your speed from GPS in a round badge like the compass, in km/h or mph as chosen in Settings; a dash when
+ * there's no recent fix with a speed.
+ */
+@Composable
+fun Speedometer(speedMs: Float?, modifier: Modifier = Modifier) {
+    val kmh = speedMs?.let { if (it < 0.5f) 0.0 else it * 3.6 }
+    val value = kmh?.let { (if (Units.imperial) it / 1.609344 else it).roundToInt().toString() } ?: "–"
+    val unit = if (Units.imperial) "mph" else "km/h"
+    Tip("Your speed, from GPS", modifier) {
+        Surface(
+            shape = CircleShape,
+            color = controlColor(),
+            shadowElevation = 3.dp,
+            modifier = Modifier.size(48.dp).semantics { contentDescription = if (kmh == null) "Speed unknown" else "$value $unit" },
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(unit, fontSize = 9.sp, lineHeight = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

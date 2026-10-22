@@ -149,6 +149,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val covered = LocalCovered.current
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
     val signal = rememberFixQuality(liveFix)
+    // For the speedometer: the live fix's speed while it's recent.
+    val speed = liveFix?.takeIf { it.hasSpeed() && System.currentTimeMillis() - it.time < 15_000 }?.speed
     // The blue dot: the newer of the last recorded dot and the live GPS fix (if it's reasonably precise), so it
     // keeps up while you travel; the map glides it between them.
     val dotAt = run {
@@ -261,7 +263,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     .padding(start = 12.dp, end = 12.dp, top = 12.dp)
                     .graphicsLayer { translationY = -hide * (topRowPx + with(density) { 12.dp.toPx() }) },
             ) {
-                if (!full) ScaleBar(camera, Modifier.align(Alignment.CenterStart))
+                // Speed on the left, opposite the compass; the scale shows beside it while the map moves.
+                Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                    if (hasLocation) {
+                        Speedometer(speed)
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    if (!full) ScaleBar(camera)
+                }
                 CompassButton(camera, Modifier.align(Alignment.CenterEnd))
             }
         }

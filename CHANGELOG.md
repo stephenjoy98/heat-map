@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.38.0] - 2026-10-22
+
+### Added
+- A speedometer on the map, on the left opposite the compass: your speed from GPS in km/h or mph (as set in
+  Settings), a dash when there's no recent fix.
+- The compass does more: once the map points north, tapping it tilts the map into 3D, and tapping again lays it
+  flat.
+
 ## [2.37.1] - 2026-10-21
 
 ### Changed
