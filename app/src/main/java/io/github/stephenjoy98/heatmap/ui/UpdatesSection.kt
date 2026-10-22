@@ -1,5 +1,9 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -46,7 +50,7 @@ import kotlinx.coroutines.launch
  * left the app.
  */
 @Composable
-internal fun UpdatesSection(resumeTick: Int) {
+internal fun UpdatesSection(resumeTick: Int, onChangelog: () -> Unit = {}) {
     val context = LocalContext.current
     val uri = LocalUriHandler.current
     val scope = rememberCoroutineScope()
@@ -128,6 +132,26 @@ internal fun UpdatesSection(resumeTick: Int) {
             if (release != null && release.pageUrl.isNotEmpty()) {
                 TextButton(onClick = { uri.openUri(release.pageUrl) }) { Text("Release page on GitHub") }
             }
+        }
+        // Every version and what changed in it, the same page as About › Changelog.
+        ItemDivider()
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onChangelog).padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Changelog", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "What's new and fixed in each version",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (Attention.changelogUnread()) {
+                AttentionDot()
+                Spacer(Modifier.width(8.dp))
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (!canInstall) {
             ItemDivider()

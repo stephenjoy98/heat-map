@@ -17,6 +17,7 @@ The app shows the entries since your last version as "What's new" after an updat
 ### Changed
 - A tidier map layers sheet: Map colours folds away under its own row (tap it to show the slider and "Colour roads
   too"), and the long 3D buildings explanation is gone.
+- Settings › Updates has a Changelog row that opens every version's changes (also still under About).
 
 ### Removed
 - Map brightness. Any brightness you'd set is cleared, so the map shows at its normal brightness.

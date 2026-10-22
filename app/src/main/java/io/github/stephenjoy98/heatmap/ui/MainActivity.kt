@@ -412,7 +412,7 @@ private fun AppScaffold(
                     Page.BACKUP -> Scaffold(snackbarHost = { SwipeSnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0)) { padding ->
                         BackupScreen(contentPadding = padding, snackbar = snackbar, onBack = back)
                     }
-                    Page.SETTINGS -> SettingsScreen(store = store, resumeTick = resumeTick, onBack = back)
+                    Page.SETTINGS -> SettingsScreen(store = store, resumeTick = resumeTick, onBack = back, onChangelog = { stack.push(Page.CHANGELOG) })
                     Page.ABOUT -> AboutScreen(onBack = back, onChangelog = { stack.push(Page.CHANGELOG) })
                     Page.CHANGELOG -> ChangelogScreen(onBack = back)
                     Page.REVIEW -> ReviewScreen(WindowInsets.navigationBars.asPaddingValues(), resumeTick, onBack = back)

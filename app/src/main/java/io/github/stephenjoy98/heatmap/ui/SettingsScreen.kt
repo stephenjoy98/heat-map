@@ -132,6 +132,7 @@ fun SettingsScreen(
     store: PointStore,
     resumeTick: Int,
     onBack: () -> Unit,
+    onChangelog: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -452,7 +453,7 @@ fun SettingsScreen(
                 )
             }
 
-            if (shows(SettingsPage.UPDATES)) UpdatesSection(resumeTick)
+            if (shows(SettingsPage.UPDATES)) UpdatesSection(resumeTick, onChangelog)
 
             Text(
                 "Location Ticker ${BuildConfig.VERSION_NAME}",
