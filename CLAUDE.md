@@ -241,5 +241,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   neutral near-white accent in the default dark theme (no orange in the UI) but **map elements are never
   Material-themed**: 3D ribbon `#FF7A1A`, preview lines/rings/edit dots use `MapAccent` (Theme.kt), graphs use `ChartColors` (Theme.kt, bright like the mode bars), text a size up
   from Material defaults with no letter spacing (`baseTypography` in Theme.kt, user compares with Gmail/Claude apps), units setting respected everywhere (`Units`), long-press tooltips on icon buttons.
+- **Every AlertDialog is wide**: `properties = DialogProperties(usePlatformDefaultWidth = false)` +
+  `modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)` (the user asked for all pop-ups wider, 2026-10-22);
+  bigger choices use `SlideUpSheet` instead.
 - When something can't be done exactly (e.g. no system dialog for revoking permissions), do the closest
   sensible thing and say so plainly in the reply.

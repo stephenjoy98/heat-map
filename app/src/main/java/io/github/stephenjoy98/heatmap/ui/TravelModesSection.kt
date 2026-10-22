@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
@@ -176,6 +177,8 @@ fun TravelModesSection() {
             value = withContext(Dispatchers.IO) { mode.withChildren.sumOf { PointStore.get(context).tripCountForMode(it) } }
         }
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { deleting = null },
             icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
             title = { Text("Delete ${mode.label}?") },
@@ -245,6 +248,10 @@ private fun ModeDialog(
     val error = if (taken) "There's already a mode called $name" else null
 
     AlertDialog(
+
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDismiss,
         title = { Text(if (mode == null) "Add travel mode" else "Edit ${mode.label}") },
         text = {

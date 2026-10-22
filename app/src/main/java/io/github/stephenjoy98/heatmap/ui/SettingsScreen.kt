@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -470,6 +471,8 @@ fun SettingsScreen(
 
     if (confirmClear) {
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { confirmClear = false },
             title = { Text("Delete all points?") },
             text = { Text("Your whole location history will be removed. This can't be undone.") },

@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.fillMaxWidth
 import io.github.stephenjoy98.heatmap.data.Units
 import android.Manifest
 import android.annotation.SuppressLint
@@ -373,6 +375,8 @@ fun AccuracyCard(fix: Location?, modifier: Modifier = Modifier, tailInset: Dp = 
 
     if (explaining) {
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { explaining = false },
             title = { Text("About accuracy") },
             text = {

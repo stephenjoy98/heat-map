@@ -17,6 +17,8 @@ The app shows the entries since your last version as "What's new" after an updat
 ### Changed
 - The compass dial (N, E, S, W, with small ticks for NE, SE, SW and NW) stays put, and the needle turns to point
   north as you rotate the map.
+- Every pop-up (About accuracy, confirmations, delete and restore questions, and the rest) now spans nearly the
+  full width of the screen, like the wider ones already did.
 
 ## [2.39.0] - 2026-10-22
 

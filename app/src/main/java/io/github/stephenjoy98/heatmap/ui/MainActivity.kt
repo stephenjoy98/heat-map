@@ -1,5 +1,8 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -293,6 +296,8 @@ private fun AppScaffold(
     if (confirmExit) {
         val activity = context.findActivity()
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { confirmExit = false },
             title = { Text("Exit Location Ticker?") },
             text = {

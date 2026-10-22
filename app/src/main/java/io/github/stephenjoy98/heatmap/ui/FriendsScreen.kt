@@ -472,6 +472,8 @@ private fun ProfileCard(snackbar: SnackbarHostState) {
     if (showQr && code != null) {
         val bitmap = remember(code) { QrCode.bitmap(QrCode.inviteLink(code!!)).asImageBitmap() }
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { showQr = false },
             title = { Text("Scan to add me") },
             text = {
@@ -682,6 +684,8 @@ private fun FriendsList(snackbar: SnackbarHostState, onOpenFriend: (Friend) -> U
         var text by remember { mutableStateOf("") }
         val parsed = Account.parseCode(text)
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { showEnter = false },
             title = { Text("Add a friend") },
             text = {
@@ -704,6 +708,8 @@ private fun FriendsList(snackbar: SnackbarHostState, onOpenFriend: (Friend) -> U
 
     removing?.let { f ->
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { removing = null },
             title = { Text("Remove ${f.name}?") },
             text = { Text("You'll stop seeing each other's routes.") },
@@ -726,6 +732,8 @@ private fun FriendsList(snackbar: SnackbarHostState, onOpenFriend: (Friend) -> U
 private fun InviteDialog(code: String, signedIn: Boolean, snackbar: SnackbarHostState, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     AlertDialog(
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         onDismissRequest = onDone,
         title = { Text("Add friend?") },
         text = {

@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.ui.window.DialogProperties
 import io.github.stephenjoy98.heatmap.data.Units
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -283,6 +284,8 @@ fun EditPanel(
 
     confirming?.let { doomed ->
         AlertDialog(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             onDismissRequest = { confirming = null },
             icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
             title = { Text(if (doomed.size == 1) "Delete this dot?" else "Delete ${doomed.size} dots?") },
