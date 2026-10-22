@@ -198,9 +198,8 @@ fun ZoomButtons(camera: MapCamera, modifier: Modifier = Modifier) {
 }
 
 /**
- * A compass dial: N, E, S and W with small ticks for NE, SE, SW and NW, around a two-tone needle. The needle
- * stays pointing up (the way the map faces); the dial turns opposite to the map's rotation, so its letters
- * always show the real directions.
+ * A compass dial: N, E, S and W with small ticks for NE, SE, SW and NW, fixed in place like a watch face,
+ * around a two-tone needle whose red end turns to point at real north as the map rotates.
  */
 @Composable
 private fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
@@ -215,27 +214,30 @@ private fun CompassNeedle(bearing: Float, modifier: Modifier = Modifier) {
         val cy = size.height / 2
         val half = size.minDimension * 0.22f
         val waist = size.minDimension * 0.075f
-        drawPath(
-            Path().apply {
-                moveTo(cx, cy - half)
-                lineTo(cx + waist, cy)
-                lineTo(cx - waist, cy)
-                close()
-            },
-            north,
-        )
-        drawPath(
-            Path().apply {
-                moveTo(cx, cy + half)
-                lineTo(cx + waist, cy)
-                lineTo(cx - waist, cy)
-                close()
-            },
-            south,
-        )
-        drawCircle(pivot, radius = waist * 0.45f, center = center)
-        // The dial: turns with the map so N always faces north.
+        // The needle turns opposite to the map's rotation, so red points north.
         rotate(-bearing, pivot = center) {
+            drawPath(
+                Path().apply {
+                    moveTo(cx, cy - half)
+                    lineTo(cx + waist, cy)
+                    lineTo(cx - waist, cy)
+                    close()
+                },
+                north,
+            )
+            drawPath(
+                Path().apply {
+                    moveTo(cx, cy + half)
+                    lineTo(cx + waist, cy)
+                    lineTo(cx - waist, cy)
+                    close()
+                },
+                south,
+            )
+        }
+        drawCircle(pivot, radius = waist * 0.45f, center = center)
+        // The dial stays put: N at the top.
+        run {
             // The letters sit around the edge, each upright relative to the dial, N in the needle's red.
             val r = size.minDimension * 0.36f
             listOf("N" to 0f, "E" to 90f, "S" to 180f, "W" to 270f).forEach { (label, angle) ->

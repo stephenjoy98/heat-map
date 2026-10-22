@@ -15,8 +15,8 @@ The app shows the entries since your last version as "What's new" after an updat
 ## [2.39.1] - 2026-10-22
 
 ### Changed
-- The compass needle now stays pointing up while the dial with N, E, S and W turns with the map, and small ticks
-  mark NE, SE, SW and NW.
+- The compass dial (N, E, S, W, with small ticks for NE, SE, SW and NW) stays put, and the needle turns to point
+  north as you rotate the map.
 
 ## [2.39.0] - 2026-10-22
 

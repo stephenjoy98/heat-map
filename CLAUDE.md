@@ -159,8 +159,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt: one queue,
   answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,
-  `MapControls` (CompassButton (2.39.1: needle fixed pointing up, dial with N/E/S/W + NE/SE/SW/NW ticks turns by
-  -bearing): north up, then toggles 3D via Prefs.buildings3d; `Altimeter` (live fix, `LocationTickerService.altitudeOf`) above
+  `MapControls` (CompassButton (2.39.1: dial with N/E/S/W + NE/SE/SW/NW ticks fixed, needle turns by -bearing;
+  the user tried a fixed needle + turning dial and asked for this way round): north up, then toggles 3D via Prefs.buildings3d; `Altimeter` (live fix, `LocationTickerService.altitudeOf`) above
   `Speedometer` (live fix speed; shrinks to a 10 dp dot below 1 km/h|mph, in a fixed 48 dp slot) on the left of MapScreen; ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
   pictures + 3D buildings), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
   `ProfileMenu` (`ProfileButton` with badge outside its clip — pass `background` instead of wrapping it in a
