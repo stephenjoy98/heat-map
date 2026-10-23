@@ -602,6 +602,11 @@ object Prefs {
         sp.edit().putStringSet("pending_route_deletes", ids).apply()
     }
 
+    /** Whether road-matched trips have been checked once for detours the recording doesn't show (RoadSnapper). */
+    var snapsRechecked: Boolean
+        get() = sp.getBoolean("snaps_rechecked_v1", false)
+        set(value) = sp.edit().putBoolean("snaps_rechecked_v1", value).apply()
+
     /** Whether the whole history has been checked once for GPS blips (see PointStore.findSpikes). */
     var spikesCleaned: Boolean
         get() = sp.getBoolean("spikes_cleaned_v1", false)

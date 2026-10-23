@@ -18,6 +18,8 @@ The app shows the entries since your last version as "What's new" after an updat
 - Long straight lines to nowhere on the map: a coarse GPS fix (or two or three) that jumped far away and came
   straight back is now removed automatically, on new recordings and once over your whole history. Removed dots
   go to deleted dots, so you can bring them back from Edit dots.
+- Roads matched to a trip that took a detour you never made (a straight line off to the side and back) are
+  caught: such trips keep their recorded line instead, and trips matched before this are checked once too.
 
 ## [2.41.0] - 2026-10-23
 

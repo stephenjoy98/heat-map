@@ -1654,6 +1654,16 @@ class PointStore private constructor(context: Context) :
             }
         }
 
+    /** Trips drawn with a road-matched shape. */
+    fun snappedTripIds(): List<Long> =
+        readableDatabase.rawQuery("SELECT trip_id FROM trip_paths WHERE poly IS NOT NULL", null)
+            .use { c -> buildList { while (c.moveToNext()) add(c.getLong(0)) } }
+
+    /** Forgets a trip's "which road?" questions (when its road shape is dropped). */
+    fun dropRoadQuestions(tripId: Long) {
+        writableDatabase.execSQL("DELETE FROM road_questions WHERE trip_id = $tripId")
+    }
+
     fun answerRoadQuestion(id: Long, choice: Int) {
         writableDatabase.execSQL("UPDATE road_questions SET chosen = $choice WHERE id = $id")
     }

@@ -22,6 +22,7 @@ import io.github.stephenjoy98.heatmap.data.Polyline
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.RoadOption
 import io.github.stephenjoy98.heatmap.data.RoadQuestion
+import io.github.stephenjoy98.heatmap.data.TrackRules
 import io.github.stephenjoy98.heatmap.data.Trip
 import io.github.stephenjoy98.heatmap.map.Smoothing
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
@@ -52,11 +53,20 @@ object RoadSnapper {
     private const val MAX_POINTS = 1500
     private const val REQUEST_GAP_MS = 1100L // Fair use of the free public service: about one request a second.
     private const val NOTIFICATION_ID = 4
+    // A matched shape that goes further than this from every recorded dot, or is this much longer than the
+    // recording, took a detour you never made: keep the recording instead.
+    private const val STRAY_METERS = 250.0
+    private const val STRAY_LENGTH_RATIO = 1.5
+    private const val STRAY_LENGTH_SLACK_M = 300.0
 
     /** Matches every trip that hasn't been matched yet. Returns the number of new questions. */
     suspend fun processPending(context: Context): Int {
         if (!Prefs.snapToRoads.value) return 0
         val store = PointStore.get(context)
+        if (!Prefs.snapsRechecked) {
+            recheckSnapped(store)
+            Prefs.snapsRechecked = true
+        }
         var questions = 0
         while (true) {
             val trips = store.tripsWithoutPath(10)
@@ -104,6 +114,10 @@ object RoadSnapper {
         }
         val mLat = DoubleArray(matched.size / 2) { matched[it * 2] }
         val mLon = DoubleArray(matched.size / 2) { matched[it * 2 + 1] }
+        if (strays(lat, lon, mLat, mLon, STRAY_METERS, STRAY_LENGTH_RATIO)) {
+            store.saveTripPath(trip.id, STATUS_RECORDED, null, null)
+            return 0
+        }
         val nearest = nearestSegments(lat, lon, mLat, mLon)
         val stretches = doubtfulStretches(nearest.distance)
         val base = Polyline.encode(mLat, mLon)
@@ -207,6 +221,56 @@ object RoadSnapper {
 
         val status = if (questions.all { it.chosen >= 0 }) STATUS_SNAPPED else STATUS_WAITING
         store.saveTripPath(tripId, status, basePoly, Polyline.encode(outLat.toDoubleArray(), outLon.toDoubleArray()))
+    }
+
+    /**
+     * Whether a matched shape wanders where the recording never went: some part of it is more than [maxMeters]
+     * from the recorded line, or it's over [lengthRatio] times as long. Every dot can be near the shape while the
+     * shape still takes a detour (an out-and-back down another street), which drew straight lines to nowhere.
+     */
+    private fun strays(lat: DoubleArray, lon: DoubleArray, mLat: DoubleArray, mLon: DoubleArray, maxMeters: Double, lengthRatio: Double): Boolean {
+        if (lat.size < 2 || mLat.size < 2) return false
+        if (length(mLat, mLon) > length(lat, lon) * lengthRatio + STRAY_LENGTH_SLACK_M) return true
+        // Check the shape's points (about 500 at most) against the recorded line.
+        val step = maxOf(1, mLat.size / 500)
+        for (j in mLat.indices step step) {
+            var best = Double.MAX_VALUE
+            for (i in 0 until lat.size - 1) {
+                best = minOf(best, pointToSegment(mLat[j], mLon[j], lat[i], lon[i], lat[i + 1], lon[i + 1]))
+                if (best <= maxMeters) break
+            }
+            if (best > maxMeters) return true
+        }
+        return false
+    }
+
+    private fun length(lat: DoubleArray, lon: DoubleArray): Double {
+        var sum = 0.0
+        for (i in 1 until lat.size) sum += TrackRules.distanceMeters(lat[i - 1], lon[i - 1], lat[i], lon[i])
+        return sum
+    }
+
+    /**
+     * Once: trips matched before the detour check came in go back to their recording if their road shape strays
+     * well away (a stricter test than for new trips, so roads picked by hand with Fix route stay).
+     */
+    private fun recheckSnapped(store: PointStore) {
+        for (id in store.snappedTripIds()) {
+            val poly = store.tripPathRow(id)?.poly ?: continue
+            val shape = Polyline.decode(poly)
+            val raw = store.tripPath(id)
+            if (raw.size < 4 || shape.size < 4) continue
+            val step = maxOf(1, (raw.size / 2) / MAX_POINTS)
+            val idx = (0 until raw.size / 2 step step).toList()
+            val lat = DoubleArray(idx.size) { raw[idx[it] * 2] }
+            val lon = DoubleArray(idx.size) { raw[idx[it] * 2 + 1] }
+            val mLat = DoubleArray(shape.size / 2) { shape[it * 2] }
+            val mLon = DoubleArray(shape.size / 2) { shape[it * 2 + 1] }
+            if (strays(lat, lon, mLat, mLon, STRAY_METERS * 1.6, STRAY_LENGTH_RATIO * 0.95)) {
+                store.dropRoadQuestions(id)
+                store.saveTripPath(id, STATUS_RECORDED, null, null)
+            }
+        }
     }
 
     private class Nearest(val distance: DoubleArray, val segment: IntArray)
