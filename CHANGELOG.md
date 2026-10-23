@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.41.1] - 2026-10-23
+
+### Fixed
+- Long straight lines to nowhere on the map: a coarse GPS fix (or two or three) that jumped far away and came
+  straight back is now removed automatically, on new recordings and once over your whole history. Removed dots
+  go to deleted dots, so you can bring them back from Edit dots.
+
 ## [2.41.0] - 2026-10-23
 
 ### Added

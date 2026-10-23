@@ -839,6 +839,47 @@ class PointStore private constructor(context: Context) :
             .use { c -> buildSet { while (c.moveToNext()) add(c.getLong(0)) } }
 
     /**
+     * GPS blips between [from] and [to]: one to three dots that jump well away (over 300 m) and come straight back
+     * to almost where they left (within a quarter of that, and within 30 minutes), when they're coarse network
+     * fixes (worse than 20 m) or would need an impossible speed. Drawn, they make long straight lines to nowhere.
+     */
+    fun findSpikes(from: Long, to: Long): List<Long> {
+        class P(val id: Long, val time: Long, val lat: Double, val lon: Double, val acc: Float)
+        val pts = readableDatabase.rawQuery(
+            "SELECT id, time, lat, lon, accuracy FROM points WHERE time >= $from AND time <= $to ORDER BY time", null
+        ).use { c -> buildList { while (c.moveToNext()) add(P(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4))) } }
+        val spikes = mutableListOf<Long>()
+        fun d(a: P, b: P) = TrackRules.distanceMeters(a.lat, a.lon, b.lat, b.lon)
+        var i = 1
+        while (i < pts.size - 1) {
+            var found = 0
+            for (k in 1..SPIKE_MAX_DOTS) {
+                if (i + k >= pts.size) break
+                val prev = pts[i - 1]
+                val next = pts[i + k]
+                if (next.time - prev.time > SPIKE_WINDOW_MS) break
+                val run = pts.subList(i, i + k)
+                val away = run.minOf { minOf(d(prev, it), d(it, next)) }
+                if (away <= SPIKE_MIN_M || d(prev, next) >= away * 0.25) continue
+                val first = run.first()
+                val seconds = (first.time - prev.time).coerceAtLeast(1) / 1000.0
+                val impossible = d(prev, first) / seconds > SPIKE_IMPOSSIBLE_MPS
+                if (run.any { it.acc > SPIKE_COARSE_M } || impossible) {
+                    found = k
+                    break
+                }
+            }
+            if (found > 0) {
+                for (j in i until i + found) spikes += pts[j].id
+                i += found
+            } else {
+                i++
+            }
+        }
+        return spikes
+    }
+
+    /**
      * Soft-deletes points: they move to the deleted_points table, out of the map, stats and backups, and can
      * be brought back with [restorePoints]. Trips they belonged to are dissolved so the trip detector
      * rebuilds them from what's left (points keep their travel mode, so answers aren't asked again).
@@ -2009,6 +2050,13 @@ class PointStore private constructor(context: Context) :
     companion object {
         // Trips closer together than this have no stay between them (the Timeline shows stays from 5 min).
         private const val ADJACENT_MS = 5 * 60_000L
+
+        // GPS blips (see findSpikes).
+        private const val SPIKE_MAX_DOTS = 3
+        private const val SPIKE_WINDOW_MS = 30 * 60_000L
+        private const val SPIKE_MIN_M = 300.0
+        private const val SPIKE_COARSE_M = 20f
+        private const val SPIKE_IMPOSSIBLE_MPS = 70.0
 
         private const val POINT_COLS = "time, lat, lon, accuracy, interval_ms, activity, mode, altitude"
 

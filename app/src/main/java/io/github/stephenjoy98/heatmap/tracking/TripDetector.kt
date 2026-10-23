@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.tracking
 
+import io.github.stephenjoy98.heatmap.data.Prefs
 import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
@@ -27,6 +28,7 @@ object TripDetector {
     private const val QUESTIONS_NOTIFICATION_ID = 2
 
     private const val MIN_SEGMENT_POINTS = 3
+    private const val SPIKE_LOOKBACK_MS = 24 * 60 * 60_000L
     private const val MIN_SEGMENT_METERS = 150.0
     private const val MIN_TRIP_METERS = 250.0
 
@@ -36,6 +38,7 @@ object TripDetector {
     @Synchronized
     fun process(context: Context, now: Long = System.currentTimeMillis()): Int {
         val store = PointStore.get(context)
+        removeSpikes(store, now)
         var questions = 0
         while (true) {
             val pts = store.pendingPoints()
@@ -58,6 +61,21 @@ object TripDetector {
         }
         if (questions > 0) notifyQuestions(context, store.tripsNeedingReview().size)
         return questions
+    }
+
+    /**
+     * Soft-deletes GPS blips (a dot or a few that jump far away and straight back, see PointStore.findSpikes) from
+     * the last day, and once from the whole history. They can be restored from Edit dots.
+     */
+    private fun removeSpikes(store: PointStore, now: Long) {
+        val from = if (Prefs.spikesCleaned) now - SPIKE_LOOKBACK_MS else 0L
+        val ids = store.findSpikes(from, now)
+        if (ids.isNotEmpty()) {
+            val result = store.deletePoints(ids)
+            Prefs.addDirtyBackupDays(result.days)
+            if (result.removedRemoteIds.isNotEmpty()) Prefs.setPendingRouteDeletes(Prefs.pendingRouteDeletes + result.removedRemoteIds)
+        }
+        Prefs.spikesCleaned = true
     }
 
     private fun isBreak(a: PendingPoint, b: PendingPoint) =

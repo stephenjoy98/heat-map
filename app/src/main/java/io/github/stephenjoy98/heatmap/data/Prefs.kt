@@ -602,6 +602,11 @@ object Prefs {
         sp.edit().putStringSet("pending_route_deletes", ids).apply()
     }
 
+    /** Whether the whole history has been checked once for GPS blips (see PointStore.findSpikes). */
+    var spikesCleaned: Boolean
+        get() = sp.getBoolean("spikes_cleaned_v1", false)
+        set(value) = sp.edit().putBoolean("spikes_cleaned_v1", value).apply()
+
     /** The release last announced in a notification, so each one is announced once. */
     var lastUpdateNotified: String?
         get() = sp.getString("last_update_notified", null)
