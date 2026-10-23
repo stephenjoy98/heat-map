@@ -182,6 +182,10 @@ back
 
 tap text "Timeline"
 shot 03-timeline 5
+# Dots on the Timeline map, then back to Routes.
+tap text "Dots"
+shot 03a-timeline-dots 4
+tap text "Routes"
 tap text "Questions"
 shot 04-questions 3
 tap text "Trips"
