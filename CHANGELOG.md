@@ -19,6 +19,9 @@ The app shows the entries since your last version as "What's new" after an updat
   yellow, to white where you go most) or Ice (the darkest blue through blues and cyan to white). Friends' heatmaps
   use the other palette so theirs and yours stay apart.
 
+### Fixed
+- Tapping a tile's name in the map layers sheet (Default, Terrain, 3D buildings…) picks it, not just the picture.
+
 ### Changed
 - The heatmap shows a much wider range of colours: it takes about 30 visits to reach the hottest colour instead
   of 20, so roads you use a few times, often and every day all look different.

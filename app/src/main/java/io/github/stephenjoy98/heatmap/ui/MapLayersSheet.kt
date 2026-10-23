@@ -214,11 +214,13 @@ private fun LayerTile(
             if (preview != null) preview(drawn) else drawn()
         }
         Spacer(Modifier.height(6.dp))
+        // The name works as part of the tile too.
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
             color = if (selected) scheme.primary else scheme.onSurface,
             textAlign = TextAlign.Center,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 2.dp),
         )
     }
 }
