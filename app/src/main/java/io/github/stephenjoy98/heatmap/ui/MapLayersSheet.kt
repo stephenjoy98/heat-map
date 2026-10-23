@@ -1,8 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
 import io.github.stephenjoy98.heatmap.data.HeatPalette
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -287,15 +285,14 @@ private fun DrawScope.drawBuildingsArt(c: ArtColors) {
 private val FIRE_STOPS = listOf(Color(0xFF78082D), Color(0xFFDC2819), Color(0xFFFF9100), Color(0xFFFFF0A0), Color.White)
 private val ICE_STOPS = listOf(Color(0xFF0C1969), Color(0xFF195AD7), Color(0xFF46B4FF), Color(0xFFC8EEFF), Color.White)
 
-/** A route that warms up from left to right through a heatmap palette. */
+/** A heatmap palette as stripes of solid colour, from one visit (left) to the most (right). */
 private fun DrawScope.drawHeatArt(stops: List<Color>) {
     val w = size.width
     val h = size.height
-    val path = Path().apply {
-        moveTo(w * 0.1f, h * 0.75f)
-        cubicTo(w * 0.35f, h * 0.2f, w * 0.6f, h * 0.95f, w * 0.9f, h * 0.3f)
+    val band = w * 0.8f / stops.size
+    stops.forEachIndexed { i, c ->
+        drawRect(c, topLeft = Offset(w * 0.1f + i * band, h * 0.3f), size = androidx.compose.ui.geometry.Size(band, h * 0.4f))
     }
-    drawPath(path, Brush.horizontalGradient(stops), style = Stroke(width = h * 0.16f, cap = StrokeCap.Round))
 }
 
 /** A street corner with the blue dot for where you are on it (grey while it's hidden). */
