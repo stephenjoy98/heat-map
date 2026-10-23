@@ -220,7 +220,7 @@ private fun LayerTile(
             style = MaterialTheme.typography.labelMedium,
             color = if (selected) scheme.primary else scheme.onSurface,
             textAlign = TextAlign.Center,
-            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 2.dp),
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 2.dp),
         )
     }
 }
