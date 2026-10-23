@@ -171,8 +171,14 @@ else
     note "MISSING the Map colours slider"
 fi
 shot 02b-layers-vivid 2
+# Heatmap colours: Ice, then the map with it.
+tap_scrolling text "Ice"
+shot 02d-layers-ice 2
 back
 shot 02c-map-vivid 4
+tap desc "Map layers"
+tap_scrolling text "Fire"
+back
 
 tap text "Timeline"
 shot 03-timeline 5
