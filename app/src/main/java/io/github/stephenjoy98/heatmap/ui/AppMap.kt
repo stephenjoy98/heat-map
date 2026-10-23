@@ -595,8 +595,10 @@ private fun VectorAppMap(
 
     // 3D route: while 3D buildings are on, load the routes in view whenever the camera settles (or the style
     // reloads, or new dots arrive) and draw them at their recorded heights.
-    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey) {
-        if (!look.buildings || route3d == null) {
+    // Off in Map layers › 3D routes: the map still tilts, with your routes drawn flat.
+    val raised by Prefs.routes3d.collectAsStateWithLifecycle()
+    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey, raised) {
+        if (!look.buildings || route3d == null || !raised) {
             holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
             return@LaunchedEffect
         }

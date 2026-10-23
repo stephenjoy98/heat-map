@@ -116,6 +116,16 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 LayerTile("3D buildings", buildings, { Prefs.setBuildings3d(!buildings) }) { drawBuildingsArt(it) }
                 val dot by Prefs.showLocationDot.collectAsStateWithLifecycle()
                 LayerTile("My location", dot, { Prefs.setShowLocationDot(!dot) }) { drawLocationArt(it) }
+                val raised by Prefs.routes3d.collectAsStateWithLifecycle()
+                LayerTile("3D routes", raised, { Prefs.setRoutes3d(!raised) }) { drawRaisedRouteArt(it) }
+            }
+            if (!buildings) {
+                Text(
+                    "3D routes show when the map is tilted into 3D.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
             Spacer(Modifier.height(20.dp))
             // The heatmap's colours: how often you've been somewhere, from one visit to the most.
@@ -314,6 +324,23 @@ private fun DrawScope.drawHeatArt(stops: List<Color>) {
     stops.forEachIndexed { i, c ->
         drawRect(c, topLeft = Offset(w * 0.1f + i * band, h * 0.3f), size = androidx.compose.ui.geometry.Size(band, h * 0.4f))
     }
+}
+
+/** A route lifted off the ground on a curtain, in the 3D route's own orange (map elements aren't themed). */
+private fun DrawScope.drawRaisedRouteArt(c: ArtColors) {
+    val w = size.width
+    val h = size.height
+    val orange = if (c.selected) Color(0xFFFF7A1A) else c.accent
+    val ground = listOf(Offset(w * 0.12f, h * 0.82f), Offset(w * 0.45f, h * 0.7f), Offset(w * 0.88f, h * 0.78f))
+    val top = listOf(Offset(w * 0.12f, h * 0.5f), Offset(w * 0.45f, h * 0.25f), Offset(w * 0.88f, h * 0.4f))
+    val curtain = Path().apply {
+        moveTo(ground[0].x, ground[0].y)
+        ground.drop(1).forEach { lineTo(it.x, it.y) }
+        top.reversed().forEach { lineTo(it.x, it.y) }
+        close()
+    }
+    drawPath(curtain, orange.copy(alpha = 0.3f))
+    for (i in 0 until top.size - 1) drawLine(orange, top[i], top[i + 1], strokeWidth = h * 0.08f)
 }
 
 /** A street corner with the blue dot for where you are on it (grey while it's hidden). */

@@ -40,7 +40,8 @@ up to your Google account, and lets you compare explored areas with friends.
   the map so buildings stand up and shows your routes in **3D**: every dot records its elevation, and
   routes are drawn as an orange ribbon at their recorded height (above a fixed low point of everything
   recorded, exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
-  Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off. **Map
+  Tilting the map with two fingers switches 3D on, and tilting it back flat switches it off. **3D routes** in the layers sheet
+  turns the raised routes off (they're then drawn flat). **Map
   colours** (folded under its own row in the same sheet: muted to vivid, with blue water, green parks and an
   optional "Colour roads too") recolour the base map, kept separately for the dark and light themes (the
   heatmap, routes and labels aren't changed).

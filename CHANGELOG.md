@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.43.0] - 2026-10-23
+
+### Added
+- 3D routes in the map layers sheet: turn off to keep your routes flat on the map when it's tilted into 3D (3D
+  buildings stay). On by default, raising routes to the heights they were recorded at.
+
 ## [2.42.0] - 2026-10-23
 
 ### Added

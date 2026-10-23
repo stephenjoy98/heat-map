@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.42.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.43.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -168,7 +168,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   `MapControls` (CompassButton (2.39.1: dial with N/E/S/W + NE/SE/SW/NW ticks fixed, needle turns by -bearing;
   the user tried a fixed needle + turning dial and asked for this way round): north up, then toggles 3D via Prefs.buildings3d; `Altimeter` (live fix, `LocationTickerService.altitudeOf`) above
   `Speedometer` (live fix speed; shrinks to a 10 dp dot below 1 km/h|mph, in a fixed 48 dp slot) on the left of MapScreen; ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
-  pictures + 3D buildings), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
+  pictures + 3D buildings, My location, 3D routes (Prefs `routes_3d`, gates the route-3d loader in AppMap)), `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
   `ProfileMenu` (`ProfileButton` with badge outside its clip — pass `background` instead of wrapping it in a
   clipping Surface; `AccountScreen` = `Page.ACCOUNT`, a page since 2.29.0 so back from nested pages returns to it), `SettingsScreen` (+ `PermissionsSection`),
   `AboutScreen`, `WhatsNew`, `Tooltips` (`Tip`, `BackButton`), `Theme` (Light/Dark/System + Material

@@ -56,6 +56,15 @@ object Prefs {
     private val _buildings3d = MutableStateFlow(false)
     val buildings3d: StateFlow<Boolean> = _buildings3d
 
+    /** Whether routes are raised to their recorded heights when the map is in 3D (Map layers › 3D routes). */
+    private val _routes3d = MutableStateFlow(true)
+    val routes3d: StateFlow<Boolean> = _routes3d
+
+    fun setRoutes3d(on: Boolean) {
+        _routes3d.value = on
+        sp.edit().putBoolean("routes_3d", on).apply()
+    }
+
     /** Whether the blue dot for where you are shows on the map (Map layers › My location). */
     private val _showLocationDot = MutableStateFlow(true)
     val showLocationDot: StateFlow<Boolean> = _showLocationDot
@@ -240,6 +249,7 @@ object Prefs {
         _mapLayer.value = MapLayerType.entries.byName(sp.getString("map_layer", null)) ?: MapLayerType.DEFAULT
         _buildings3d.value = sp.getBoolean("buildings_3d", false)
         _showLocationDot.value = sp.getBoolean("show_location_dot", true)
+        _routes3d.value = sp.getBoolean("routes_3d", true)
         _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
         _snapToRoads.value = sp.getBoolean("snap_roads", true)
     }
@@ -530,7 +540,7 @@ object Prefs {
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
-        "show_location_dot", "map_colour_roads", "heat_palette",
+        "show_location_dot", "map_colour_roads", "heat_palette", "routes_3d",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */
