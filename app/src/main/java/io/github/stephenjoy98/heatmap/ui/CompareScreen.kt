@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Prefs
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -126,11 +128,12 @@ fun CompareScreen(friend: Friend, onBack: () -> Unit) {
 
     val all = TravelMode.entries.toSet()
     val sharedColor = if (dark) Color(0xCCFFF3B0) else Color(0xCC7B2CBF)
-    val mineHeat = remember(dark) {
-        HeatTiles(OwnTracks(store, all), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, DisplayMode.ROUTES, tilePx)
+    val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
+    val mineHeat = remember(dark, palette) {
+        HeatTiles(OwnTracks(store, all), HeatRamps.own(palette, dark), DisplayMode.ROUTES, tilePx)
     }
-    val theirHeat = remember(dark, friend.uid, comparison) {
-        HeatTiles(FriendTracks(store, friend.uid, all), if (dark) HeatRamps.darkFriend else HeatRamps.lightFriend, DisplayMode.ROUTES, tilePx)
+    val theirHeat = remember(dark, friend.uid, comparison, palette) {
+        HeatTiles(FriendTracks(store, friend.uid, all), HeatRamps.friend(palette, dark), DisplayMode.ROUTES, tilePx)
     }
     val layers = remember(highlight, comparison, mineHeat, theirHeat) {
         val faded = if (highlight == Highlight.BOTH) 1f else 0.4f

@@ -181,8 +181,9 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
     // Routes at their recorded heights, for the 3D buildings view.
     val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
-    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads) {
-        listOf(MapLayer("heat", HeatTiles(OwnTracks(store, filter), if (dark) HeatRamps.darkHeat else HeatRamps.lightHeat, mode, tilePx)))
+    val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
+    val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads, palette) {
+        listOf(MapLayer("heat-$palette", HeatTiles(OwnTracks(store, filter), HeatRamps.own(palette, dark), mode, tilePx)))
     }
 
     LaunchedEffect(stats) {

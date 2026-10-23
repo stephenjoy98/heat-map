@@ -1,5 +1,7 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Prefs
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,15 +79,16 @@ fun FriendProfileScreen(friend: Friend, onBack: () -> Unit, onCompare: () -> Uni
     }
     val camera = rememberMapCamera()
     LaunchedEffect(loaded) { loaded?.second?.let { frame(camera, it) } }
-    val heat = remember(dark, friend.uid, loaded) {
+    val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
+    val heat = remember(dark, friend.uid, loaded, palette) {
         HeatTiles(
             FriendTracks(store, friend.uid, TravelMode.entries.toSet()),
-            if (dark) HeatRamps.darkFriend else HeatRamps.lightFriend,
+            HeatRamps.friend(palette, dark),
             DisplayMode.ROUTES,
             tilePx,
         )
     }
-    val layers = remember(heat) { listOf(MapLayer("friend-${friend.uid}", heat)) }
+    val layers = remember(heat) { listOf(MapLayer("friend-${friend.uid}-$palette", heat)) }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {

@@ -1,5 +1,8 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.HeatPalette
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -111,6 +114,15 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 LayerTile("3D buildings", buildings, { Prefs.setBuildings3d(!buildings) }) { drawBuildingsArt(it) }
                 val dot by Prefs.showLocationDot.collectAsStateWithLifecycle()
                 LayerTile("My location", dot, { Prefs.setShowLocationDot(!dot) }) { drawLocationArt(it) }
+            }
+            Spacer(Modifier.height(20.dp))
+            // The heatmap's colours: how often you've been somewhere, from one visit to the most.
+            Text("Heatmap", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(12.dp))
+            val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LayerTile("Fire", palette == HeatPalette.FIRE, { Prefs.setHeatPalette(HeatPalette.FIRE) }) { drawHeatArt(FIRE_STOPS) }
+                LayerTile("Ice", palette == HeatPalette.ICE, { Prefs.setHeatPalette(HeatPalette.ICE) }) { drawHeatArt(ICE_STOPS) }
             }
             Spacer(Modifier.height(20.dp))
             // Map colours, folded away until you want it: muted to vivid, and whether roads join in.
@@ -269,6 +281,21 @@ private fun DrawScope.drawBuildingsArt(c: ArtColors) {
     }
     box(w * 0.14f, h * 0.45f, w * 0.26f)
     box(w * 0.5f, h * 0.28f, w * 0.24f)
+}
+
+// The heatmap palettes' own colours (map elements aren't themed), from one visit to the most.
+private val FIRE_STOPS = listOf(Color(0xFF78082D), Color(0xFFDC2819), Color(0xFFFF9100), Color(0xFFFFF0A0), Color.White)
+private val ICE_STOPS = listOf(Color(0xFF0C1969), Color(0xFF195AD7), Color(0xFF46B4FF), Color(0xFFC8EEFF), Color.White)
+
+/** A route that warms up from left to right through a heatmap palette. */
+private fun DrawScope.drawHeatArt(stops: List<Color>) {
+    val w = size.width
+    val h = size.height
+    val path = Path().apply {
+        moveTo(w * 0.1f, h * 0.75f)
+        cubicTo(w * 0.35f, h * 0.2f, w * 0.6f, h * 0.95f, w * 0.9f, h * 0.3f)
+    }
+    drawPath(path, Brush.horizontalGradient(stops), style = Stroke(width = h * 0.16f, cap = StrokeCap.Round))
 }
 
 /** A street corner with the blue dot for where you are on it (grey while it's hidden). */

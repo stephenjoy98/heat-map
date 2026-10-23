@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.map
 
+import io.github.stephenjoy98.heatmap.data.HeatPalette
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -42,8 +43,11 @@ object HeatRenderer {
     /** Above this many points in a tile, draw a density grid instead of individual routes. */
     const val ROUTE_POINT_LIMIT = 300_000
 
-    /** Alpha a single pass adds; about 20 overlapping visits saturate the ramp. */
-    const val PASS_ALPHA = 0.12f
+    /**
+     * Alpha a single pass adds; about 30 overlapping visits saturate the ramp, so roads used a few times, dozens
+     * of times and every day all get colours of their own.
+     */
+    const val PASS_ALPHA = 0.085f
 
     /**
      * Renders the [box] area into a [size]×[size] bitmap, or returns null if nothing is there.
@@ -183,15 +187,56 @@ object HeatRenderer {
 
 /** Colour ramps from "travelled once" to "travelled the most". */
 object HeatRamps {
-    /** Strava-like: dark red, orange, yellow, white. For the dark map. */
+    /**
+     * Fire, for the dark map: a cool dark red for a road used once, through red, orange and yellow, to white for
+     * the places you've been most.
+     */
     val darkHeat = build(
-        floatArrayOf(0.00f, 90f, 10f, 40f),
-        floatArrayOf(HeatRenderer.PASS_ALPHA, 150f, 22f, 48f),
-        floatArrayOf(0.35f, 225f, 62f, 22f),
-        floatArrayOf(0.60f, 255f, 140f, 0f),
-        floatArrayOf(0.82f, 255f, 212f, 90f),
-        floatArrayOf(1.00f, 255f, 255f, 238f),
+        floatArrayOf(0.00f, 70f, 0f, 30f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 120f, 8f, 45f),
+        floatArrayOf(0.22f, 170f, 18f, 40f),
+        floatArrayOf(0.36f, 220f, 40f, 25f),
+        floatArrayOf(0.50f, 250f, 90f, 10f),
+        floatArrayOf(0.64f, 255f, 145f, 0f),
+        floatArrayOf(0.78f, 255f, 200f, 50f),
+        floatArrayOf(0.90f, 255f, 240f, 160f),
+        floatArrayOf(1.00f, 255f, 255f, 255f),
     )
+
+    /** Ice, for the dark map: the darkest blue for a road used once, through blues and cyan, to white. */
+    val darkIce = build(
+        floatArrayOf(0.00f, 5f, 10f, 60f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 12f, 25f, 105f),
+        floatArrayOf(0.22f, 18f, 50f, 160f),
+        floatArrayOf(0.36f, 25f, 90f, 215f),
+        floatArrayOf(0.50f, 40f, 135f, 250f),
+        floatArrayOf(0.64f, 70f, 180f, 255f),
+        floatArrayOf(0.78f, 130f, 215f, 255f),
+        floatArrayOf(0.90f, 200f, 238f, 255f),
+        floatArrayOf(1.00f, 255f, 255f, 255f),
+    )
+
+    /** Ice on the white map: light blue to the deepest navy (white wouldn't show there). */
+    val lightIce = build(
+        floatArrayOf(0.00f, 160f, 205f, 255f),
+        floatArrayOf(HeatRenderer.PASS_ALPHA, 120f, 180f, 255f),
+        floatArrayOf(0.36f, 50f, 120f, 240f),
+        floatArrayOf(0.60f, 20f, 70f, 200f),
+        floatArrayOf(0.82f, 10f, 35f, 150f),
+        floatArrayOf(1.00f, 5f, 10f, 80f),
+    )
+
+    /** Your heatmap's colours for the chosen palette and map. */
+    fun own(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {
+        HeatPalette.FIRE -> if (dark) darkHeat else lightHeat
+        HeatPalette.ICE -> if (dark) darkIce else lightIce
+    }
+
+    /** A friend's heatmap: the other palette, so theirs and yours always look different. */
+    fun friend(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {
+        HeatPalette.FIRE -> if (dark) darkFriend else lightFriend
+        HeatPalette.ICE -> if (dark) darkHeat else lightHeat
+    }
 
     /** Light orange to deep crimson, which reads well on the white map. */
     val lightHeat = build(

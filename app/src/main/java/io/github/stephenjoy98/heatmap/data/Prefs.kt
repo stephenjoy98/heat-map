@@ -13,6 +13,9 @@ enum class MapTheme { SYSTEM, DARK, LIGHT }
 
 enum class MapLayerType { DEFAULT, TERRAIN }
 
+/** The heatmap's colours: Fire (dark red to white) or Ice (darkest blue to white). */
+enum class HeatPalette { FIRE, ICE }
+
 /** Where Review insights are written. */
 enum class AiEngine { ON_DEVICE, CLOUD, STATS }
 
@@ -130,6 +133,14 @@ object Prefs {
     private val _mapColourLight = MutableStateFlow(0f)
     val mapColourLight: StateFlow<Float> = _mapColourLight
 
+    private val _heatPalette = MutableStateFlow(HeatPalette.FIRE)
+    val heatPalette: StateFlow<HeatPalette> = _heatPalette
+
+    fun setHeatPalette(p: HeatPalette) {
+        _heatPalette.value = p
+        sp.edit().putString("heat_palette", p.name).apply()
+    }
+
     /** Whether Map colours also recolours roads; off keeps roads in the standard look. */
     private val _mapColourRoads = MutableStateFlow(false)
     val mapColourRoads: StateFlow<Boolean> = _mapColourRoads
@@ -212,6 +223,7 @@ object Prefs {
         _mapColourDark.value = sp.getFloat("map_colour_dark", 0f)
         _mapColourLight.value = sp.getFloat("map_colour_light", 0f)
         _mapColourRoads.value = sp.getBoolean("map_colour_roads", false)
+        _heatPalette.value = HeatPalette.entries.byName(sp.getString("heat_palette", null)) ?: HeatPalette.FIRE
         // Updates aren't downloaded on their own any more: the app offers them and you choose (asked 2026-10-21).
         // Turn automatic updates off once for everyone who had them on by default.
         if (!sp.getBoolean("auto_update_off_v1", false)) {
@@ -518,7 +530,7 @@ object Prefs {
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
-        "show_location_dot", "map_colour_roads",
+        "show_location_dot", "map_colour_roads", "heat_palette",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */

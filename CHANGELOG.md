@@ -12,6 +12,17 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.41.0] - 2026-10-23
+
+### Added
+- Heatmap colours in the map layers sheet: Fire (a cool dark red where you've been once, through red, orange and
+  yellow, to white where you go most) or Ice (the darkest blue through blues and cyan to white). Friends' heatmaps
+  use the other palette so theirs and yours stay apart.
+
+### Changed
+- The heatmap shows a much wider range of colours: it takes about 30 visits to reach the hottest colour instead
+  of 20, so roads you use a few times, often and every day all look different.
+
 ## [2.40.0] - 2026-10-22
 
 ### Changed
