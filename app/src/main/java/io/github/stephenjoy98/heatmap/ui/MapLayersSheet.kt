@@ -1,5 +1,9 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.HeatPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -121,6 +125,21 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LayerTile("Fire", palette == HeatPalette.FIRE, { Prefs.setHeatPalette(HeatPalette.FIRE) }) { drawHeatArt(FIRE_STOPS) }
                 LayerTile("Ice", palette == HeatPalette.ICE, { Prefs.setHeatPalette(HeatPalette.ICE) }) { drawHeatArt(ICE_STOPS) }
+            }
+            // Routes draws the lines you travelled; Dots draws where the recorded dots are, thicker where there are more.
+            val display by Prefs.displayMode.collectAsStateWithLifecycle()
+            Spacer(Modifier.height(12.dp))
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = display == DisplayMode.ROUTES,
+                    onClick = { Prefs.setDisplayMode(DisplayMode.ROUTES) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                ) { Text("Routes") }
+                SegmentedButton(
+                    selected = display == DisplayMode.POINTS,
+                    onClick = { Prefs.setDisplayMode(DisplayMode.POINTS) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                ) { Text("Dots") }
             }
             Spacer(Modifier.height(20.dp))
             // Map colours, folded away until you want it: muted to vivid, and whether roads join in.

@@ -99,6 +99,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -217,7 +218,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         fixMode = mode
         fixing = from..to
     }
-    val rangeEditing = retiming != null || adding != null || fixing != null
+    // Breaking a trip in two: the trip's dots, with the first part picked out up to the split.
+    var splitting by remember { mutableStateOf<Trip?>(null) }
+    val rangeEditing = retiming != null || adding != null || fixing != null || splitting != null
     val mapEditing = editing || rangeEditing
     // Picking several trips to change their mode together; null when not picking.
     var picked by remember { mutableStateOf<Set<Long>?>(null) }
@@ -235,8 +238,9 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         listOf(MapLayer("timeline-${d.period}-$colors", TimelineTiles(d.routes, tilePx, casing.toArgb()), alpha = if (mapEditing) 0.35f else 1f))
     }
 
-    LaunchedEffect(retiming, adding, fixing) {
-        val window = retiming?.let { it.startTime..it.endTime } ?: adding ?: fixing ?: return@LaunchedEffect
+    LaunchedEffect(retiming, adding, fixing, splitting) {
+        val window = retiming?.let { it.startTime..it.endTime } ?: splitting?.let { it.startTime..it.endTime } ?: adding ?: fixing
+            ?: return@LaunchedEffect
         retimeLoading = true
         val from = minOf(period.fromMs, window.first)
         val to = maxOf(period.toMs, window.last + 1)
@@ -251,6 +255,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 last = (pts.size * 3 / 5).coerceAtLeast(minOf(first + 1, pts.size - 1))
             }
             retime.range = first..last.coerceAtMost(pts.size - 1)
+            // Splitting starts half way through the trip.
+            if (splitting != null && last - first >= 2) retime.range = first..(first + last) / 2
         }
         retimeLoading = false
         frameDots(camera, retime.target)
@@ -259,6 +265,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         retiming = null
         adding = null
         fixing = null
+        splitting = null
     }
     // Ways between the first and last dot picked, through any points tapped on the map.
     fun findRoads() {
@@ -377,6 +384,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 Text(
                     when {
                         retiming != null -> "Change times"
+                        splitting != null -> "Split trip"
                         adding != null -> "Add a trip"
                         fixing != null -> "Fix route"
                         picked != null -> "${picked!!.size} selected"
@@ -516,6 +524,16 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                 findRoads()
                             }
                         }
+                        // Splitting: a tap picks the dot the first part ends on.
+                        splitting != null -> { lat, lon ->
+                            val trip = splitting
+                            nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
+                                val pts = retime.points
+                                val first = pts.indexOfFirst { it.time >= trip!!.startTime }
+                                val last = pts.indexOfLast { it.time <= trip!!.endTime }
+                                if (first >= 0 && last - first >= 2) retime.range = first..i.coerceIn(first, last - 1)
+                            }
+                        }
                         rangeEditing -> { lat, lon ->
                             nearestDot(camera, retime, lat, lon, tapRadiusPx)?.let { i ->
                                 val r = retime.range
@@ -526,6 +544,34 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     },
                 )
                 ScaleBar(camera, Modifier.align(Alignment.BottomStart).padding(8.dp))
+                // Routes or dots: Dots shows every recorded dot of the day; tap one to pick it and delete it.
+                if (!rangeEditing && picked == null) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                        shadowElevation = 3.dp,
+                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                    ) {
+                        SingleChoiceSegmentedButtonRow {
+                            SegmentedButton(
+                                selected = !editing,
+                                onClick = { if (editing) stopEditing() },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                            ) { Text("Routes") }
+                            SegmentedButton(
+                                selected = editing,
+                                onClick = {
+                                    if (!editing) {
+                                        edit.day = anchor
+                                        edit.showingDeleted = false
+                                        editing = true
+                                    }
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                            ) { Text("Dots") }
+                        }
+                    }
+                }
                 if (editing) {
                     DotsOverlay(camera, edit, Modifier.fillMaxSize())
                     // Map type and 3D buildings, right where you're editing.
@@ -610,6 +656,20 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         },
                     )
                 }
+            } else if (splitting != null) {
+                val trip = splitting!!
+                Box(Modifier.padding(12.dp)) {
+                    SplitPanel(
+                        trip = trip,
+                        state = retime,
+                        loading = retimeLoading,
+                        onCancel = { splitting = null },
+                        onSave = { at ->
+                            undoable("Trip split", trip.startTime, trip.endTime) { store.splitTrip(trip.id, at) }
+                            splitting = null
+                        },
+                    )
+                }
             } else if (rangeEditing) {
                 val trip = retiming
                 Box(Modifier.padding(12.dp)) {
@@ -654,6 +714,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                         onClick = { entry.box?.let { frame(camera, it) } },
                                         onMode = { changeMode(entry.trip, it) },
                                         onRetime = { retiming = entry.trip },
+                                        onSplit = { splitting = entry.trip },
                                         onFix = { startFix(entry.trip.startTime, entry.trip.endTime, entry.trip.mode) },
                                         selection = picked,
                                         onSelect = select,
@@ -673,6 +734,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                         onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
                                         onSectionMode = { mv, m -> changeMode(mv.trip, m) },
                                         onSectionRetime = { mv -> retiming = mv.trip },
+                                        onSectionSplit = { mv -> splitting = mv.trip },
                                         onFix = { mv -> startFix(mv?.trip?.startTime ?: entry.start, mv?.trip?.endTime ?: entry.end, mv?.trip?.mode ?: entry.mode) },
                                         selection = picked,
                                         onSelect = select,
@@ -736,6 +798,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             pick = pick,
             onDismiss = { mapPick = null },
             onRetime = { retiming = it },
+            onSplit = { splitting = it },
             onMode = { trip, m -> changeMode(trip, m) },
             onFix = { startFix(pick.window.first, pick.window.last, pick.trip?.mode ?: pick.prev?.mode ?: TravelMode.UNKNOWN) },
             onMakeTrip = { adding = pick.window },
@@ -857,6 +920,7 @@ private fun GroupRow(
     onSectionClick: (DayEntry.Move) -> Unit,
     onSectionMode: (DayEntry.Move, TravelMode) -> Unit,
     onSectionRetime: (DayEntry.Move) -> Unit,
+    onSectionSplit: (DayEntry.Move) -> Unit,
     onFix: (DayEntry.Move?) -> Unit,
     selection: Set<Long>?,
     onSelect: (List<Long>, Boolean) -> Unit,
@@ -948,6 +1012,7 @@ private fun GroupRow(
                         onClick = { onSectionClick(mv) },
                         onMode = { onSectionMode(mv, it) },
                         onRetime = { onSectionRetime(mv) },
+                        onSplit = { onSectionSplit(mv) },
                         onFix = { onFix(mv) },
                         selection = selection,
                         onSelect = onSelect,
@@ -968,6 +1033,7 @@ private fun MoveRow(
     onClick: () -> Unit,
     onMode: (TravelMode) -> Unit,
     onRetime: () -> Unit,
+    onSplit: () -> Unit,
     onFix: () -> Unit,
     selection: Set<Long>?,
     onSelect: (List<Long>, Boolean) -> Unit,
@@ -1019,7 +1085,16 @@ private fun MoveRow(
                 },
             )
             DropdownMenuItem(
-                text = { Text("Fix route on the map") },
+                text = { Text("Split into two trips") },
+                leadingIcon = { MaterialIcon(R.drawable.ic_content_cut) },
+                onClick = {
+                    menu = false
+                    onSplit()
+                },
+            )
+            // Fix route works on part of a trip too: narrow its range and only that stretch is snapped.
+            DropdownMenuItem(
+                text = { Text("Snap to a road (all or part)") },
                 leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
                 onClick = {
                     menu = false
@@ -1078,6 +1153,7 @@ private fun MapPickDialog(
     pick: MapPick,
     onDismiss: () -> Unit,
     onRetime: (Trip) -> Unit,
+    onSplit: (Trip) -> Unit,
     onMode: (Trip, TravelMode) -> Unit,
     onFix: () -> Unit,
     onMakeTrip: () -> Unit,
@@ -1126,7 +1202,8 @@ private fun MapPickDialog(
             Spacer(Modifier.height(8.dp))
             if (trip != null) {
                 PickAction("Change times", Icons.Filled.Edit) { act { onRetime(trip) } }
-                PickAction("Fix route on the map", Icons.Filled.Place) { act(onFix) }
+                PickAction("Split into two trips", null, R.drawable.ic_content_cut) { act { onSplit(trip) } }
+                PickAction("Snap to a road (all or part)", Icons.Filled.Place) { act(onFix) }
             } else {
                 if (canJoin && prev != null && next != null) PickAction("Join the ${prev.mode.label} and ${next.mode.label} trips around them", null) { act(onJoin) }
                 PickAction("Make them a trip", Icons.Filled.Add) { act(onMakeTrip) }
@@ -1140,12 +1217,12 @@ private fun MapPickDialog(
 }
 
 @Composable
-private fun PickAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, onClick: () -> Unit) {
+private fun PickAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, drawable: Int = R.drawable.ic_merge, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) Icon(icon, contentDescription = null) else MaterialIcon(R.drawable.ic_merge)
+        if (icon != null) Icon(icon, contentDescription = null) else MaterialIcon(drawable)
         Spacer(Modifier.width(16.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
@@ -1262,6 +1339,69 @@ private fun RetimePanel(
                         },
                         enabled = !saving && count >= 2 && changed && (trip != null || mode != null),
                     ) { Text(if (trip == null) "Add" else "Save") }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Breaking a trip in two: a slider (and minus and plus) picks the dot the first part ends on; the first part is
+ * highlighted on the map, and a tap on a dot puts the split there.
+ */
+@Composable
+private fun SplitPanel(trip: Trip, state: DotEditState, loading: Boolean, onCancel: () -> Unit, onSave: (Long) -> Unit) {
+    val pts = state.points
+    val first = pts.indexOfFirst { it.time >= trip.startTime }
+    val last = pts.indexOfLast { it.time <= trip.endTime }
+    val canSplit = !loading && first >= 0 && last - first >= 2
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Tip("Cancel") { IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Cancel") } }
+                Box(Modifier.size(12.dp).background(Color(trip.mode.color), CircleShape))
+                Spacer(Modifier.width(8.dp))
+                Text("Split this ${trip.mode.fullLabel} trip", style = MaterialTheme.typography.titleMedium)
+            }
+            if (!canSplit) {
+                Hint(if (loading) "Loading dots…" else "This trip has too few dots to split.")
+            } else {
+                val split = state.range.last.coerceIn(first, last - 1)
+                val endsAt = pts[split].time
+                val startsAt = pts[split + 1].time
+                Text(
+                    "First part ${timeFormat.format(Date(trip.startTime))} – ${timeFormat.format(Date(endsAt))}, " +
+                        "second part ${timeFormat.format(Date(startsAt))} – ${timeFormat.format(Date(trip.endTime))}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                Slider(
+                    value = split.toFloat(),
+                    onValueChange = { state.range = first..it.roundToInt().coerceIn(first, last - 1) },
+                    valueRange = first.toFloat()..(last - 1).toFloat(),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { state.range = first..(split - 1).coerceAtLeast(first) }, enabled = split > first) { Text("− 1 dot") }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { state.range = first..(split + 1).coerceAtMost(last - 1) }, enabled = split < last - 1) { Text("+ 1 dot") }
+                }
+                Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Tap a dot to split there",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                    Spacer(Modifier.width(4.dp))
+                    Button(onClick = { onSave(startsAt) }) { Text("Split") }
                 }
             }
         }
@@ -1411,8 +1551,9 @@ private fun RouteFixPanel(
                     }
                 }
                 Text(
-                    "Tap the map where you went to make the road pass there (up to $MAX_VIAS points). " +
-                        "Without a road picked, the joined trip is matched to roads automatically.",
+                    "To snap only part of a trip, narrow the range to that stretch: it becomes its own trip and the rest " +
+                        "stays as it is. Tap the map where you went to make the road pass there (up to $MAX_VIAS points). " +
+                        "Without a road picked, the stretch is matched to roads automatically.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),

@@ -1381,6 +1381,32 @@ class PointStore private constructor(context: Context) :
         return DeleteResult(days, remoteIds, newId)
     }
 
+    /**
+     * Breaks a trip in two: dots from [atTime] on become a trip of their own, in the same travel mode. Both parts
+     * are worked out again (and matched to roads afresh). Returns the edited days and shared routes replaced.
+     */
+    fun splitTrip(tripId: Long, atTime: Long): DeleteResult {
+        val trip = trip(tripId) ?: return DeleteResult(emptySet(), emptyList())
+        if (atTime <= trip.startTime || atTime > trip.endTime) return DeleteResult(emptySet(), emptyList())
+        val db = writableDatabase
+        val remoteIds = mutableListOf<String>()
+        db.beginTransaction()
+        try {
+            val rest = insertTripRow(db, trip.mode, trip.inferredMode, trip.confidence, trip.needsReview)
+            db.execSQL("UPDATE points SET trip_id = $rest WHERE trip_id = $tripId AND time >= $atTime")
+            // Both halves get new road shapes and questions.
+            db.execSQL("DELETE FROM trip_paths WHERE trip_id = $tripId")
+            db.execSQL("DELETE FROM road_questions WHERE trip_id = $tripId")
+            refreshTrip(db, tripId, remoteIds)
+            refreshTrip(db, rest, remoteIds)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(setOf(dayOf(trip.startTime), dayOf(trip.endTime)), remoteIds)
+    }
+
     /** A new, empty trip row; [refreshTrip] fills in its times and ends once it has dots. */
     private fun insertTripRow(db: SQLiteDatabase, mode: TravelMode, inferred: TravelMode, confidence: Float, needsReview: Boolean): Long =
         db.insert("trips", null, ContentValues().apply {

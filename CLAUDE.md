@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.41.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.42.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -158,7 +158,10 @@ travel stats, Insights (AI write-ups), backup and friends.
   `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null →
   `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`,
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
-  then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked); trip, road and
+  then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked; on part of a trip addTrip splits it,
+  which is how "Snap to a road (all or part)" isolates a stretch); Split (2.42.0: `splitting` → `SplitPanel`, `retime.range.last` =
+  last dot of the first part → `PointStore.splitTrip(tripId, atTime)`, undoable); Routes/Dots segmented toggle on the map
+  (Dots = Edit dots mode); trip, road and
   level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt: one queue,
   answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,

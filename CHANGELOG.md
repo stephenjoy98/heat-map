@@ -12,6 +12,17 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.42.0] - 2026-10-23
+
+### Added
+- Routes or Dots: a switch on the Timeline's map shows every recorded dot of the day; tap a dot to pick it and
+  delete it (or pick a range). The map's layers sheet has the same switch for the main map (Dots draws where your
+  dots are, denser where there are more).
+- Split a trip in two: "Split into two trips" when you long-press a trip (in the list or on the map). A slider, the
+  minus and plus buttons or a tap on a dot picks where; both parts keep the trip's travel mode.
+- Snap only part of a trip to a road: "Snap to a road (all or part)" (was "Fix route on the map"). Narrow the range
+  to the stretch you want and only that part is matched to roads, as a trip of its own; the rest stays as it was.
+
 ## [2.41.1] - 2026-10-23
 
 ### Fixed
