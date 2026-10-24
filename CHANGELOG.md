@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.1] - 2026-10-24
+
+### Changed
+- The follow me marker is flatter and styled like Uber's, in red: a red disc with a black border and a black arrow.
+
 ## [2.45.0] - 2026-10-24
 
 ### Added

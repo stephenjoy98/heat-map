@@ -471,7 +471,7 @@ class TileOverlayView(context: Context) : View(context) {
         }
     private val arrow = Path()
 
-    /** Follow me: draw the location as a raised navigation puck (red rim, red arrow) standing on the map. */
+    /** Follow me: draw the location as a flat navigation puck (red face, black rim and arrow) lying on the map. */
     var navMarker: Boolean = false
         set(value) {
             if (value == field) return
@@ -479,24 +479,23 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** Dark theme: the puck's face is dark instead of white. */
+    /** Dark theme: a stronger shadow, so the puck stands out on the dark map. */
     var navDark: Boolean = false
         set(value) {
             if (value == field) return
             field = value
-            navDisc.color = if (value) Color.rgb(40, 40, 44) else Color.WHITE
             navShadow.color = if (value) Color.argb(110, 0, 0, 0) else Color.argb(60, 0, 0, 0)
             invalidate()
         }
     private var lastHeading = 0f
-    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val navRed = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(239, 83, 80) }
-    private val navRedDark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(183, 28, 28) }
-    private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(150, 24, 24) }
+    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(229, 57, 53) }
+    private val navArrowLight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(45, 45, 45) }
+    private val navArrowDark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+    private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 20, 20) }
     private val navArrowShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 0, 0, 0) }
     private val navOval = RectF()
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(229, 57, 53)
+        color = Color.BLACK
         style = Paint.Style.STROKE
     }
     private val navShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(60, 0, 0, 0) }
@@ -606,10 +605,9 @@ class TileOverlayView(context: Context) : View(context) {
     }
 
     /**
-     * Uber-style navigation marker in red, made to look solid: a puck with a red side standing on the map, a
-     * white (dark in dark theme) face with a red rim, and a two-tone red arrow raised above it, pointing the way
-     * you're heading (the last known way while you're still). The face lies flat on a tilted map and the side
-     * shows more the further it's tilted, like a coin seen from an angle.
+     * Uber-style navigation marker in red: a flat puck with a thin dark edge, a red face with a black rim, and a
+     * black arrow (two shades, lit from the left) pointing the way you're heading (the last known way while
+     * you're still). The face lies flat on a tilted map and its edge shows a little more the further it's tilted.
      */
     private fun drawNavMarker(canvas: Canvas, x: Float, y: Float, bearing: Float, tilt: Float) {
         heading?.let { lastHeading = it }
@@ -617,7 +615,7 @@ class TileOverlayView(context: Context) : View(context) {
         val t = Math.toRadians(tilt.toDouble())
         val squash = cos(t).toFloat().coerceAtLeast(0.35f)
         // How tall the side looks on screen: a sliver seen from above, more when tilted.
-        val lift = 1.5f * density + 6 * density * kotlin.math.sin(t).toFloat()
+        val lift = 1f * density + 2.5f * density * kotlin.math.sin(t).toFloat()
         // Shadow on the ground.
         canvas.save()
         canvas.translate(x, y + 2 * density)
@@ -636,11 +634,11 @@ class TileOverlayView(context: Context) : View(context) {
         canvas.translate(x, y - lift)
         canvas.scale(1f, squash)
         canvas.drawCircle(0f, 0f, r, navDisc)
-        navRing.strokeWidth = 2.5f * density
-        canvas.drawCircle(0f, 0f, r - 1.25f * density, navRing)
+        navRing.strokeWidth = 3f * density
+        canvas.drawCircle(0f, 0f, r - 1.5f * density, navRing)
         // The arrow's shadow, a little below it on screen whichever way it points.
         canvas.save()
-        canvas.translate(0f, 1.5f * density / squash)
+        canvas.translate(0f, 0.75f * density / squash)
         canvas.rotate(lastHeading - bearing)
         navArrowPath(r, half = 0)
         canvas.drawPath(arrow, navArrowShadow)
@@ -648,9 +646,9 @@ class TileOverlayView(context: Context) : View(context) {
         // The arrow, lit from the left: a light half and a dark half meeting along its spine.
         canvas.rotate(lastHeading - bearing)
         navArrowPath(r, half = -1)
-        canvas.drawPath(arrow, navRed)
+        canvas.drawPath(arrow, navArrowLight)
         navArrowPath(r, half = 1)
-        canvas.drawPath(arrow, navRedDark)
+        canvas.drawPath(arrow, navArrowDark)
         canvas.restore()
     }
 
