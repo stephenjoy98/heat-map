@@ -12,6 +12,16 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.3] - 2026-10-24
+
+### Changed
+- The follow me marker has no white outline any more, and on the 3D map it's a thin disc with a dark edge.
+
+### Fixed
+- Follow me starts straight away: the map jumps to you (turned your way on the 3D map) instead of waiting for the
+  next position, and on the 3D map the arrow stays pointing straight up while the map turns under it. Tilting into
+  or out of 3D while following turns the map at once, and the map turning no longer stops the tilt halfway.
+
 ## [2.45.2] - 2026-10-24
 
 ### Changed

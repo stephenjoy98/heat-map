@@ -234,8 +234,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             val turn = if (tilted3d) lastHeading else Float.NaN
             val sincePan = now - lastPanAt
             if (lastFollowAt == 0L) {
-                // Just started: fly in close to you first.
-                camera.animateTo(at.latitude, at.longitude, 17f)
+                // Just started: jump in close to you straight away, already turned your way in 3D.
+                camera.snapTo(at.latitude, at.longitude, 17f, turn)
             } else if (sincePan < FOLLOW_PAUSE_MS) {
                 // Dragged away to look around: come back once the map has been left alone for a moment.
                 while (true) {
@@ -248,6 +248,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 camera.glideTo(at.latitude, at.longitude, (now - lastFollowAt).coerceIn(300L, 2_500L).toInt(), turn)
             }
             lastFollowAt = android.os.SystemClock.uptimeMillis()
+        }
+        // Tilting into 3D (or back) while following turns the map at once: heading-up in 3D, north up flat.
+        LaunchedEffect(tilted3d) {
+            val at = dotAt
+            if (following && at != null && lastFollowAt != 0L) {
+                camera.glideTo(at.latitude, at.longitude, 400, if (tilted3d) lastHeading else 0f)
+            }
         }
         // While the accuracy card is open, touching the map anywhere else closes it. The buttons drawn above
         // this still work as usual.

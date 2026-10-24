@@ -155,6 +155,11 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
         commands.tryEmit(Command(lat, lon, zoom, animate = true))
     }
 
+    /** Flies quickly to a spot at [zoom], turned to [bearing] (NaN keeps the rotation): starting to follow you. */
+    fun snapTo(lat: Double, lon: Double, zoom: Float, bearing: Float = Float.NaN, durationMs: Int = 350) {
+        commands.tryEmit(Command(lat, lon, zoom, animate = true, durationMs = durationMs, bearing = bearing))
+    }
+
     /** Glides the map's middle to a spot at a steady pace over [durationMs], keeping the zoom. */
     fun glideTo(lat: Double, lon: Double, durationMs: Int, bearing: Float = Float.NaN) {
         commands.tryEmit(Command(lat, lon, Float.NaN, animate = true, durationMs = durationMs, bearing = bearing))
@@ -501,6 +506,7 @@ private fun VectorAppMap(
         holder.withMap { m -> m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, ((ATTRIBUTION_BOTTOM_DP + bottomInset.value) * dp).toInt()) }
     }
     val loadRoute3d by rememberUpdatedState(route3d)
+    val currentLook by rememberUpdatedState(look)
     val overlay = holder.overlay
     SideEffect {
         holder.onClick = onMapClick
@@ -599,6 +605,7 @@ private fun VectorAppMap(
         overlay.heading = heading
         overlay.navMarker = navMarker
         overlay.navDark = look.dark
+        overlay.navHeadingUp = navMarker && look.buildings
     }
 
     LaunchedEffect(refreshKey) {
@@ -642,6 +649,16 @@ private fun VectorAppMap(
                         org.maplibre.android.camera.CameraPosition.Builder(m.cameraPosition)
                             .target(MLatLng(c.lat, c.lon))
                             .bearing(c.bearing.toDouble())
+                            // The tilt it's heading for, so a turn never stops a tilt into (or out of) 3D halfway;
+                            // an angle picked by hand in 3D is kept.
+                            .tilt(
+                                when {
+                                    !currentLook.buildings -> 0.0
+                                    m.cameraPosition.tilt >= TILT_3D * 0.6 -> m.cameraPosition.tilt
+                                    else -> TILT_3D.toDouble()
+                                }
+                            )
+                            .apply { if (!c.zoom.isNaN()) zoom(c.zoom.toVectorZoom()) }
                             .build()
                     )
                 } else if (c.zoom.isNaN()) org.maplibre.android.camera.CameraUpdateFactory.newLatLng(MLatLng(c.lat, c.lon))

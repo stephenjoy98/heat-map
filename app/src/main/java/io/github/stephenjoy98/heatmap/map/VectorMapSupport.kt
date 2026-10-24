@@ -478,7 +478,7 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** Dark theme: a stronger shadow and a white outline, so the marker stands out on the dark map. */
+    /** Dark theme: a stronger shadow, so the marker stands out on the dark map. */
     var navDark: Boolean = false
         set(value) {
             if (value == field) return
@@ -489,10 +489,16 @@ class TileOverlayView(context: Context) : View(context) {
     private var lastHeading = 0f
     private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val navArrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-    private val navOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-    }
+    private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(25, 25, 25) }
+    private val navOval = android.graphics.RectF()
+
+    /** Heading-up following: the map turns with you, so the arrow is drawn pointing straight up at once. */
+    var navHeadingUp: Boolean = false
+        set(value) {
+            if (value == field) return
+            field = value
+            invalidate()
+        }
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
@@ -605,25 +611,37 @@ class TileOverlayView(context: Context) : View(context) {
 
     /**
      * Uber's navigation marker: a flat white disc with a thick black ring and a black arrow pointing the way
-     * you're heading (the last known way while you're still), on a soft shadow. It lies flat on a tilted map.
+     * you're heading (the last known way while you're still), on a soft shadow. On a tilted map it lies flat
+     * and becomes a thin disc, its dark edge showing below the face.
      */
     private fun drawNavMarker(canvas: Canvas, x: Float, y: Float, bearing: Float, tilt: Float) {
         heading?.let { lastHeading = it }
         val r = 16 * density
-        val squash = cos(Math.toRadians(tilt.toDouble())).toFloat().coerceAtLeast(0.35f)
+        val t = Math.toRadians(tilt.toDouble())
+        val squash = cos(t).toFloat().coerceAtLeast(0.35f)
+        // How thick the disc looks: nothing from straight above, a few pixels when tilted.
+        val lift = if (tilt > 2f) 3.5f * density * kotlin.math.sin(t).toFloat() else 0f
         canvas.save()
-        canvas.translate(x, y)
+        canvas.translate(x, y + 2 * density)
         canvas.scale(1f, squash)
-        canvas.drawCircle(0f, 2 * density, r + 2.5f * density, navShadow)
+        canvas.drawCircle(0f, 0f, r + 2.5f * density, navShadow)
+        canvas.restore()
+        if (lift > 0f) {
+            // The disc's edge: its outline stacked from the ground up to the face.
+            val steps = (lift / (0.5f * density)).toInt().coerceAtLeast(1)
+            for (i in 0 until steps) {
+                val cy = y - lift * i / steps
+                navOval.set(x - r, cy - r * squash, x + r, cy + r * squash)
+                canvas.drawOval(navOval, navSide)
+            }
+        }
+        canvas.save()
+        canvas.translate(x, y - lift)
+        canvas.scale(1f, squash)
         canvas.drawCircle(0f, 0f, r, navDisc)
         navRing.strokeWidth = 3.5f * density
         canvas.drawCircle(0f, 0f, r - 1.75f * density, navRing)
-        // On the dark map a black ring would vanish, so a thin white line traces it.
-        if (navDark) {
-            navOutline.strokeWidth = 1.5f * density
-            canvas.drawCircle(0f, 0f, r + 0.5f * density, navOutline)
-        }
-        canvas.rotate(lastHeading - bearing)
+        if (!navHeadingUp) canvas.rotate(lastHeading - bearing)
         arrow.reset()
         arrow.moveTo(0f, -r * 0.55f)
         arrow.lineTo(r * 0.5f, r * 0.42f)
