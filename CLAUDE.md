@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.45.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.45.2**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -151,8 +151,9 @@ travel stats, Insights (AI write-ups), backup and friends.
   `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; 2.45.0: panning
   (`MapCamera.panTick`) no longer stops it, it pauses `FOLLOW_PAUSE_MS` 5 s then glides back; tap = come back now;
   long-press again stops it (user's request); 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red marker squashed
-  by the tilt; 2.45.1 (user's request, Uber-like inverted): flat puck, red face, black
-  rim, two-tone black arrow, thin dark edge from stacked ovals (no gradients); `navDark` strengthens the shadow and adds a thin light outline; in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
+  by the tilt; 2.45.2: black and white exactly like Uber (the user tried red/3D puck
+  versions in 2.45.0–2.45.1 and found them weird): flat white disc, thick black ring, solid black arrow, soft shadow;
+  `navDark` strengthens the shadow and adds a thin white outline; in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
   with range slider, soft delete/restore, move/add dots (2.45.0: `DotEditState.placing` MOVE/ADD, next map tap →
   `PointStore.movePoint` / `addPointAfter` (halfway in time to the next dot, same trip, accuracy 5 m) then `refreshTrip`;
   undo = move back / `removeAddedPoint` + `restore(snapshot)`; for ferry routes, which are TRACK so never road-snapped), undo snackbar over the map, layers button; long-press a trip row

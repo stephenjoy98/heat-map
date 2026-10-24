@@ -10,7 +10,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
@@ -471,7 +470,7 @@ class TileOverlayView(context: Context) : View(context) {
         }
     private val arrow = Path()
 
-    /** Follow me: draw the location as a flat navigation puck (red face, black rim and arrow) lying on the map. */
+    /** Follow me: draw the location as Uber's navigation marker (white disc, black ring and arrow) lying on the map. */
     var navMarker: Boolean = false
         set(value) {
             if (value == field) return
@@ -479,7 +478,7 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** Dark theme: a stronger shadow and a light outline, so the puck stands out on the dark map. */
+    /** Dark theme: a stronger shadow and a white outline, so the marker stands out on the dark map. */
     var navDark: Boolean = false
         set(value) {
             if (value == field) return
@@ -488,14 +487,10 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
     private var lastHeading = 0f
-    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(229, 57, 53) }
-    private val navArrowLight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(45, 45, 45) }
-    private val navArrowDark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-    private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 20, 20) }
-    private val navArrowShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 0, 0, 0) }
-    private val navOval = RectF()
+    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val navArrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private val navOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(200, 230, 230, 230)
+        color = Color.WHITE
         style = Paint.Style.STROKE
     }
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -609,71 +604,34 @@ class TileOverlayView(context: Context) : View(context) {
     }
 
     /**
-     * Uber-style navigation marker in red: a flat puck with a thin dark edge, a red face with a black rim, and a
-     * black arrow (two shades, lit from the left) pointing the way you're heading (the last known way while
-     * you're still). The face lies flat on a tilted map and its edge shows a little more the further it's tilted.
+     * Uber's navigation marker: a flat white disc with a thick black ring and a black arrow pointing the way
+     * you're heading (the last known way while you're still), on a soft shadow. It lies flat on a tilted map.
      */
     private fun drawNavMarker(canvas: Canvas, x: Float, y: Float, bearing: Float, tilt: Float) {
         heading?.let { lastHeading = it }
         val r = 16 * density
-        val t = Math.toRadians(tilt.toDouble())
-        val squash = cos(t).toFloat().coerceAtLeast(0.35f)
-        // How tall the side looks on screen: a sliver seen from above, more when tilted.
-        val lift = 1f * density + 2.5f * density * kotlin.math.sin(t).toFloat()
-        // Shadow on the ground.
+        val squash = cos(Math.toRadians(tilt.toDouble())).toFloat().coerceAtLeast(0.35f)
         canvas.save()
-        canvas.translate(x, y + 2 * density)
+        canvas.translate(x, y)
         canvas.scale(1f, squash)
-        canvas.drawCircle(0f, 0f, r + 3 * density, navShadow)
-        canvas.restore()
-        // The side: the face's outline stacked from the ground up.
-        val steps = (lift / (0.5f * density)).toInt().coerceAtLeast(1)
-        for (i in 0..steps) {
-            val cy = y - lift * i / steps
-            navOval.set(x - r, cy - r * squash, x + r, cy + r * squash)
-            canvas.drawOval(navOval, navSide)
-        }
-        // The face, with its rim.
-        canvas.save()
-        canvas.translate(x, y - lift)
-        canvas.scale(1f, squash)
+        canvas.drawCircle(0f, 2 * density, r + 2.5f * density, navShadow)
         canvas.drawCircle(0f, 0f, r, navDisc)
-        navRing.strokeWidth = 3f * density
-        canvas.drawCircle(0f, 0f, r - 1.5f * density, navRing)
-        // On the dark map a black rim would vanish, so a thin light line traces it.
+        navRing.strokeWidth = 3.5f * density
+        canvas.drawCircle(0f, 0f, r - 1.75f * density, navRing)
+        // On the dark map a black ring would vanish, so a thin white line traces it.
         if (navDark) {
-            navOutline.strokeWidth = 1.2f * density
-            canvas.drawCircle(0f, 0f, r + 0.2f * density, navOutline)
+            navOutline.strokeWidth = 1.5f * density
+            canvas.drawCircle(0f, 0f, r + 0.5f * density, navOutline)
         }
-        // The arrow's shadow, a little below it on screen whichever way it points.
-        canvas.save()
-        canvas.translate(0f, 0.75f * density / squash)
         canvas.rotate(lastHeading - bearing)
-        navArrowPath(r, half = 0)
-        canvas.drawPath(arrow, navArrowShadow)
-        canvas.restore()
-        // The arrow, lit from the left: a light half and a dark half meeting along its spine.
-        canvas.rotate(lastHeading - bearing)
-        navArrowPath(r, half = -1)
-        canvas.drawPath(arrow, navArrowLight)
-        navArrowPath(r, half = 1)
-        canvas.drawPath(arrow, navArrowDark)
-        canvas.restore()
-    }
-
-    /** The arrow on the puck, pointing up: whole ([half] 0), or its left (-1) or right (1) half. */
-    private fun navArrowPath(r: Float, half: Int) {
         arrow.reset()
-        arrow.moveTo(0f, -r * 0.62f)
-        if (half <= 0) {
-            if (half == 0) arrow.lineTo(r * 0.48f, r * 0.5f)
-            arrow.lineTo(0f, r * 0.22f)
-            arrow.lineTo(-r * 0.48f, r * 0.5f)
-        } else {
-            arrow.lineTo(r * 0.48f, r * 0.5f)
-            arrow.lineTo(0f, r * 0.22f)
-        }
+        arrow.moveTo(0f, -r * 0.55f)
+        arrow.lineTo(r * 0.5f, r * 0.42f)
+        arrow.lineTo(0f, r * 0.2f)
+        arrow.lineTo(-r * 0.5f, r * 0.42f)
         arrow.close()
+        canvas.drawPath(arrow, navArrow)
+        canvas.restore()
     }
 
     class LayerSpec(val id: String, val source: TileBitmapSource, val alpha: Float, val zIndex: Float)

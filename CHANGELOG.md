@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.2] - 2026-10-24
+
+### Changed
+- The follow me marker is black and white like Uber's: a flat white disc with a thick black ring and a black arrow
+  (with a thin white outline in dark theme so the ring shows on the dark map).
+
 ## [2.45.1] - 2026-10-24
 
 ### Changed
