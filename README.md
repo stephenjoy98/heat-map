@@ -54,7 +54,8 @@ up to your Google account, and lets you compare explored areas with friends.
   means; fixes less precise than 100 m (500 m in battery-saver mode) are never recorded.
 - **Edit dots** (pencil on the Timeline tab): fix mapping errors. Pick a day, narrow it down with a **start–end
   slider** (the dots in range are highlighted and joined in time order), or tap a single dot and step
-  through its neighbours, then delete. Trips touching deleted dots are rebuilt from what's left, and
+  through its neighbours, then delete, **move** it (tap Move, then its new spot) or **add dots** after it, one
+  per tap, to trace a route GPS got wrong, like a ferry crossing. Trips touching deleted dots are rebuilt from what's left, and
   backups and shared routes are updated on the next sync. Deleting is a **soft delete**: deleted dots
   move to a Deleted list for that day (with Undo right after), and you can restore them at any time.
 
@@ -106,8 +107,9 @@ up to your Google account, and lets you compare explored areas with friends.
   you narrow the range to. **Routes / Dots** on the Timeline map shows every dot; tap one to delete it.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
-- **Follow me**: long-press the location button to keep your dot in the middle of the map while you travel; an
-  arrow on the dot shows your heading.
+- **Follow me**: long-press the location button to keep your dot in the middle of the map while you travel,
+  shown as a raised red navigation puck (dark face in dark theme) pointing your way. Drag the map to look around
+  and it comes back to you after a few seconds; long-press the button again to stop.
 - **Altimeter and speedometer** on the map (left, opposite the compass) from GPS; the speedometer shrinks to a dot
   when you're still; tapping the **compass** when north up tilts the
   map into 3D and back.

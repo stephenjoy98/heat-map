@@ -598,6 +598,7 @@ private fun VectorAppMap(
         overlay.latest = latest?.let { MLatLng(it.latitude, it.longitude) }
         overlay.heading = heading
         overlay.navMarker = navMarker
+        overlay.navDark = look.dark
     }
 
     LaunchedEffect(refreshKey) {

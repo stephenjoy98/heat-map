@@ -110,6 +110,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.DpOffset
 import io.github.stephenjoy98.heatmap.data.DeleteResult
+import io.github.stephenjoy98.heatmap.data.EditablePoint
 import io.github.stephenjoy98.heatmap.data.Trip
 import io.github.stephenjoy98.heatmap.data.RoadQuestion
 import io.github.stephenjoy98.heatmap.data.LevelQuestion
@@ -307,6 +308,41 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             }
         }
         Unit
+    }
+    // Moving a dot, or adding one by hand, can be undone too: the dot goes back and the trips around it with it.
+    fun dotEdit(label: String, dot: EditablePoint, change: () -> DeleteResult, back: () -> DeleteResult) {
+        if (edit.busy) return
+        edit.busy = true
+        scope.launch {
+            val (snap, result) = withContext(Dispatchers.IO) { store.snapshot(dot.time, dot.time) to change() }
+            afterDotEdit(context, result)
+            editReload++
+            editSnackbar.currentSnackbarData?.dismiss()
+            if (editSnackbar.showSnackbar(label, actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                afterDotEdit(context, withContext(Dispatchers.IO) { back(); store.restore(snap) })
+                edit.reselect = dot.id
+                editReload++
+            }
+        }
+    }
+    fun moveDot(dot: EditablePoint, lat: Double, lon: Double) {
+        edit.placing = null
+        edit.reselect = dot.id
+        dotEdit("Dot moved", dot, { store.movePoint(dot.id, lat, lon) }, { store.movePoint(dot.id, dot.lat, dot.lon, dot.accuracy) })
+    }
+    fun addDot(after: EditablePoint, lat: Double, lon: Double) {
+        var added = -1L
+        dotEdit(
+            "Dot added", after,
+            {
+                val made = store.addPointAfter(after.id, lat, lon)
+                added = made?.first ?: -1L
+                // The new dot is picked next, so taps keep adding along the way.
+                edit.reselect = made?.first ?: after.id
+                made?.second ?: DeleteResult(emptySet(), emptyList())
+            },
+            { if (added > 0) store.removeAddedPoint(added) else DeleteResult(emptySet(), emptyList()) },
+        )
     }
     val changeModes = { trips: List<Trip>, mode: TravelMode ->
         if (trips.isNotEmpty()) {
@@ -515,7 +551,14 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         }
                     },
                     onMapClick = when {
-                        editing -> { lat, lon -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it } }
+                        editing -> { lat, lon ->
+                            val dot = edit.selected?.let { edit.points.getOrNull(it) }
+                            when {
+                                dot != null && edit.placing == DotPlacing.MOVE -> moveDot(dot, lat, lon)
+                                dot != null && edit.placing == DotPlacing.ADD -> addDot(dot, lat, lon)
+                                else -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it }
+                            }
+                        }
                         // Tapping a dot moves whichever end of the trip is nearer to it.
                         // Fixing a route: a tap says the route went through there.
                         fixing != null -> { lat, lon ->

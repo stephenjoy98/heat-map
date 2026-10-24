@@ -106,6 +106,7 @@ import io.github.stephenjoy98.heatmap.map.OwnTracks
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -162,11 +163,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val speed = liveFix?.takeIf { it.hasSpeed() && System.currentTimeMillis() - it.time < 15_000 }?.speed
     // For the altimeter: height above sea level (on Android 14 and later; above the GPS ellipsoid before that).
     val altitude = liveFix?.takeIf { System.currentTimeMillis() - it.time < 60_000 }?.let { LocationTickerService.altitudeOf(it) }
-    // Follow me (long-press the location button): the map glides along with the dot, until you drag it.
+    // Follow me (long-press the location button, long-press again to stop): the map glides along with the dot.
+    // Dragging the map doesn't stop it; the map comes back to you a few seconds after you let go.
     var following by rememberSaveable { mutableStateOf(false) }
     var lastFollowAt by remember { mutableLongStateOf(0L) }
+    var lastPanAt by remember { mutableLongStateOf(0L) }
     val haptics = LocalHapticFeedback.current
-    LaunchedEffect(camera.panTick) { following = false }
+    LaunchedEffect(camera.panTick) { if (following) lastPanAt = android.os.SystemClock.uptimeMillis() }
     // The blue dot: the newer of the last recorded dot and the live GPS fix (if it's reasonably precise), so it
     // keeps up while you travel; the map glides it between them.
     val dotAt = run {
@@ -227,15 +230,24 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             val at = dotAt ?: return@LaunchedEffect
             if (!following) return@LaunchedEffect
             val now = android.os.SystemClock.uptimeMillis()
+            // In 3D the map turns with you so the arrow points straight ahead (up); flat, it stays north up.
+            val turn = if (tilted3d) lastHeading else Float.NaN
+            val sincePan = now - lastPanAt
             if (lastFollowAt == 0L) {
                 // Just started: fly in close to you first.
                 camera.animateTo(at.latitude, at.longitude, 17f)
+            } else if (sincePan < FOLLOW_PAUSE_MS) {
+                // Dragged away to look around: come back once the map has been left alone for a moment.
+                while (true) {
+                    val wait = FOLLOW_PAUSE_MS - (android.os.SystemClock.uptimeMillis() - lastPanAt)
+                    if (wait <= 0) break
+                    delay(wait)
+                }
+                camera.glideTo(at.latitude, at.longitude, 800, turn)
             } else {
-                // In 3D the map turns with you so the arrow points straight ahead (up); flat, it stays north up.
-                val turn = if (tilted3d) lastHeading else Float.NaN
                 camera.glideTo(at.latitude, at.longitude, (now - lastFollowAt).coerceIn(300L, 2_500L).toInt(), turn)
             }
-            lastFollowAt = now
+            lastFollowAt = android.os.SystemClock.uptimeMillis()
         }
         // While the accuracy card is open, touching the map anywhere else closes it. The buttons drawn above
         // this still work as usual.
@@ -379,7 +391,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     } == true
                     val rotated = ((camera.bearing % 360f) + 360f) % 360f in 1f..359f
                     val turnsNorth = onLatest && rotated
-                    // Long-press: follow me, keeping the dot in the middle while the map moves under it. Tap stops it.
+                    // Long-press: follow me, keeping the dot in the middle while the map moves under it; long-press
+                    // again to stop. A tap while following brings the map straight back to you.
                     // (No tooltip here: a long-press is the follow gesture.)
                     Surface(
                         shape = CircleShape,
@@ -393,7 +406,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                             .combinedClickable(
                                 onClick = {
                                     when {
-                                        following -> following = false
+                                        following -> dotAt?.let {
+                                            lastPanAt = 0L
+                                            camera.glideTo(it.latitude, it.longitude, 600, if (tilted3d) lastHeading else Float.NaN)
+                                        }
                                         latest == null -> scope.launch { snackbar.showSnackbar("No points recorded yet") }
                                         turnsNorth -> camera.northUp()
                                         else -> camera.animateTo(latest.lat, latest.lon, 16f)
@@ -401,7 +417,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                                 },
                                 onLongClick = {
                                     val at = dotAt
-                                    if (at == null) {
+                                    if (following) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        following = false
+                                        scope.launch {
+                                            snackbar.currentSnackbarData?.dismiss()
+                                            snackbar.showSnackbar("Stopped following you")
+                                        }
+                                    } else if (at == null) {
                                         scope.launch { snackbar.showSnackbar("No position yet") }
                                     } else {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -409,14 +432,14 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                                         following = true
                                         scope.launch {
                                             snackbar.currentSnackbarData?.dismiss()
-                                            snackbar.showSnackbar("Following you. Drag the map or tap the button to stop.")
+                                            snackbar.showSnackbar("Following you. Long-press the button again to stop.")
                                         }
                                     }
                                 },
                             )
                             .semantics {
                                 contentDescription = when {
-                                    following -> "Following you; tap to stop"
+                                    following -> "Following you; tap to come back to you, long-press to stop following"
                                     turnsNorth -> "Turn map north up; long-press to follow you"
                                     else -> "Go to my latest position; long-press to follow you"
                                 }
@@ -464,6 +487,9 @@ object MapChrome {
 
 /** How long controls take to fly out of or back onto the map when switching full screen. */
 const val FULLSCREEN_MS = 300
+
+// How long follow me waits after you drag the map before bringing it back to you.
+private const val FOLLOW_PAUSE_MS = 5_000L
 
 /** Material's "filter_list" icon; the core icon set doesn't include it. */
 private val FilterIcon: ImageVector by lazy {

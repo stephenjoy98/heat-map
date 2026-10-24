@@ -245,8 +245,11 @@ if [ -n "${fx:-}" ]; then
     adb shell input swipe "$fx" "$fy" "$fx" "$fy" 900
     note "long-pressed the location button (follow me)"
     shot 15a-follow 4
-    adb shell input tap "$fx" "$fy"
-    note "tapped it again to stop following"
+    adb shell input swipe 540 1000 300 1000 300
+    note "dragged the map while following (it should keep following)"
+    shot 15b-follow-drag 6
+    adb shell input swipe "$fx" "$fy" "$fx" "$fy" 900
+    note "long-pressed it again to stop following"
 else
     note "MISSING the location button for follow me"
 fi

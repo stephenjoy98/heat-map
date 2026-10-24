@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.44.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.45.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -148,10 +148,14 @@ travel stats, Insights (AI write-ups), backup and friends.
   alive via `cacheKey`; tilt >8° by hand turns 3D on, <2° turns it off; 3D route loader), `MapScreen`
   (filter button + chips, stats, profile button, scale bar + compass under the top row, accuracy button
   bottom-left, location/zoom/layers bottom-right, record panel; long-press location = follow me (`following`:
-  `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; `MapCamera.panTick`
-  from MapLibre's OnMoveListener stops it; 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red arrow marker squashed
-  by the tilt; in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
-  with range slider, soft delete/restore, undo snackbar over the map, layers button; long-press a trip row
+  `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; 2.45.0: panning
+  (`MapCamera.panTick`) no longer stops it, it pauses `FOLLOW_PAUSE_MS` 5 s then glides back; tap = come back now;
+  long-press again stops it (user's request); 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red marker squashed
+  by the tilt; 2.45.0: a 3D puck (stacked ovals for a red side, raised two-tone arrow, no gradients) with a dark face
+  via `navDark` in dark theme; in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
+  with range slider, soft delete/restore, move/add dots (2.45.0: `DotEditState.placing` MOVE/ADD, next map tap →
+  `PointStore.movePoint` / `addPointAfter` (halfway in time to the next dot, same trip, accuracy 5 m) then `refreshTrip`;
+  undo = move back / `removeAddedPoint` + `restore(snapshot)`; for ferry routes, which are TRACK so never road-snapped), undo snackbar over the map, layers button; long-press a trip row
   for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
   the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back

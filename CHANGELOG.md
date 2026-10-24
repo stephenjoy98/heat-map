@@ -12,6 +12,19 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.0] - 2026-10-24
+
+### Added
+- Move dots in Edit dots on the Timeline: tap a dot, tap **Move**, then tap where it should be. **Add dots** puts
+  new dots after the picked one, one per tap on the map, so you can trace the way a ferry actually went across the
+  water instead of the line GPS drew. The trip is worked out again from the moved dots, and Undo puts them back.
+
+### Changed
+- Follow me keeps following when you drag the map: look around and the map comes back to you a few seconds after
+  you let go (or straight away if you tap the location button). Long-press the location button again to stop.
+- The follow me marker looks solid now: a puck with a red side standing on the map and a raised two-tone arrow. It
+  has a dark face in dark theme.
+
 ## [2.44.0] - 2026-10-24
 
 ### Changed

@@ -953,6 +953,97 @@ class PointStore private constructor(context: Context) :
         return DeleteResult(days, remoteIds)
     }
 
+    /**
+     * Moves a dot to where it should have been (a ferry crossing that GPS drew over land, say). Its trip keeps
+     * the dot, with times and distance worked out again and its road match redone. A hand-placed dot counts as
+     * accurate unless [accuracy] says otherwise (undo passes the old one back).
+     */
+    fun movePoint(id: Long, lat: Double, lon: Double, accuracy: Float? = null): DeleteResult {
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        db.beginTransaction()
+        try {
+            val row = db.rawQuery("SELECT time, trip_id, accuracy FROM points WHERE id = $id", null).use { c ->
+                if (c.moveToFirst()) Triple(c.getLong(0), c.getLong(1), c.getFloat(2)) else null
+            } ?: return DeleteResult(emptySet(), emptyList())
+            days += dayOf(row.first)
+            val acc = accuracy ?: minOf(row.third, HAND_PLACED_ACCURACY_M)
+            db.execSQL("UPDATE points SET lat = ?, lon = ?, accuracy = ? WHERE id = ?", arrayOf<Any>(lat, lon, acc, id))
+            if (row.second > 0) refreshTrip(db, row.second, remoteIds)
+            invalidateExplored(db)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
+
+    /**
+     * Adds a dot by hand halfway in time between dot [afterId] and the next one, at [lat], [lon], in the same
+     * trip, to trace a route the recording missed. Returns the new dot's id, or null if there's no next dot
+     * (or no time left between the two).
+     */
+    fun addPointAfter(afterId: Long, lat: Double, lon: Double): Pair<Long, DeleteResult>? {
+        val db = writableDatabase
+        val remoteIds = mutableListOf<String>()
+        var id = -1L
+        var time = 0L
+        db.beginTransaction()
+        try {
+            val before = db.rawQuery("SELECT time, trip_id, mode, activity, interval_ms FROM points WHERE id = $afterId", null).use { c ->
+                if (c.moveToFirst()) longArrayOf(c.getLong(0), c.getLong(1), c.getLong(2), c.getLong(3), c.getLong(4)) else null
+            } ?: return null
+            val next = db.rawQuery("SELECT MIN(time) FROM points WHERE time > ${before[0]}", null).use { c ->
+                if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+            } ?: return null
+            if (next - before[0] < 2) return null
+            time = (before[0] + next) / 2
+            val values = ContentValues().apply {
+                put("time", time)
+                put("lat", lat)
+                put("lon", lon)
+                put("accuracy", HAND_PLACED_ACCURACY_M)
+                put("interval_ms", before[4])
+                put("mode", before[2])
+                put("activity", before[3])
+                put("trip_id", before[1])
+            }
+            id = db.insertWithOnConflict("points", null, values, SQLiteDatabase.CONFLICT_IGNORE)
+            if (id == -1L) return null
+            if (before[1] > 0) refreshTrip(db, before[1], remoteIds)
+            invalidateExplored(db)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return id to DeleteResult(setOf(dayOf(time)), remoteIds)
+    }
+
+    /** Removes a dot added by hand for good (undoing [addPointAfter]); recorded dots go through [deletePoints]. */
+    fun removeAddedPoint(id: Long): DeleteResult {
+        val db = writableDatabase
+        val remoteIds = mutableListOf<String>()
+        var day = ""
+        db.beginTransaction()
+        try {
+            val row = db.rawQuery("SELECT time, trip_id FROM points WHERE id = $id", null).use { c ->
+                if (c.moveToFirst()) c.getLong(0) to c.getLong(1) else null
+            } ?: return DeleteResult(emptySet(), emptyList())
+            day = dayOf(row.first)
+            db.execSQL("DELETE FROM points WHERE id = $id")
+            if (row.second > 0) refreshTrip(db, row.second, remoteIds)
+            invalidateExplored(db)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(setOf(day), remoteIds)
+    }
+
     /** Removes trips (and their road data) and hands their points back to the trip detector. */
     private fun dissolveTrips(db: SQLiteDatabase, tripIds: List<Long>, remoteIds: MutableList<String>) {
         if (tripIds.isEmpty()) return
@@ -2093,6 +2184,9 @@ class PointStore private constructor(context: Context) :
         private const val SPIKE_MIN_M = 300.0
         private const val SPIKE_COARSE_M = 20f
         private const val SPIKE_IMPOSSIBLE_MPS = 70.0
+
+        // Accuracy given to a dot moved or added by hand, so it never counts as a coarse fix.
+        private const val HAND_PLACED_ACCURACY_M = 5f
 
         private const val POINT_COLS = "time, lat, lon, accuracy, interval_ms, activity, mode, altitude"
 

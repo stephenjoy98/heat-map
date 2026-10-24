@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +52,7 @@ import android.content.Context
 import io.github.stephenjoy98.heatmap.data.DeleteResult
 import io.github.stephenjoy98.heatmap.data.EditablePoint
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.roads.RoadSnapWorker
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +77,12 @@ class DotEditState(day: LocalDate) {
     var points by mutableStateOf<List<EditablePoint>>(emptyList())
     var range by mutableStateOf(0..0)
     var selected by mutableStateOf<Int?>(null)
+    /** Waiting for a tap on the map to move the picked dot there, or to add dots after it. */
+    var placing by mutableStateOf<DotPlacing?>(null)
+    /** A dot to pick again once the dots are reloaded (the one just moved or added). */
+    var reselect: Long? = null
+    /** A move or add is being saved; taps wait for the dots to reload so they act on the right dot. */
+    var busy = false
 
     /** The dots a delete (or restore) would act on: the tapped dot if there is one, otherwise the range. */
     val target: List<EditablePoint>
@@ -84,9 +92,15 @@ class DotEditState(day: LocalDate) {
     fun load(newPoints: List<EditablePoint>) {
         points = newPoints
         range = 0..(newPoints.size - 1).coerceAtLeast(0)
-        selected = null
+        selected = reselect?.let { id -> newPoints.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+        reselect = null
+        busy = false
+        if (selected == null) placing = null
     }
 }
+
+/** What a tap on the map does to the picked dot: moves it there, or adds a dot after it there. */
+enum class DotPlacing { MOVE, ADD }
 
 /**
  * Draws the day's dots over the map: dots inside the range are highlighted and joined in time order, the
@@ -232,7 +246,34 @@ fun EditPanel(
                                 ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next dot") }
                             }
                         }
-                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                        val placing = state.placing
+                        if (placing != null) {
+                            Hint(
+                                if (placing == DotPlacing.MOVE) "Tap the map where this dot should be."
+                                else "Tap along the way it went to add dots after this one, one per tap: handy for a ferry crossing."
+                            )
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Button(onClick = { state.placing = null }) { Text(if (placing == DotPlacing.MOVE) "Cancel" else "Done") }
+                            }
+                        } else if (!state.showingDeleted) {
+                            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(onClick = { state.placing = DotPlacing.MOVE }, modifier = Modifier.weight(1f)) {
+                                    MaterialIcon(R.drawable.ic_open_with, size = 18)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Move")
+                                }
+                                FilledTonalButton(
+                                    onClick = { state.placing = DotPlacing.ADD },
+                                    enabled = state.selected!! < pts.size - 1,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    MaterialIcon(R.drawable.ic_add_location_alt, size = 18)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Add dots")
+                                }
+                            }
+                        }
+                        if (placing == null) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { state.selected = null }) { Text("Back to range") }
                             Spacer(Modifier.width(8.dp))
                             if (state.showingDeleted) {
