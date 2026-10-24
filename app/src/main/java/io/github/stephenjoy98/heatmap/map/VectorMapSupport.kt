@@ -629,15 +629,14 @@ class TileOverlayView(context: Context) : View(context) {
         val squash = cos(t).toFloat().coerceAtLeast(0.35f)
         // How thick the disc looks: nothing from straight above, a few pixels when tilted.
         val lift = if (tilt > 2f) 3.5f * density * kotlin.math.sin(t).toFloat() else 0f
-        // The glow: rings of the route colour, fainter further out (plain circles, no gradient or blur).
+        // The glow: many faint circles of the route colour stacked, so it fades smoothly outwards (no gradient or
+        // blur, which aren't reliable on every phone's hardware drawing).
         canvas.save()
         canvas.translate(x, y)
         canvas.scale(1f, squash)
-        for (i in GLOW_STEPS downTo 1) {
-            navHalo.color = navGlow
-            navHalo.alpha = 70 / i
-            canvas.drawCircle(0f, 0f, r + i * 3 * density, navHalo)
-        }
+        navHalo.color = navGlow
+        navHalo.alpha = GLOW_ALPHA
+        for (i in GLOW_STEPS downTo 1) canvas.drawCircle(0f, 0f, r + i * GLOW_STEP_DP * density, navHalo)
         canvas.restore()
         if (lift > 0f) {
             // The disc's edge: its outline stacked from the ground up to the face.
@@ -671,6 +670,8 @@ class TileOverlayView(context: Context) : View(context) {
         const val MIN_GLIDE_MS = 300L
         const val MAX_GLIDE_MS = 2_500L
         const val MAX_GLIDE_M = 2_000.0
-        const val GLOW_STEPS = 4
+        const val GLOW_STEPS = 16
+        const val GLOW_STEP_DP = 0.8f
+        const val GLOW_ALPHA = 13
     }
 }
