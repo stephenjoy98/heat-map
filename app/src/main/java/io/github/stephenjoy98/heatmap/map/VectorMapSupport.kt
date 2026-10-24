@@ -487,7 +487,7 @@ class TileOverlayView(context: Context) : View(context) {
         }
 
     /** The colour the follow me marker's ring glows in: the colour of your routes. */
-    var navGlow: Int = Color.rgb(236, 48, 88)
+    var navGlow: Int = Color.rgb(185, 30, 62)
         set(value) {
             if (value == field) return
             field = value
@@ -509,7 +509,7 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(236, 48, 88)
+        color = Color.rgb(185, 30, 62)
         style = Paint.Style.STROKE
     }
 

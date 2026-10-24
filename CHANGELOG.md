@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.5] - 2026-10-24
+
+### Changed
+- The follow me marker's ring and glow are a bit darker.
+
 ## [2.45.4] - 2026-10-24
 
 ### Changed
