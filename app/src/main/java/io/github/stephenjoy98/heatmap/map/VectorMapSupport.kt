@@ -497,7 +497,7 @@ class TileOverlayView(context: Context) : View(context) {
     private val navHalo = Paint(Paint.ANTI_ALIAS_FLAG)
     private var lastHeading = 0f
     private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(36, 33, 38) }
-    private val navArrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val navArrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(200, 200, 205) }
     private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(14, 13, 16) }
     private val navOval = android.graphics.RectF()
 
