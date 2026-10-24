@@ -15,7 +15,8 @@ The app shows the entries since your last version as "What's new" after an updat
 ## [2.45.1] - 2026-10-24
 
 ### Changed
-- The follow me marker is flatter and styled like Uber's, in red: a red disc with a black border and a black arrow.
+- The follow me marker is flatter and styled like Uber's, in red: a red disc with a black border and a black arrow
+  (with a thin light outline in dark theme so the border shows on the dark map).
 
 ## [2.45.0] - 2026-10-24
 

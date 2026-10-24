@@ -479,7 +479,7 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** Dark theme: a stronger shadow, so the puck stands out on the dark map. */
+    /** Dark theme: a stronger shadow and a light outline, so the puck stands out on the dark map. */
     var navDark: Boolean = false
         set(value) {
             if (value == field) return
@@ -494,6 +494,10 @@ class TileOverlayView(context: Context) : View(context) {
     private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 20, 20) }
     private val navArrowShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 0, 0, 0) }
     private val navOval = RectF()
+    private val navOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(200, 230, 230, 230)
+        style = Paint.Style.STROKE
+    }
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
@@ -636,6 +640,11 @@ class TileOverlayView(context: Context) : View(context) {
         canvas.drawCircle(0f, 0f, r, navDisc)
         navRing.strokeWidth = 3f * density
         canvas.drawCircle(0f, 0f, r - 1.5f * density, navRing)
+        // On the dark map a black rim would vanish, so a thin light line traces it.
+        if (navDark) {
+            navOutline.strokeWidth = 1.2f * density
+            canvas.drawCircle(0f, 0f, r + 0.2f * density, navOutline)
+        }
         // The arrow's shadow, a little below it on screen whichever way it points.
         canvas.save()
         canvas.translate(0f, 0.75f * density / squash)
