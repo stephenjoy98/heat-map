@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.44.0] - 2026-10-24
+
+### Changed
+- Follow me shows you as a navigation arrow (a white disc with a red ring and arrow) instead of the blue dot. On the
+  flat map it stays north up and the arrow turns the way you're heading; on the 3D map the arrow lies flat in the
+  middle pointing straight ahead and the map turns and moves around it as you travel.
+
 ## [2.43.0] - 2026-10-23
 
 ### Added

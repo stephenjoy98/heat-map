@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.43.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.44.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -149,7 +149,8 @@ travel stats, Insights (AI write-ups), backup and friends.
   (filter button + chips, stats, profile button, scale bar + compass under the top row, accuracy button
   bottom-left, location/zoom/layers bottom-right, record panel; long-press location = follow me (`following`:
   `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; `MapCamera.panTick`
-  from MapLibre's OnMoveListener stops it)), `TimelineScreen` (also hosts **Edit dots**
+  from MapLibre's OnMoveListener stops it; 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red arrow marker squashed
+  by the tilt; in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
   with range slider, soft delete/restore, undo snackbar over the map, layers button; long-press a trip row
   for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);

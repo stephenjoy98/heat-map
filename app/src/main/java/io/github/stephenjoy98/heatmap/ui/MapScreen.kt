@@ -6,6 +6,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseIn
@@ -179,6 +180,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     }
     // The arrow on the dot: which way you're going, while you're moving.
     val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
+    // The way you were last heading, kept while you stop, for turning the map in 3D follow me.
+    var lastHeading by remember { mutableFloatStateOf(Float.NaN) }
+    LaunchedEffect(heading) { heading?.let { lastHeading = it } }
+    val tilted3d by Prefs.buildings3d.collectAsStateWithLifecycle()
     // Routes at their recorded heights, for the 3D buildings view.
     val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
     val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
@@ -215,6 +220,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             route3d = route3d,
             bottomInset = navPad,
             heading = heading,
+            navMarker = following,
         )
         // While following, keep the dot in the middle: the map glides as long as the dot does between positions.
         LaunchedEffect(dotAt, following) {
@@ -225,7 +231,9 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 // Just started: fly in close to you first.
                 camera.animateTo(at.latitude, at.longitude, 17f)
             } else {
-                camera.glideTo(at.latitude, at.longitude, (now - lastFollowAt).coerceIn(300L, 2_500L).toInt())
+                // In 3D the map turns with you so the arrow points straight ahead (up); flat, it stays north up.
+                val turn = if (tilted3d) lastHeading else Float.NaN
+                camera.glideTo(at.latitude, at.longitude, (now - lastFollowAt).coerceIn(300L, 2_500L).toInt(), turn)
             }
             lastFollowAt = now
         }

@@ -470,6 +470,22 @@ class TileOverlayView(context: Context) : View(context) {
         }
     private val arrow = Path()
 
+    /** Follow me: draw the location as a navigation arrow (white disc, red ring and arrow) lying on the map. */
+    var navMarker: Boolean = false
+        set(value) {
+            if (value == field) return
+            field = value
+            invalidate()
+        }
+    private var lastHeading = 0f
+    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val navRed = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(229, 57, 53) }
+    private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(229, 57, 53)
+        style = Paint.Style.STROKE
+    }
+    private val navShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(60, 0, 0, 0) }
+
     var latest: LatLng? = null
         set(value) {
             if (value == field) return
@@ -552,6 +568,10 @@ class TileOverlayView(context: Context) : View(context) {
         }
         shown?.let {
             val p = projection.toScreenLocation(it)
+            if (navMarker) {
+                drawNavMarker(canvas, p.x, p.y, map.cameraPosition.bearing.toFloat(), map.cameraPosition.tilt.toFloat())
+                return
+            }
             heading?.let { h ->
                 // A small triangle just outside the dot, pointing where you're going (allowing for map rotation).
                 canvas.save()
@@ -568,6 +588,31 @@ class TileOverlayView(context: Context) : View(context) {
             canvas.drawCircle(p.x, p.y, 7 * density, ring)
             canvas.drawCircle(p.x, p.y, 5 * density, dot)
         }
+    }
+
+    /**
+     * Uber-style navigation marker in red: a white disc with a red ring and a red arrow pointing the way you're
+     * heading (the last known way while you're still). Squashed by the map's tilt so it lies flat on a 3D map.
+     */
+    private fun drawNavMarker(canvas: Canvas, x: Float, y: Float, bearing: Float, tilt: Float) {
+        heading?.let { lastHeading = it }
+        val r = 16 * density
+        canvas.save()
+        canvas.translate(x, y)
+        canvas.scale(1f, kotlin.math.cos(Math.toRadians(tilt.toDouble())).toFloat().coerceAtLeast(0.35f))
+        canvas.drawCircle(0f, 2 * density, r + 2 * density, navShadow)
+        canvas.drawCircle(0f, 0f, r, navDisc)
+        navRing.strokeWidth = 2.5f * density
+        canvas.drawCircle(0f, 0f, r, navRing)
+        canvas.rotate(lastHeading - bearing)
+        arrow.reset()
+        arrow.moveTo(0f, -r * 0.62f)
+        arrow.lineTo(r * 0.48f, r * 0.5f)
+        arrow.lineTo(0f, r * 0.22f)
+        arrow.lineTo(-r * 0.48f, r * 0.5f)
+        arrow.close()
+        canvas.drawPath(arrow, navRed)
+        canvas.restore()
     }
 
     class LayerSpec(val id: String, val source: TileBitmapSource, val alpha: Float, val zIndex: Float)
