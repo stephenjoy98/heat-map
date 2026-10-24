@@ -1,0 +1,61 @@
+Location Ticker 2.44.0 on 14 (API 34)
+Performing Streamed Install
+Success
+Starting: Intent { cmp=io.github.stephenjoy98.heatmap/.ui.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: io.github.stephenjoy98.heatmap/.ui.MainActivity
+TotalTime: 9321
+WaitTime: 9342
+Complete
+screenshot 01-map
+tapped desc "Start recording" at 143 1984
+screenshot 02-recording
+tapped desc "Map layers" at 985 1789
+screenshot 02a-layers
+tapped text "Map colours" at 184 2183
+dragged Map colours to Vivid
+screenshot 02b-layers-vivid
+tapped text "Ice" at 396 1453
+screenshot 02d-layers-ice
+screenshot 02c-map-vivid
+tapped desc "Map layers" at 985 1789
+tapped text "Fire" at 154 1882
+tapped text "Timeline" at 814 2274
+screenshot 03-timeline
+tapped text "Dots" at 433 759
+screenshot 03a-timeline-dots
+tapped text "Routes" at 180 381
+tapped text "Questions" at 810 359
+screenshot 04-questions
+tapped text "Trips" at 270 359
+tapped desc "Account" at 1006 212
+screenshot 05-account
+tapped text "Settings" at 301 2148
+screenshot 06-settings
+tapped text "General" at 264 2179
+screenshot 07-settings-general
+tapped text "Battery" at 258 1174
+screenshot 08-settings-battery
+tapped text "Battery saver" at 306 1955
+screenshot 09-battery-saver
+tapped text "User" at 224 920
+tapped text "Updates" at 270 1985
+screenshot 10-settings-updates
+tapped text "Insights" at 299 1902
+screenshot 11-insights
+screenshot 12-insights-lower
+screenshot 13-insights-bottom
+tapped text "Profile" at 284 1270
+screenshot 14-profile
+tapped text "Map" at 264 2274
+screenshot 15-map-after
+long-pressed the location button (follow me)
+screenshot 15a-follow
+tapped it again to stop following
+tapped desc "Full screen" at 985 1186
+screenshot 16-fullscreen
+tapped desc "Exit full screen" at 985 1702
+screenshot 17-fullscreen-exit
+saved run.mp4
+No crashes
