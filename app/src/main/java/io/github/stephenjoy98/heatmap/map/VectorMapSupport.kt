@@ -487,7 +487,7 @@ class TileOverlayView(context: Context) : View(context) {
         }
 
     /** The colour the follow me marker's ring glows in: the colour of your routes. */
-    var navGlow: Int = Color.rgb(185, 30, 62)
+    var navGlow: Int = Color.rgb(128, 10, 44)
         set(value) {
             if (value == field) return
             field = value
@@ -509,7 +509,7 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(185, 30, 62)
+        color = Color.rgb(128, 10, 44)
         style = Paint.Style.STROKE
     }
 
@@ -624,7 +624,7 @@ class TileOverlayView(context: Context) : View(context) {
      */
     private fun drawNavMarker(canvas: Canvas, x: Float, y: Float, bearing: Float, tilt: Float) {
         heading?.let { lastHeading = it }
-        val r = 20 * density
+        val r = 16 * density
         val t = Math.toRadians(tilt.toDouble())
         val squash = cos(t).toFloat().coerceAtLeast(0.35f)
         // How thick the disc looks: nothing from straight above, a few pixels when tilted.
@@ -651,8 +651,8 @@ class TileOverlayView(context: Context) : View(context) {
         canvas.translate(x, y - lift)
         canvas.scale(1f, squash)
         canvas.drawCircle(0f, 0f, r, navDisc)
-        navRing.strokeWidth = 3f * density
-        canvas.drawCircle(0f, 0f, r - 1.5f * density, navRing)
+        navRing.strokeWidth = 2.5f * density
+        canvas.drawCircle(0f, 0f, r - 1.25f * density, navRing)
         if (!navHeadingUp) canvas.rotate(lastHeading - bearing)
         arrow.reset()
         arrow.moveTo(0f, -r * 0.5f)
@@ -672,6 +672,6 @@ class TileOverlayView(context: Context) : View(context) {
         const val MAX_GLIDE_M = 2_000.0
         const val GLOW_STEPS = 16
         const val GLOW_STEP_DP = 0.8f
-        const val GLOW_ALPHA = 13
+        const val GLOW_ALPHA = 16
     }
 }

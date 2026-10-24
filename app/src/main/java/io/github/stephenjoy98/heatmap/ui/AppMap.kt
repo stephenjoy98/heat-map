@@ -609,8 +609,8 @@ private fun VectorAppMap(
         overlay.navDark = look.dark
         // The follow me marker glows in the colour your routes are drawn in.
         overlay.navGlow = when (palette) {
-            HeatPalette.FIRE -> if (look.dark) android.graphics.Color.rgb(185, 30, 62) else android.graphics.Color.rgb(170, 28, 22)
-            HeatPalette.ICE -> if (look.dark) android.graphics.Color.rgb(28, 100, 200) else android.graphics.Color.rgb(14, 50, 160)
+            HeatPalette.FIRE -> if (look.dark) android.graphics.Color.rgb(128, 10, 44) else android.graphics.Color.rgb(170, 28, 22)
+            HeatPalette.ICE -> if (look.dark) android.graphics.Color.rgb(18, 55, 165) else android.graphics.Color.rgb(14, 50, 160)
         }
         overlay.navHeadingUp = navMarker && look.buildings
     }

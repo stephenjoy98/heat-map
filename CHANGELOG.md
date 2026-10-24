@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.6] - 2026-10-24
+
+### Changed
+- The follow me marker is a little smaller, and its ring and glow match the dark red of your routes (dark blue with
+  Ice).
+
 ## [2.45.5] - 2026-10-24
 
 ### Changed
