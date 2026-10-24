@@ -224,6 +224,33 @@ back
 tap text "Map"
 shot 15-map-after 4
 
+# Follow me: long-press the location button (its description starts "Go to my latest position" or "Turn map").
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+read -r fx fy <<< "$(python3 -I - "$OUT/.ui.xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(0)
+for node in root.iter("node"):
+    d = node.get("content-desc") or ""
+    if "long-press to follow you" in d:
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+)"
+if [ -n "${fx:-}" ]; then
+    adb shell input swipe "$fx" "$fy" "$fx" "$fy" 900
+    note "long-pressed the location button (follow me)"
+    shot 15a-follow 4
+    adb shell input tap "$fx" "$fy"
+    note "tapped it again to stop following"
+else
+    note "MISSING the location button for follow me"
+fi
+
 # Full screen: only the compass, location, zoom, layers and full-screen buttons stay; the second shot is taken
 # mid-animation to catch the controls flying out.
 tap desc "Full screen"
