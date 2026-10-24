@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.45.3**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.45.4**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -151,9 +151,9 @@ travel stats, Insights (AI write-ups), backup and friends.
   `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; 2.45.0: panning
   (`MapCamera.panTick`) no longer stops it, it pauses `FOLLOW_PAUSE_MS` 5 s then glides back; tap = come back now;
   long-press again stops it (user's request); 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red marker squashed
-  by the tilt; 2.45.2: black and white exactly like Uber (the user tried red/3D puck
-  versions in 2.45.0–2.45.1 and found them weird): flat white disc, thick black ring, solid black arrow, soft shadow;
-  `navDark` strengthens the shadow (2.45.3: white outline removed at the user's request; tilted >2° = thin disc with a
+  by the tilt; 2.45.4: "trace cursor" from the user's mockup (after red/3D puck and Uber
+  black-and-white tries in 2.45.0–2.45.3): dark disc, white arrow, ring + glow (4 translucent circles, no blur/gradient)
+  in `navGlow` = the heat palette's colour (FIRE red-pink / ICE blue, set in AppMap); (2.45.3: no outline; tilted >2° = thin disc with a
   dark edge from stacked ovals; `navHeadingUp` (follow + 3D) draws the arrow straight up; follow starts with
   `MapCamera.snapTo` (350 ms, zoom 17 + bearing); bearing glides keep the target tilt so they don't stop the 3D tilt); in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
   with range slider, soft delete/restore, move/add dots (2.45.0: `DotEditState.placing` MOVE/ADD, next map tap →

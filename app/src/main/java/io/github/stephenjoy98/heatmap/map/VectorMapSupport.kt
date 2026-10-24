@@ -478,18 +478,27 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** Dark theme: a stronger shadow, so the marker stands out on the dark map. */
+    /** Dark theme: kept for the marker's look on the dark map. */
     var navDark: Boolean = false
         set(value) {
             if (value == field) return
             field = value
-            navShadow.color = if (value) Color.argb(110, 0, 0, 0) else Color.argb(60, 0, 0, 0)
             invalidate()
         }
+
+    /** The colour the follow me marker's ring glows in: the colour of your routes. */
+    var navGlow: Int = Color.rgb(236, 48, 88)
+        set(value) {
+            if (value == field) return
+            field = value
+            navRing.color = value
+            invalidate()
+        }
+    private val navHalo = Paint(Paint.ANTI_ALIAS_FLAG)
     private var lastHeading = 0f
-    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val navArrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-    private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(25, 25, 25) }
+    private val navDisc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(36, 33, 38) }
+    private val navArrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val navSide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(14, 13, 16) }
     private val navOval = android.graphics.RectF()
 
     /** Heading-up following: the map turns with you, so the arrow is drawn pointing straight up at once. */
@@ -500,10 +509,9 @@ class TileOverlayView(context: Context) : View(context) {
             invalidate()
         }
     private val navRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.BLACK
+        color = Color.rgb(236, 48, 88)
         style = Paint.Style.STROKE
     }
-    private val navShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(60, 0, 0, 0) }
 
     var latest: LatLng? = null
         set(value) {
@@ -610,21 +618,26 @@ class TileOverlayView(context: Context) : View(context) {
     }
 
     /**
-     * Uber's navigation marker: a flat white disc with a thick black ring and a black arrow pointing the way
-     * you're heading (the last known way while you're still), on a soft shadow. On a tilted map it lies flat
-     * and becomes a thin disc, its dark edge showing below the face.
+     * The trace cursor: a dark disc with a white arrow pointing the way you're heading (the last known way while
+     * you're still), ringed and glowing in the colour of your routes. On a tilted map it lies flat and becomes a
+     * thin disc, its dark edge showing below the face.
      */
     private fun drawNavMarker(canvas: Canvas, x: Float, y: Float, bearing: Float, tilt: Float) {
         heading?.let { lastHeading = it }
-        val r = 16 * density
+        val r = 20 * density
         val t = Math.toRadians(tilt.toDouble())
         val squash = cos(t).toFloat().coerceAtLeast(0.35f)
         // How thick the disc looks: nothing from straight above, a few pixels when tilted.
         val lift = if (tilt > 2f) 3.5f * density * kotlin.math.sin(t).toFloat() else 0f
+        // The glow: rings of the route colour, fainter further out (plain circles, no gradient or blur).
         canvas.save()
-        canvas.translate(x, y + 2 * density)
+        canvas.translate(x, y)
         canvas.scale(1f, squash)
-        canvas.drawCircle(0f, 0f, r + 2.5f * density, navShadow)
+        for (i in GLOW_STEPS downTo 1) {
+            navHalo.color = navGlow
+            navHalo.alpha = 70 / i
+            canvas.drawCircle(0f, 0f, r + i * 3 * density, navHalo)
+        }
         canvas.restore()
         if (lift > 0f) {
             // The disc's edge: its outline stacked from the ground up to the face.
@@ -639,14 +652,14 @@ class TileOverlayView(context: Context) : View(context) {
         canvas.translate(x, y - lift)
         canvas.scale(1f, squash)
         canvas.drawCircle(0f, 0f, r, navDisc)
-        navRing.strokeWidth = 3.5f * density
-        canvas.drawCircle(0f, 0f, r - 1.75f * density, navRing)
+        navRing.strokeWidth = 3f * density
+        canvas.drawCircle(0f, 0f, r - 1.5f * density, navRing)
         if (!navHeadingUp) canvas.rotate(lastHeading - bearing)
         arrow.reset()
-        arrow.moveTo(0f, -r * 0.55f)
-        arrow.lineTo(r * 0.5f, r * 0.42f)
-        arrow.lineTo(0f, r * 0.2f)
-        arrow.lineTo(-r * 0.5f, r * 0.42f)
+        arrow.moveTo(0f, -r * 0.5f)
+        arrow.lineTo(r * 0.42f, r * 0.4f)
+        arrow.lineTo(0f, r * 0.18f)
+        arrow.lineTo(-r * 0.42f, r * 0.4f)
         arrow.close()
         canvas.drawPath(arrow, navArrow)
         canvas.restore()
@@ -658,5 +671,6 @@ class TileOverlayView(context: Context) : View(context) {
         const val MIN_GLIDE_MS = 300L
         const val MAX_GLIDE_MS = 2_500L
         const val MAX_GLIDE_M = 2_000.0
+        const val GLOW_STEPS = 4
     }
 }

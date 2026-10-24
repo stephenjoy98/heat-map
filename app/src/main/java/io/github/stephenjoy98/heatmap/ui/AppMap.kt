@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.data.MapLayerType
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.HeatPalette
 import io.github.stephenjoy98.heatmap.map.TileBitmapSource
 import kotlinx.coroutines.delay
 import io.github.stephenjoy98.heatmap.map.TileOverlayView
@@ -507,6 +508,7 @@ private fun VectorAppMap(
     }
     val loadRoute3d by rememberUpdatedState(route3d)
     val currentLook by rememberUpdatedState(look)
+    val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
     val overlay = holder.overlay
     SideEffect {
         holder.onClick = onMapClick
@@ -605,6 +607,11 @@ private fun VectorAppMap(
         overlay.heading = heading
         overlay.navMarker = navMarker
         overlay.navDark = look.dark
+        // The follow me marker glows in the colour your routes are drawn in.
+        overlay.navGlow = when (palette) {
+            HeatPalette.FIRE -> if (look.dark) android.graphics.Color.rgb(236, 48, 88) else android.graphics.Color.rgb(215, 40, 30)
+            HeatPalette.ICE -> if (look.dark) android.graphics.Color.rgb(45, 140, 250) else android.graphics.Color.rgb(20, 70, 200)
+        }
         overlay.navHeadingUp = navMarker && look.buildings
     }
 

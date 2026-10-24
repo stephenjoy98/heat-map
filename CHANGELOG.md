@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.45.4] - 2026-10-24
+
+### Changed
+- New follow me marker, the trace cursor: a dark disc with a white arrow, ringed and glowing in the colour of your
+  routes (red with Fire, blue with Ice). It's still a thin disc on the 3D map.
+
 ## [2.45.3] - 2026-10-24
 
 ### Changed
