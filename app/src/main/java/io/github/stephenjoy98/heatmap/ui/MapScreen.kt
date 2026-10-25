@@ -188,7 +188,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     // The way you were last heading, kept while you stop, for turning the map in 3D follow me.
     var lastHeading by remember { mutableFloatStateOf(Float.NaN) }
     LaunchedEffect(heading) { heading?.let { lastHeading = it } }
-    val tilted3d by Prefs.buildings3d.collectAsStateWithLifecycle()
     // Routes at their recorded heights, for the 3D buildings view.
     val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
     val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
@@ -251,8 +250,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             val at = dotAt ?: return@LaunchedEffect
             if (!following) return@LaunchedEffect
             val now = android.os.SystemClock.uptimeMillis()
-            // In 3D the map turns with you so the arrow points straight ahead (up); flat, it stays north up.
-            val turn = if (tilted3d) lastHeading else Float.NaN
+            // The map turns with you so the arrow points straight ahead (up), flat or in 3D.
+            val turn = lastHeading
             val sincePan = now - lastPanAt
             if (lastFollowAt == 0L) {
                 // Just started: jump in close to you straight away, already turned your way in 3D.
@@ -269,13 +268,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 camera.glideTo(at.latitude, at.longitude, (now - lastFollowAt).coerceIn(300L, 2_500L).toInt(), turn)
             }
             lastFollowAt = android.os.SystemClock.uptimeMillis()
-        }
-        // Tilting into 3D (or back) while following turns the map at once: heading-up in 3D, north up flat.
-        LaunchedEffect(tilted3d) {
-            val at = dotAt
-            if (following && at != null && lastFollowAt != 0L) {
-                camera.glideTo(at.latitude, at.longitude, 400, if (tilted3d) lastHeading else 0f)
-            }
         }
         // While the accuracy card is open, touching the map anywhere else closes it. The buttons drawn above
         // this still work as usual.
@@ -436,7 +428,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                                     when {
                                         following -> dotAt?.let {
                                             lastPanAt = 0L
-                                            camera.glideTo(it.latitude, it.longitude, 600, if (tilted3d) lastHeading else Float.NaN)
+                                            camera.glideTo(it.latitude, it.longitude, 600, lastHeading)
                                         }
                                         latest == null -> scope.launch { snackbar.showSnackbar("No points recorded yet") }
                                         turnsNorth -> camera.northUp()
@@ -448,6 +440,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                                     if (following) {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         following = false
+                                        // Back to north up, as the map was before following.
+                                        camera.northUp()
                                         scope.launch {
                                             snackbar.currentSnackbarData?.dismiss()
                                             snackbar.showSnackbar("Stopped following you")

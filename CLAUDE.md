@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.46.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.46.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -155,7 +155,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   black-and-white tries in 2.45.0–2.45.3): dark disc, white arrow, ring + glow (4 translucent circles, no blur/gradient)
   in `navGlow` = the heat palette's colour (FIRE red-pink / ICE blue, set in AppMap; 2.45.6 at the user's request matches the route line: dark map FIRE rgb(128,10,44), ICE rgb(18,55,165); r 16 dp; glow = 16 circles 0.8 dp apart, alpha 16; arrow light grey rgb(200,200,205)); (2.45.3: no outline; tilted >2° = thin disc with a
   dark edge from stacked ovals; `navHeadingUp` (follow + 3D) draws the arrow straight up; follow starts with
-  `MapCamera.snapTo` (350 ms, zoom 17 + bearing); bearing glides keep the target tilt so they don't stop the 3D tilt); in 3D (`buildings3d`) the glide also sets bearing = last heading, heading-up)), `TimelineScreen` (also hosts **Edit dots**
+  `MapCamera.snapTo` (350 ms, zoom 17 + bearing); bearing glides keep the target tilt so they don't stop the 3D tilt); the glide also sets bearing = last heading, heading-up (since 2.46.1 flat too, at the user's request; `navHeadingUp` = following; stopping calls `northUp()`))), `TimelineScreen` (also hosts **Edit dots**
   with range slider, soft delete/restore, move/add dots (2.45.0: `DotEditState.placing` MOVE/ADD, next map tap →
   `PointStore.movePoint` / `addPointAfter` (halfway in time to the next dot, same trip, accuracy 5 m) then `refreshTrip`;
   undo = move back / `removeAddedPoint` + `restore(snapshot)`; for ferry routes, which are TRACK so never road-snapped), undo snackbar over the map, layers button; long-press a trip row

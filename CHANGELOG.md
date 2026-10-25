@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.46.1] - 2026-10-25
+
+### Changed
+- Follow me turns the map with you on the flat map too: the marker's arrow points straight up and the map rotates
+  as you change direction. Stopping follow me turns the map back north up.
+
 ## [2.46.0] - 2026-10-25
 
 ### Added
