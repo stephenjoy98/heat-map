@@ -76,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.GeoBox
@@ -199,6 +201,25 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
         if (!centered && latest != null) {
             camera.moveTo(latest.lat, latest.lon, 15f)
             centered = true
+        }
+    }
+
+    // While following you with the app on screen, record every second; back to the usual interval when follow me
+    // stops or the app goes to the background.
+    val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val boost = following && lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+    LaunchedEffect(boost) {
+        if (Prefs.followBoost.value != boost) {
+            Prefs.setFollowBoost(boost)
+            if (Prefs.tracking.value) LocationTickerService.start(context)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (Prefs.followBoost.value) {
+                Prefs.setFollowBoost(false)
+                if (Prefs.tracking.value) LocationTickerService.start(context)
+            }
         }
     }
 
@@ -439,7 +460,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                                         following = true
                                         scope.launch {
                                             snackbar.currentSnackbarData?.dismiss()
-                                            snackbar.showSnackbar("Following you. Long-press the button again to stop.")
+                                            snackbar.showSnackbar("Following you, recording every second. Long-press the button again to stop.")
                                         }
                                     }
                                 },

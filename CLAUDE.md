@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.45.6**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.46.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -150,7 +150,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   bottom-left, location/zoom/layers bottom-right, record panel; long-press location = follow me (`following`:
   `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; 2.45.0: panning
   (`MapCamera.panTick`) no longer stops it, it pauses `FOLLOW_PAUSE_MS` 5 s then glides back; tap = come back now;
-  long-press again stops it (user's request); 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red marker squashed
+  long-press again stops it (user's request); 2.46.0: following with the app STARTED sets runtime `Prefs.followBoost` → service records every `FOLLOW_SEC` 1 s with high accuracy (overrides auto/place), restored on stop/background/dispose via `LocationTickerService.start`; 2.44.0: `TileOverlayView.navMarker` draws an Uber-style red marker squashed
   by the tilt; 2.45.4: "trace cursor" from the user's mockup (after red/3D puck and Uber
   black-and-white tries in 2.45.0–2.45.3): dark disc, white arrow, ring + glow (4 translucent circles, no blur/gradient)
   in `navGlow` = the heat palette's colour (FIRE red-pink / ICE blue, set in AppMap; 2.45.6 at the user's request matches the route line: dark map FIRE rgb(128,10,44), ICE rgb(18,55,165); r 16 dp; glow = 16 circles 0.8 dp apart, alpha 16; arrow light grey rgb(200,200,205)); (2.45.3: no outline; tilted >2° = thin disc with a

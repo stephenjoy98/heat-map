@@ -109,7 +109,8 @@ up to your Google account, and lets you compare explored areas with friends.
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
 - **Follow me**: long-press the location button to keep your dot in the middle of the map while you travel,
   shown as a trace cursor (a dark disc with a white arrow, glowing in your routes' colour; a thin disc on the 3D map) pointing your way. Drag the map to look around
-  and it comes back to you after a few seconds; long-press the button again to stop.
+  and it comes back to you after a few seconds; long-press the button again to stop. While following (with the
+  app on screen) it records every second, then goes back to your usual interval.
 - **Altimeter and speedometer** on the map (left, opposite the compass) from GPS; the speedometer shrinks to a dot
   when you're still; tapping the **compass** when north up tilts the
   map into 3D and back.

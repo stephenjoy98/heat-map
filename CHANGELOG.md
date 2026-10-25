@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.46.0] - 2026-10-25
+
+### Added
+- While follow me is on (and the app is on screen), recording switches to every second, so the route is traced in
+  full detail. It goes back to your usual interval when you stop following or leave the app.
+
 ## [2.45.6] - 2026-10-24
 
 ### Changed

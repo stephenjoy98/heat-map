@@ -169,12 +169,14 @@ class LocationTickerService : Service() {
     private var currentPlace: SavedPlace? = null
 
     private fun requestUpdates() {
-        val seconds = placeSec ?: if (Prefs.autoInterval.value) autoSec else Prefs.intervalSec.value
+        // Follow me on the map: every second, with GPS, until it's turned off.
+        val boost = Prefs.followBoost.value
+        val seconds = if (boost) FOLLOW_SEC else placeSec ?: if (Prefs.autoInterval.value) autoSec else Prefs.intervalSec.value
         Prefs.setLiveIntervalSec(seconds)
         val interval = seconds * 1000L
         // Settled at a saved place, Wi-Fi and cell positioning are plenty and use much less battery.
-        val settled = placeSec != null && placeSec!! >= PLACE_WATCH_SEC * 2
-        val highAccuracy = Prefs.highAccuracy.value && !settled
+        val settled = !boost && placeSec != null && placeSec!! >= PLACE_WATCH_SEC * 2
+        val highAccuracy = boost || (Prefs.highAccuracy.value && !settled)
         handler.post {
             intervalMs = interval
             maxAccuracyM = accuracyLimitM(highAccuracy)
@@ -341,6 +343,7 @@ class LocationTickerService : Service() {
     companion object {
         // How often to record at a saved place once you start moving, to catch leaving it.
         private const val PLACE_WATCH_SEC = 20
+        private const val FOLLOW_SEC = 1
         private val MOVING_ACTIVITIES = setOf(
             DetectedActivity.IN_VEHICLE, DetectedActivity.ON_BICYCLE, DetectedActivity.WALKING,
             DetectedActivity.RUNNING, DetectedActivity.ON_FOOT,

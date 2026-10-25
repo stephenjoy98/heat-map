@@ -46,6 +46,14 @@ object Prefs {
     private val _savedPlaces = MutableStateFlow<List<SavedPlace>>(emptyList())
     val savedPlaces: StateFlow<List<SavedPlace>> = _savedPlaces
 
+    /** Follow me is on with the app in front: record every second meanwhile (not saved). */
+    private val _followBoost = MutableStateFlow(false)
+    val followBoost: StateFlow<Boolean> = _followBoost
+
+    fun setFollowBoost(on: Boolean) {
+        _followBoost.value = on
+    }
+
     /** The saved place you're at right now while recording, if any (not saved). */
     private val _atPlace = MutableStateFlow<SavedPlace?>(null)
     val atPlace: StateFlow<SavedPlace?> = _atPlace
