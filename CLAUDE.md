@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.49.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.49.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -163,7 +163,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
   the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back
   same-mode trips (long-press expands; `flattened()` for lookups); multi-select (`picked` set,
-  `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null →
+  `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null (2.49.1: a window with no dots inside starts on the dots either side, never the middle of the day) →
   `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`,
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
   then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked; on part of a trip addTrip splits it,

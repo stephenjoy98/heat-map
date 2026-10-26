@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.49.1] - 2026-10-26
+
+### Fixed
+- "Add a trip here" on a stay with no dots in between (only one at each end) opened a different part of the day
+  (the middle of all the day's dots). It now starts on the dots either side of that stay.
+
 ## [2.49.0] - 2026-10-26
 
 ### Added

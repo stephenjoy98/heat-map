@@ -252,9 +252,15 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             var first = pts.indexOfFirst { it.time >= window.first }
             var last = pts.indexOfLast { it.time <= window.last }
             if (first < 0 || last < first) {
-                // Nothing in the stretch: start from the middle of the day's dots.
-                first = pts.size * 2 / 5
-                last = (pts.size * 3 / 5).coerceAtLeast(minOf(first + 1, pts.size - 1))
+                // No dots inside the stretch (a stay with a dot only at each end, say): take the dots on either side
+                // of it, so the range stays where it was asked for instead of jumping elsewhere in the day.
+                val before = pts.indexOfLast { it.time <= window.first }
+                val after = pts.indexOfFirst { it.time >= window.last }
+                first = if (before >= 0) before else after.coerceAtLeast(0)
+                last = if (after >= 0) after else pts.size - 1
+                if (last <= first) {
+                    if (last < pts.size - 1) last = first + 1 else first = (last - 1).coerceAtLeast(0)
+                }
             }
             retime.range = first..last.coerceAtMost(pts.size - 1)
             // Splitting starts half way through the trip.
