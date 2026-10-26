@@ -64,6 +64,10 @@ object Prefs {
     private val _buildings3d = MutableStateFlow(false)
     val buildings3d: StateFlow<Boolean> = _buildings3d
 
+    /** The map is tilted into 3D (compass or two fingers); separate from 3D buildings, which also show flat. */
+    private val _mapTilted = MutableStateFlow(false)
+    val mapTilted: StateFlow<Boolean> = _mapTilted
+
     /** Whether routes are raised to their recorded heights when the map is in 3D (Map layers › 3D routes). */
     private val _routes3d = MutableStateFlow(true)
     val routes3d: StateFlow<Boolean> = _routes3d
@@ -255,7 +259,9 @@ object Prefs {
         _savedPlaces.value = SavedPlace.decode(sp.getString("saved_places", null))
         _settingsAsPages.value = sp.getBoolean("settings_pages", true)
         _mapLayer.value = MapLayerType.entries.byName(sp.getString("map_layer", null)) ?: MapLayerType.DEFAULT
-        _buildings3d.value = sp.getBoolean("buildings_3d", false)
+        _buildings3d.value = sp.getBoolean("buildings_3d", "map_tilted", false)
+        // Before 2.47.0 one switch did both: a map with 3D buildings was a tilted one.
+        _mapTilted.value = sp.getBoolean("map_tilted", _buildings3d.value)
         _showLocationDot.value = sp.getBoolean("show_location_dot", true)
         _routes3d.value = sp.getBoolean("routes_3d", true)
         _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
@@ -533,6 +539,11 @@ object Prefs {
     fun setBuildings3d(on: Boolean) {
         _buildings3d.value = on
         sp.edit().putBoolean("buildings_3d", on).apply()
+    }
+
+    fun setMapTilted(on: Boolean) {
+        _mapTilted.value = on
+        sp.edit().putBoolean("map_tilted", on).apply()
     }
 
     fun setShowLocationDot(on: Boolean) {

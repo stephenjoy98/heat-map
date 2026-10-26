@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.46.3**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.47.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -145,7 +145,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   Compare; back = pop page → Map tab → exit confirm), `Navigation.kt` (PageStack, predictive back,
   `GrowFromSource` popups, `trackBounds`), `AppMap.kt` (MapLibre only; `MapCamera` with commands/actions,
   bearing, cameraTick, metersPerPixel, moving, projector; per-activity `VectorMapCache` keeps each tab's map
-  alive via `cacheKey`; tilt >8° by hand turns 3D on, <2° turns it off; 3D route loader), `MapScreen`
+  alive via `cacheKey`; 2.47.0: `Prefs.mapTilted` ("map_tilted", seeded from buildings_3d) is the tilt/3D view (compass, gestures: tilt >8° by hand turns it on, <2° off; gates 3D routes, follow tilt) and `Prefs.buildings3d` only adds the extrusions, flat or tilted (user's request); 3D route loader), `MapScreen`
   (filter button + chips, stats, profile button, scale bar + compass under the top row, accuracy button
   bottom-left, location/zoom/layers bottom-right, record panel; long-press location = follow me (`following`:
   `MapCamera.glideTo` per dot update with `easeCamera` linear, same duration as the dot's glide; 2.45.0: panning

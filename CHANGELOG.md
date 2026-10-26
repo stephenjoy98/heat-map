@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.47.0] - 2026-10-26
+
+### Changed
+- 3D buildings (in the map layers sheet) now show on the flat map too, not only when it's tilted. Tilting the
+  map into 3D (compass or two fingers) is separate and no longer turns buildings on or off.
+
 ## [2.46.3] - 2026-10-26
 
 ### Changed

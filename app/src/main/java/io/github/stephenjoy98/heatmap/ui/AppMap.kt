@@ -201,11 +201,12 @@ fun AppMap(
     val dark = isDarkTheme()
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
+    val tilted by Prefs.mapTilted.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading, navMarker)
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading, navMarker, tilted)
 }
 
-/** How the base map looks: theme, terrain shading and 3D buildings (which also tilt the camera). */
+/** How the base map looks: theme, terrain shading and 3D buildings (shown flat or tilted). */
 private data class MapLook(val dark: Boolean, val terrain: Boolean = false, val buildings: Boolean = false)
 
 private const val TILT_3D = 45f
@@ -499,6 +500,8 @@ private fun VectorAppMap(
     bottomInset: Dp,
     heading: Float?,
     navMarker: Boolean,
+    // Tilted into 3D (compass or two fingers); 3D routes are raised only then.
+    tilted: Boolean,
 ) {
     val holder = rememberVectorMap(cacheKey)
     val context = LocalContext.current
@@ -507,7 +510,7 @@ private fun VectorAppMap(
         holder.withMap { m -> m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, ((ATTRIBUTION_BOTTOM_DP + bottomInset.value) * dp).toInt()) }
     }
     val loadRoute3d by rememberUpdatedState(route3d)
-    val currentLook by rememberUpdatedState(look)
+    val currentTilted by rememberUpdatedState(tilted)
     val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
     val overlay = holder.overlay
     SideEffect {
@@ -541,14 +544,14 @@ private fun VectorAppMap(
                 }
                 m.addOnCameraMoveListener {
                     report()
-                    // Tilting by hand switches 3D buildings on; tilting back flat switches them off.
+                    // Tilting by hand puts the map in 3D; tilting back flat lays it flat.
                     if (holder.gesture) {
                         val tilt = m.cameraPosition.tilt
-                        if (tilt > AUTO_3D_TILT && !Prefs.buildings3d.value) {
+                        if (tilt > AUTO_3D_TILT && !Prefs.mapTilted.value) {
                             holder.tiltedByGesture = true
-                            Prefs.setBuildings3d(true)
-                        } else if (tilt < AUTO_FLAT_TILT && Prefs.buildings3d.value) {
-                            Prefs.setBuildings3d(false)
+                            Prefs.setMapTilted(true)
+                        } else if (tilt < AUTO_FLAT_TILT && Prefs.mapTilted.value) {
+                            Prefs.setMapTilted(false)
                         }
                     }
                 }
@@ -589,14 +592,14 @@ private fun VectorAppMap(
     LaunchedEffect(look) { holder.setLook(look) }
     MapBrightness(holder, look.dark)
 
-    LaunchedEffect(look.buildings) {
+    LaunchedEffect(tilted) {
         holder.withMap { m ->
             // Switched on by tilting: keep the angle the user chose.
-            if (look.buildings && holder.tiltedByGesture) {
+            if (tilted && holder.tiltedByGesture) {
                 holder.tiltedByGesture = false
                 return@withMap
             }
-            val tilt = if (look.buildings) TILT_3D.toDouble() else 0.0
+            val tilt = if (tilted) TILT_3D.toDouble() else 0.0
             if (m.cameraPosition.tilt != tilt) m.animateCamera(org.maplibre.android.camera.CameraUpdateFactory.tiltTo(tilt), 600)
         }
     }
@@ -620,12 +623,12 @@ private fun VectorAppMap(
         overlay.refresh()
     }
 
-    // 3D route: while 3D buildings are on, load the routes in view whenever the camera settles (or the style
+    // 3D route: while the map is tilted, load the routes in view whenever the camera settles (or the style
     // reloads, or new dots arrive) and draw them at their recorded heights.
     // Off in Map layers › 3D routes: the map still tilts, with your routes drawn flat.
     val raised by Prefs.routes3d.collectAsStateWithLifecycle()
-    LaunchedEffect(holder, camera, look.buildings, route3d != null, refreshKey, raised) {
-        if (!look.buildings || route3d == null || !raised) {
+    LaunchedEffect(holder, camera, tilted, route3d != null, refreshKey, raised) {
+        if (!tilted || route3d == null || !raised) {
             holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
             return@LaunchedEffect
         }
@@ -660,7 +663,7 @@ private fun VectorAppMap(
                             // an angle picked by hand in 3D is kept.
                             .tilt(
                                 when {
-                                    !currentLook.buildings -> 0.0
+                                    !currentTilted -> 0.0
                                     m.cameraPosition.tilt >= TILT_3D * 0.6 -> m.cameraPosition.tilt
                                     else -> TILT_3D.toDouble()
                                 }

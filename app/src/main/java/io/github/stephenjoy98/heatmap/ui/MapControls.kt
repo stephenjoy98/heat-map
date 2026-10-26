@@ -94,7 +94,7 @@ fun LayersButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  */
 @Composable
 fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
-    val tilted by Prefs.buildings3d.collectAsStateWithLifecycle()
+    val tilted by Prefs.mapTilted.collectAsStateWithLifecycle()
     val rotated = ((camera.bearing % 360f) + 360f) % 360f in 1f..359f
     val action = when {
         rotated -> "Turn the map back to north"
@@ -103,7 +103,7 @@ fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
     }
     Tip(action, modifier) {
         Surface(
-            onClick = { if (rotated) camera.northUp() else Prefs.setBuildings3d(!tilted) },
+            onClick = { if (rotated) camera.northUp() else Prefs.setMapTilted(!tilted) },
             shape = CircleShape,
             color = controlColor(),
             shadowElevation = 3.dp,
