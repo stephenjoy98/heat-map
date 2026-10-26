@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.47.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.48.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -139,7 +139,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   blue location dot that glides linearly between positions over the time between them (2.37.1; MapScreen feeds
   the newer of the last recorded dot and the live fix ≤50 m; `heading` arrow from the live fix's bearing when >1 m/s)),
   heat rendering (`HeatRenderer.PASS_ALPHA` 0.085 ≈ 30 passes to saturate; `HeatRamps.own/friend(palette, dark)`,
-  Prefs `heat_palette` FIRE/ICE chosen in the layers sheet; friends get the other palette), smoothing, tile sources.
+  Prefs `heat_palette` FIRE/ICE/WHITE (2.48.0: WHITE = flat `plainWhite`/`plainDark` ramp, no heat; friends then use Fire) chosen in the layers sheet; friends get the other palette), smoothing, tile sources.
 - `ui/`: `MainActivity` (AppScaffold: tabs **Map** and **Timeline**; `PageHost` page stack for Profile,
   Friends, Backup, Settings, About, Changelog, **Insights** (file still `ReviewScreen.kt`, enum `Page.REVIEW`),
   Compare; back = pop page → Map tab → exit confirm), `Navigation.kt` (PageStack, predictive back,

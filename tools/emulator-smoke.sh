@@ -176,6 +176,11 @@ tap_scrolling text "Ice"
 shot 02d-layers-ice 2
 back
 shot 02c-map-vivid 4
+# Plain white routes (no heat), then back to Fire.
+tap desc "Map layers"
+tap_scrolling text "White"
+back
+shot 02e-map-white 4
 tap desc "Map layers"
 tap_scrolling text "Fire"
 back

@@ -230,12 +230,18 @@ object HeatRamps {
     fun own(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {
         HeatPalette.FIRE -> if (dark) darkHeat else lightHeat
         HeatPalette.ICE -> if (dark) darkIce else lightIce
+        HeatPalette.WHITE -> if (dark) plainWhite else plainDark
     }
+
+    /** Plain routes, no heat: every road you've used in white (near-black on the white map, where white wouldn't show). */
+    val plainWhite = build(floatArrayOf(0f, 240f, 240f, 240f), floatArrayOf(1f, 240f, 240f, 240f))
+    val plainDark = build(floatArrayOf(0f, 45f, 45f, 50f), floatArrayOf(1f, 45f, 45f, 50f))
 
     /** A friend's heatmap: the other palette, so theirs and yours always look different. */
     fun friend(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {
         HeatPalette.FIRE -> if (dark) darkFriend else lightFriend
         HeatPalette.ICE -> if (dark) darkHeat else lightHeat
+        HeatPalette.WHITE -> if (dark) darkHeat else lightHeat
     }
 
     /** Light orange to deep crimson, which reads well on the white map. */

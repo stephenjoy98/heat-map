@@ -14,7 +14,7 @@ enum class MapTheme { SYSTEM, DARK, LIGHT }
 enum class MapLayerType { DEFAULT, TERRAIN }
 
 /** The heatmap's colours: Fire (dark red to white) or Ice (darkest blue to white). */
-enum class HeatPalette { FIRE, ICE }
+enum class HeatPalette { FIRE, ICE, WHITE }
 
 /** Where Review insights are written. */
 enum class AiEngine { ON_DEVICE, CLOUD, STATS }

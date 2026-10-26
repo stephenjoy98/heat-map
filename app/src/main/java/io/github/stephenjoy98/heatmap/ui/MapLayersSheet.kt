@@ -135,6 +135,8 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LayerTile("Fire", palette == HeatPalette.FIRE, { Prefs.setHeatPalette(HeatPalette.FIRE) }) { drawHeatArt(FIRE_STOPS) }
                 LayerTile("Ice", palette == HeatPalette.ICE, { Prefs.setHeatPalette(HeatPalette.ICE) }) { drawHeatArt(ICE_STOPS) }
+                // No heat: every route the same plain white.
+                LayerTile("White", palette == HeatPalette.WHITE, { Prefs.setHeatPalette(HeatPalette.WHITE) }) { drawHeatArt(WHITE_STOPS) }
             }
             // Routes draws the lines you travelled; Dots draws where the recorded dots are, thicker where there are more.
             val display by Prefs.displayMode.collectAsStateWithLifecycle()
@@ -314,6 +316,7 @@ private fun DrawScope.drawBuildingsArt(c: ArtColors) {
 
 // The heatmap palettes' own colours (map elements aren't themed), from one visit to the most.
 private val FIRE_STOPS = listOf(Color(0xFF78082D), Color(0xFFDC2819), Color(0xFFFF9100), Color(0xFFFFF0A0), Color.White)
+private val WHITE_STOPS = List(5) { Color(0xFFF0F0F0) }
 private val ICE_STOPS = listOf(Color(0xFF0C1969), Color(0xFF195AD7), Color(0xFF46B4FF), Color(0xFFC8EEFF), Color.White)
 
 /** A heatmap palette as stripes of solid colour, from one visit (left) to the most (right). */

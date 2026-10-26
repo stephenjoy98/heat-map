@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.48.0] - 2026-10-26
+
+### Added
+- **White** in the map layers sheet's Heatmap colours: your explored routes drawn plain white, without the heat
+  colours (dark grey on the light map, where white wouldn't show). Friends' routes stay in Fire colours.
+
 ## [2.47.0] - 2026-10-26
 
 ### Changed

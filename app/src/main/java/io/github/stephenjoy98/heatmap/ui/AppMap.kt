@@ -614,6 +614,7 @@ private fun VectorAppMap(
         overlay.navGlow = when (palette) {
             HeatPalette.FIRE -> if (look.dark) android.graphics.Color.rgb(128, 10, 44) else android.graphics.Color.rgb(170, 28, 22)
             HeatPalette.ICE -> if (look.dark) android.graphics.Color.rgb(18, 55, 165) else android.graphics.Color.rgb(14, 50, 160)
+            HeatPalette.WHITE -> if (look.dark) android.graphics.Color.rgb(150, 150, 155) else android.graphics.Color.rgb(60, 60, 65)
         }
         overlay.navHeadingUp = navMarker
     }

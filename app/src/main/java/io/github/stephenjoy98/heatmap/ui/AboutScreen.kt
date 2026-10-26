@@ -66,7 +66,7 @@ private const val REPO_URL = "https://github.com/$GITHUB_USER/heat-map"
 /** What the app does, in a few lines for the About page. */
 // What the app can do today. Keep this up to date with every release (see CLAUDE.md).
 private val FEATURES = listOf(
-    R.drawable.ic_map to "A heatmap of everywhere you've been, on OpenStreetMap, with terrain, 3D buildings, adjustable colours and Fire or Ice heat colours",
+    R.drawable.ic_map to "A heatmap of everywhere you've been, on OpenStreetMap, with terrain, 3D buildings, adjustable colours and Fire, Ice or plain white routes",
     R.drawable.ic_timer to "Automatic recording, from every second on the move to every minute when still",
     R.drawable.ic_home to "Saved places like home and work, where recording slows down to save battery",
     R.drawable.ic_track_changes to "Say what trip you're on from the recording tile, or let the app work it out",
