@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.46.3] - 2026-10-26
+
+### Changed
+- "How did you travel?" takes two steps now: tap a travel mode (the best guess is picked to start with), then
+  Save, so a stray tap doesn't answer it.
+- The Undo banner on the Timeline shows at the top of the screen, so it no longer covers Skip and Save.
+
 ## [2.46.2] - 2026-10-26
 
 ### Changed

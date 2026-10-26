@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -828,8 +829,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             }
         }
     }
-        // "Undo" after each change to trips and each answer.
-        SwipeSnackbarHost(undoSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = contentPadding.calculateBottomPadding()))
+        // "Undo" after each change to trips and each answer: at the top, clear of the Skip and Save buttons below.
+        SwipeSnackbarHost(undoSnackbar, Modifier.align(Alignment.TopCenter).statusBarsPadding())
     }
 
     if (layersOpen) {

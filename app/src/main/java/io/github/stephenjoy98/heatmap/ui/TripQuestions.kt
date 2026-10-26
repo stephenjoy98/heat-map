@@ -166,6 +166,9 @@ private fun TripQuestionCard(
     val lines = remember(path, lineColor) { listOf(PreviewLine(path, lineColor, 5f)) }
     val start = Date(trip.startTime)
     val time = DateFormat.getTimeInstance(DateFormat.SHORT)
+    // Two steps: pick a mode (the best guess is picked to start with), then Save.
+    var chosen by remember(trip.id) { mutableStateOf<TravelMode?>(null) }
+    val answer = chosen ?: trip.inferredMode
     QuestionCard("How did you travel?", left, modifier) {
         Spacer(Modifier.height(6.dp))
         Text(
@@ -190,11 +193,13 @@ private fun TripQuestionCard(
             modifier = Modifier.padding(top = 4.dp),
         )
         Spacer(Modifier.height(8.dp))
-        ModeChips(selected = null, suggested = trip.inferredMode, onPick = onAnswer)
+        ModeChips(selected = chosen, suggested = trip.inferredMode, onPick = { chosen = it })
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onShowDay(trip) }) { Text("Show on Timeline") }
             Spacer(Modifier.weight(1f))
             if (onSkip != null) TextButton(onClick = onSkip) { Text("Skip") }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { onAnswer(answer) }) { Text("Save") }
         }
     }
 }

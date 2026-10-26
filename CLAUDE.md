@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.46.2**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.46.3**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -170,7 +170,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   which is how "Snap to a road (all or part)" isolates a stretch); Split (2.42.0: `splitting` → `SplitPanel`, `retime.range.last` =
   last dot of the first part → `PointStore.splitTrip(tripId, atTime)`, undoable); Routes/Dots segmented toggle on the map
   (Dots = Edit dots mode); trip, road and
-  level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt: one queue,
+  level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt; 2.46.3: trip question = pick chip (starts on the best guess) then Save; Timeline undo snackbar at TopCenter + statusBarsPadding so it never covers Skip/Save; one queue,
   answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton (2.39.1: dial with N/E/S/W + NE/SE/SW/NW ticks fixed, needle turns by -bearing;
