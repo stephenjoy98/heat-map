@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.51.0] - 2026-10-26
+
+### Changed
+- Fixing a route ("Snap to a road") shows the route as it's drawn now in white while you edit, and nothing is saved
+  before you've seen the result: **Show snapped route** draws the snapped line on the map first (or pick one of
+  the roads Find roads offers), then **Save this route**. Changing the range clears the preview.
+
 ## [2.50.0] - 2026-10-26
 
 ### Added

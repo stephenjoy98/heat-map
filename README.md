@@ -105,7 +105,8 @@ up to your Google account, and lets you compare explored areas with friends.
   to see and edit each part, or change the mode of all parts from its menu.
 - **Fix route** (long-press › Fix route on the map): pick a stretch of dots across gaps and trips; it's
   joined into one trip and snapped to roads, or to a road you pick from "Find roads". Tap the map to make
-  the road pass through a spot.
+  the road pass through a spot. The route as drawn now shows in white while you edit, and the new line is shown
+  before anything is saved ("Show snapped route", then "Save this route").
 - **Split a trip** (long-press › Split into two trips) at any dot; **Snap to a road (all or part)** snaps just the stretch
   you narrow the range to. **Routes / Dots** on the Timeline map shows every dot; tap one to delete it.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them

@@ -53,6 +53,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import java.time.ZoneId
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -213,6 +214,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     var chosenRoad by remember { mutableIntStateOf(-1) }
     var roadsLoading by remember { mutableStateOf(false) }
     var roadsError by remember { mutableStateOf<String?>(null) }
+    // Fixing a route: the line as it's drawn now, shown under the new ones until you save.
+    var fixCurrent by remember { mutableStateOf<List<DoubleArray>>(emptyList()) }
     val startFix = { from: Long, to: Long, mode: TravelMode ->
         vias.clear()
         roads = emptyList()
@@ -320,6 +323,59 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 else -> null
             }
             roadsLoading = false
+        }
+    }
+    // The stretch matched to roads (or tracks) the way it would be on its own, to look at before saving.
+    fun previewSnap() {
+        val pts = retime.points
+        if (pts.size < 2) return
+        val stretch = pts.subList(retime.range.first, retime.range.last + 1)
+        if (stretch.size < 2) return
+        val network = TrackSnapper.networkFor(fixMode)
+        val costing = Valhalla.costing(fixMode) ?: "auto"
+        // Long stretches are thinned, like trips matched in the background.
+        val step = maxOf(1, stretch.size / 1500)
+        val keep = (stretch.indices step step).toMutableList().apply { if (last() != stretch.lastIndex) add(stretch.lastIndex) }
+        val lat = DoubleArray(keep.size) { stretch[keep[it]].lat }
+        val lon = DoubleArray(keep.size) { stretch[keep[it]].lon }
+        roadsLoading = true
+        roadsError = null
+        scope.launch {
+            val found = withContext(Dispatchers.IO) {
+                runCatching { if (network != null) TrackSnapper.snap(lat, lon, network) else Valhalla.match(lat, lon, costing) }
+            }
+            val line = found.getOrNull()
+            roads = listOfNotNull(line?.let { RoadPath(it, AUTO_MATCH) })
+            chosenRoad = if (roads.isNotEmpty()) 0 else -1
+            roadsError = when {
+                found.isFailure -> "Couldn't reach the routing service. Check your connection and try again."
+                line == null -> "Couldn't match this stretch. Try Find roads, or tap the map where you went."
+                else -> null
+            }
+            roadsLoading = false
+        }
+    }
+    // While fixing, keep the line as it's drawn now on the map, for the stretch picked.
+    LaunchedEffect(fixing, retime.range, retime.points) {
+        if (fixing == null || retime.points.size < 2) {
+            fixCurrent = emptyList()
+            return@LaunchedEffect
+        }
+        // A new stretch needs its road found or snapped again before saving.
+        roads = emptyList()
+        chosenRoad = -1
+        delay(250)
+        val r = retime.range
+        val from = retime.points[r.first.coerceIn(0, retime.points.lastIndex)].time
+        val to = retime.points[r.last.coerceIn(0, retime.points.lastIndex)].time
+        fixCurrent = withContext(Dispatchers.IO) {
+            val trips = store.tripsBetween(from, to + 1).filter { it.endTime >= from && it.startTime <= to }
+            if (trips.isEmpty()) {
+                val pts = store.editablePoints(from, to + 1)
+                listOf(DoubleArray(pts.size * 2) { if (it % 2 == 0) pts[it / 2].lat else pts[it / 2].lon })
+            } else {
+                trips.map { store.tripDisplayPath(it.id) }
+            }
         }
     }
     BackHandler(enabled = picked != null && !LocalCovered.current) { picked = null }
@@ -659,7 +715,11 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     SwipeSnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
                 } else if (rangeEditing) {
                     DotsOverlay(camera, retime, Modifier.fillMaxSize())
-                    if (fixing != null) RouteLinesOverlay(camera, roads, chosenRoad, vias, Modifier.fillMaxSize())
+                    if (fixing != null) {
+                        // The route as it's drawn now (white), under the new one to pick or confirm.
+                        if (fixCurrent.isNotEmpty()) TripHighlight(camera, fixCurrent, Modifier.fillMaxSize())
+                        RouteLinesOverlay(camera, roads, chosenRoad, vias, Modifier.fillMaxSize())
+                    }
                     LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
                 } else if (data == null) {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -713,6 +773,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         error = roadsError,
                         vias = vias.size,
                         onFindRoads = ::findRoads,
+                        onPreview = ::previewSnap,
                         onClearVias = {
                             vias.clear()
                             roads = emptyList()
@@ -1622,6 +1683,7 @@ private fun RouteFixPanel(
     error: String?,
     vias: Int,
     onFindRoads: () -> Unit,
+    onPreview: () -> Unit,
     onClearVias: () -> Unit,
     onCancel: () -> Unit,
     onSave: (Long, Long) -> Unit,
@@ -1677,16 +1739,23 @@ private fun RouteFixPanel(
                             FilterChip(
                                 selected = i == chosen,
                                 onClick = { onChoose(if (i == chosen) -1 else i) },
-                                label = { Text((r.streetName?.let { "Via $it" } ?: "Road ${i + 1}") + " · " + Units.distance(polylineKm(r.points))) },
+                                label = {
+                                    val name = when (r.streetName) {
+                                        AUTO_MATCH -> "Snapped to your dots"
+                                        null -> "Road ${i + 1}"
+                                        else -> "Via ${r.streetName}"
+                                    }
+                                    Text(name + " · " + Units.distance(polylineKm(r.points)))
+                                },
                                 leadingIcon = { Box(Modifier.size(10.dp).background(roadColors[i % roadColors.size], CircleShape)) },
                             )
                         }
                     }
                 }
                 Text(
-                    "To snap only part of a trip, narrow the range to that stretch: it becomes its own trip and the rest " +
-                        "stays as it is. Tap the map where you went to make the road pass there (up to $MAX_VIAS points). " +
-                        "Without a road picked, the stretch is matched to roads automatically.",
+                    "White is the route as it's drawn now; the coloured line is what it becomes. To snap only part of a " +
+                        "trip, narrow the range to that stretch: it becomes its own trip and the rest stays as it is. Tap the " +
+                        "map where you went to make the road pass there (up to $MAX_VIAS points).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -1694,18 +1763,26 @@ private fun RouteFixPanel(
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onCancel) { Text("Cancel") }
                     Spacer(Modifier.width(4.dp))
-                    Button(
-                        onClick = {
-                            saving = true
-                            onSave(first.time, last.time)
-                        },
-                        enabled = !saving,
-                    ) { Text(if (chosen >= 0) "Save with this road" else "Join and snap") }
+                    // Nothing is saved before you've seen it: first the snapped line, then Save.
+                    if (chosen >= 0) {
+                        Button(
+                            onClick = {
+                                saving = true
+                                onSave(first.time, last.time)
+                            },
+                            enabled = !saving && !roadsLoading,
+                        ) { Text("Save this route") }
+                    } else {
+                        Button(onClick = onPreview, enabled = !roadsLoading) { Text(if (roadsLoading) "Snapping…" else "Show snapped route") }
+                    }
                 }
             }
         }
     }
 }
+
+/** Marks the line Show snapped route made, so its chip can say so. */
+private const val AUTO_MATCH = "\u0000auto"
 
 /** Length of an interleaved [lat, lon, …] line in kilometres. */
 private fun polylineKm(pts: DoubleArray): Double {

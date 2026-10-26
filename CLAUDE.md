@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.50.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.51.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -164,7 +164,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back
   same-mode trips (long-press expands; `flattened()` for lookups); multi-select (`picked` set,
   `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null (2.49.1: a window with no dots inside starts on the dots either side, never the middle of the day) →
-  `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`,
+  `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`; 2.51.0: `fixCurrent` = drawn paths of trips in the range (or the dots) shown with `TripHighlight` under `RouteLinesOverlay`; save only after a preview: "Show snapped route" (`previewSnap`: Valhalla.match or TrackSnapper.snap on the stretch, RoadPath streetName `AUTO_MATCH`) or a road from Find roads, then "Save this route"; range change clears roads;
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
   then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked; on part of a trip addTrip splits it,
   which is how "Snap to a road (all or part)" isolates a stretch); Map long-press (2.49.0: `sectionNear` also measures trips' drawn `trip_paths.poly`; MapPick sheet adds "Draw the recorded route instead of the road" (`saveTripPath(id, STATUS_RECORDED, null, null)`, undoable) and "Edit its dots" (opens Edit dots on that day)); Split (2.42.0: `splitting` → `SplitPanel`, `retime.range.last` =
