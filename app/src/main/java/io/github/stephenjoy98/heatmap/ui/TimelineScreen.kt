@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -145,6 +147,8 @@ import io.github.stephenjoy98.heatmap.data.Units
 import io.github.stephenjoy98.heatmap.roads.RoadPath
 import io.github.stephenjoy98.heatmap.roads.Valhalla
 import io.github.stephenjoy98.heatmap.roads.TrackSnapper
+import io.github.stephenjoy98.heatmap.roads.SnapLog
+import androidx.compose.ui.window.DialogProperties
 import kotlin.math.ln
 import kotlin.math.min
 
@@ -234,6 +238,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     var mapPick by remember { mutableStateOf<MapPick?>(null) }
     // The trip (or trips) tapped in the list or long-pressed on the map, drawn on top so you can see which it is.
     var highlight by remember { mutableStateOf<List<DoubleArray>>(emptyList()) }
+    // Editing panels (dots, times, a new trip, fixing a route, splitting) share this height limit and scroll inside.
+    val panelMax = (LocalConfiguration.current.screenHeightDp * 0.46f).dp
     LaunchedEffect(period) { highlight = emptyList() }
     fun showTrips(trips: List<Trip>, box: GeoBox?) {
         box?.let { frame(camera, it) }
@@ -287,6 +293,58 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         splitting = null
     }
     // Ways between the first and last dot picked, through any points tapped on the map.
+    // Snapping shows each step in a dialog as it goes, so when it fails you can see which step it was.
+    val snapSteps = remember { mutableStateListOf<SnapStep>() }
+    var snapDialog by remember { mutableStateOf(false) }
+    fun runSnap(empty: String, work: (SnapLog) -> List<RoadPath>) {
+        snapSteps.clear()
+        snapDialog = true
+        roadsLoading = true
+        roadsError = null
+        val log = object : SnapLog {
+            override fun step(text: String) {
+                scope.launch(Dispatchers.Main) {
+                    snapSteps.finishRunning(failed = false)
+                    snapSteps += SnapStep(text, SnapStep.State.RUNNING)
+                }
+            }
+            override fun fail(text: String) {
+                scope.launch(Dispatchers.Main) {
+                    snapSteps.finishRunning(failed = true)
+                    snapSteps += SnapStep(text, SnapStep.State.FAILED)
+                }
+            }
+        }
+        scope.launch {
+            val found = withContext(Dispatchers.IO) { runCatching { work(log) } }
+            roads = found.getOrDefault(emptyList())
+            chosenRoad = if (roads.isNotEmpty()) 0 else -1
+            val error = found.exceptionOrNull()
+            when {
+                error != null -> {
+                    val why = "${error.javaClass.simpleName}: ${error.message ?: "no details"}"
+                    snapSteps.finishRunning(failed = true)
+                    snapSteps += SnapStep(why, SnapStep.State.FAILED)
+                    roadsError = "Snapping failed. $why"
+                }
+                roads.isEmpty() -> {
+                    if (snapSteps.none { it.state == SnapStep.State.FAILED }) {
+                        snapSteps.finishRunning(failed = true)
+                        snapSteps += SnapStep(empty, SnapStep.State.FAILED)
+                    }
+                    roadsError = snapSteps.lastOrNull { it.state == SnapStep.State.FAILED }?.text ?: empty
+                }
+                else -> {
+                    snapSteps.finishRunning(failed = false)
+                    val km = Units.distance(polylineKm(roads.first().points))
+                    snapSteps += SnapStep(if (roads.size == 1) "Done: $km" else "Done: ${roads.size} ways, the first $km", SnapStep.State.DONE)
+                    delay(700)
+                    snapDialog = false
+                }
+            }
+            roadsLoading = false
+        }
+    }
     fun findRoads() {
         val pts = retime.points
         if (pts.isEmpty()) return
@@ -297,32 +355,27 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         val network = TrackSnapper.networkFor(fixMode)
         val stretch = pts.subList(retime.range.first, retime.range.last + 1)
         val stops = listOf(a.lat to a.lon) + vias + (b.lat to b.lon)
-        roadsLoading = true
-        roadsError = null
-        scope.launch {
-            val found = withContext(Dispatchers.IO) {
-                runCatching {
-                    when {
-                        network != null && vias.isEmpty() -> listOfNotNull(
-                            TrackSnapper.snap(DoubleArray(stretch.size) { stretch[it].lat }, DoubleArray(stretch.size) { stretch[it].lon }, network)
-                                ?.let { RoadPath(it, null) }
-                        )
-                        network != null -> listOfNotNull(TrackSnapper.route(stops, network)?.let { RoadPath(it, null) })
-                        vias.isEmpty() -> Valhalla.routes(a.lat, a.lon, b.lat, b.lon, costing)
-                        else -> listOfNotNull(Valhalla.routeThrough(stops, costing))
-                    }
+        val empty = when (network) {
+            TrackSnapper.Network.FERRY -> "No ferry route found between these points."
+            TrackSnapper.Network.RAIL -> "No railway found between these points."
+            null -> "No road found between these points."
+        }
+        runSnap(empty) { log ->
+            when {
+                network != null && vias.isEmpty() -> listOfNotNull(
+                    TrackSnapper.snap(DoubleArray(stretch.size) { stretch[it].lat }, DoubleArray(stretch.size) { stretch[it].lon }, network, log)
+                        ?.let { RoadPath(it, null) }
+                )
+                network != null -> listOfNotNull(TrackSnapper.route(stops, network, log)?.let { RoadPath(it, null) })
+                vias.isEmpty() -> {
+                    log.step("Asking the Valhalla routing service for roads between the two ends")
+                    Valhalla.routes(a.lat, a.lon, b.lat, b.lon, costing).also { if (it.isEmpty()) log.fail("Valhalla found no road between these points") }
+                }
+                else -> {
+                    log.step("Asking the Valhalla routing service for the road through ${stops.size} points")
+                    listOfNotNull(Valhalla.routeThrough(stops, costing)).also { if (it.isEmpty()) log.fail("Valhalla found no road through these points") }
                 }
             }
-            roads = found.getOrDefault(emptyList())
-            chosenRoad = if (roads.isNotEmpty()) 0 else -1
-            roadsError = when {
-                found.isFailure -> "Couldn't reach the routing service. Check your connection and try again."
-                roads.isEmpty() && network == TrackSnapper.Network.FERRY -> "No ferry route found between these points."
-                roads.isEmpty() && network != null -> "No railway found between these points."
-                roads.isEmpty() -> "No road found between these points."
-                else -> null
-            }
-            roadsLoading = false
         }
     }
     // The stretch matched to roads (or tracks) the way it would be on its own, to look at before saving.
@@ -338,21 +391,14 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         val keep = (stretch.indices step step).toMutableList().apply { if (last() != stretch.lastIndex) add(stretch.lastIndex) }
         val lat = DoubleArray(keep.size) { stretch[keep[it]].lat }
         val lon = DoubleArray(keep.size) { stretch[keep[it]].lon }
-        roadsLoading = true
-        roadsError = null
-        scope.launch {
-            val found = withContext(Dispatchers.IO) {
-                runCatching { if (network != null) TrackSnapper.snap(lat, lon, network) else Valhalla.match(lat, lon, costing) }
+        runSnap("Couldn't match this stretch. Try Find roads, or tap the map where you went.") { log ->
+            val line = if (network != null) {
+                TrackSnapper.snap(lat, lon, network, log)
+            } else {
+                log.step("Sending ${lat.size} dots to the Valhalla routing service to match them to roads")
+                Valhalla.match(lat, lon, costing).also { if (it == null) log.fail("Valhalla couldn't match these dots to roads") }
             }
-            val line = found.getOrNull()
-            roads = listOfNotNull(line?.let { RoadPath(it, AUTO_MATCH) })
-            chosenRoad = if (roads.isNotEmpty()) 0 else -1
-            roadsError = when {
-                found.isFailure -> "Couldn't reach the routing service. Check your connection and try again."
-                line == null -> "Couldn't match this stretch. Try Find roads, or tap the map where you went."
-                else -> null
-            }
-            roadsLoading = false
+            listOfNotNull(line?.let { RoadPath(it, AUTO_MATCH) })
         }
     }
     // While fixing, keep the line as it's drawn now on the map, for the stretch picked.
@@ -727,7 +773,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             }
 
             if (editing) {
-                Box(Modifier.padding(12.dp)) {
+                Box(Modifier.padding(12.dp).heightIn(max = panelMax)) {
                     EditPanel(
                         state = edit,
                         loading = editLoading,
@@ -760,7 +806,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     )
                 }
             } else if (fixing != null) {
-                Box(Modifier.padding(12.dp)) {
+                Box(Modifier.padding(12.dp).heightIn(max = panelMax)) {
                     RouteFixPanel(
                         state = retime,
                         loading = retimeLoading,
@@ -799,7 +845,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 }
             } else if (splitting != null) {
                 val trip = splitting!!
-                Box(Modifier.padding(12.dp)) {
+                Box(Modifier.padding(12.dp).heightIn(max = panelMax)) {
                     SplitPanel(
                         trip = trip,
                         state = retime,
@@ -813,7 +859,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 }
             } else if (rangeEditing) {
                 val trip = retiming
-                Box(Modifier.padding(12.dp)) {
+                Box(Modifier.padding(12.dp).heightIn(max = panelMax)) {
                     key(trip?.id, adding) {
                         RetimePanel(
                             trip = trip,
@@ -936,6 +982,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     if (layersOpen) {
         MapLayersSheet(onDismiss = { layersOpen = false })
     }
+
+    if (snapDialog) SnapProgressDialog(snapSteps, running = roadsLoading, onDismiss = { snapDialog = false })
 
     mapPick?.let { pick ->
         MapPickDialog(
@@ -1346,8 +1394,11 @@ private fun MapPickDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text("How did you travel?", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                ModeChips(selected = trip.mode, onPick = { m -> act { if (m != trip.mode || trip.needsReview) onMode(trip, m) } })
+                ModeDropdown(
+                    selected = trip.mode,
+                    onPick = { m -> act { if (m != trip.mode || trip.needsReview) onMode(trip, m) } },
+                    modifier = Modifier.padding(top = 12.dp),
+                )
             } else {
                 Text(
                     "Dots from ${timeFormat.format(Date(pick.window.first))} to ${timeFormat.format(Date(pick.window.last))} that aren't " +
@@ -1475,12 +1526,7 @@ private fun RetimePanel(
                     )
                 }
                 if (trip == null) {
-                    Text(
-                        "How did you travel?",
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
-                    )
-                    ModeChips(selected = mode, onPick = { mode = it }, modifier = Modifier.padding(horizontal = 12.dp))
+                    ModeDropdown(selected = mode, onPick = { mode = it }, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -1719,8 +1765,7 @@ private fun RouteFixPanel(
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
                 RangeSteppers(state, Modifier.padding(horizontal = 4.dp))
-                ModeChips(selected = mode, onPick = onMode, modifier = Modifier.padding(horizontal = 12.dp))
-                Spacer(Modifier.height(8.dp))
+                ModeDropdown(selected = mode, onPick = onMode, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = onFindRoads, enabled = !roadsLoading) {
                         Text(if (roadsLoading) "Finding roads…" else if (roads.isEmpty()) "Find roads" else "Find again")
@@ -1753,9 +1798,7 @@ private fun RouteFixPanel(
                     }
                 }
                 Text(
-                    "White is the route as it's drawn now; the coloured line is what it becomes. To snap only part of a " +
-                        "trip, narrow the range to that stretch: it becomes its own trip and the rest stays as it is. Tap the " +
-                        "map where you went to make the road pass there (up to $MAX_VIAS points).",
+                    "White is the route now, colour is the new one. Tap the map to route through a spot (up to $MAX_VIAS).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -1779,6 +1822,51 @@ private fun RouteFixPanel(
             }
         }
     }
+}
+
+/** One step of snapping a route, as shown in the progress dialog. */
+private class SnapStep(val text: String, val state: State) {
+    enum class State { RUNNING, DONE, FAILED }
+}
+
+/** Ends the step that's running, as done or failed. */
+private fun MutableList<SnapStep>.finishRunning(failed: Boolean) {
+    val i = indexOfLast { it.state == SnapStep.State.RUNNING }
+    if (i >= 0) this[i] = SnapStep(this[i].text, if (failed) SnapStep.State.FAILED else SnapStep.State.DONE)
+}
+
+/** Each step of snapping as it happens: a spinner on the one running, a tick when done, the reason if it fails. */
+@Composable
+private fun SnapProgressDialog(steps: List<SnapStep>, running: Boolean, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        title = { Text(if (running) "Snapping the route…" else if (steps.any { it.state == SnapStep.State.FAILED }) "Snapping didn't work" else "Snapped") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (steps.isEmpty()) Text("Starting…", style = MaterialTheme.typography.bodyMedium)
+                steps.forEach { s ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+                            when (s.state) {
+                                SnapStep.State.RUNNING -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                SnapStep.State.DONE -> Icon(Icons.Filled.Check, contentDescription = "Done", tint = MaterialTheme.colorScheme.primary)
+                                SnapStep.State.FAILED -> Icon(Icons.Filled.Close, contentDescription = "Failed", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            s.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (s.state == SnapStep.State.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(if (running) "Hide" else "Close") } },
+    )
 }
 
 /** Marks the line Show snapped route made, so its chip can say so. */

@@ -3,6 +3,8 @@ package io.github.stephenjoy98.heatmap.ui
 import androidx.compose.ui.window.DialogProperties
 import io.github.stephenjoy98.heatmap.data.Units
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -188,7 +190,7 @@ fun EditPanel(
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Tip("Stop editing") { IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Stop editing") } }
                 Text("Edit dots", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))

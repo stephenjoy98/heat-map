@@ -12,6 +12,17 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.52.0] - 2026-10-26
+
+### Added
+- Snapping a route (Show snapped route, Find roads) shows its progress step by step in a dialog: which service it
+  asks, how many lines it got back, matching the dots, and when something fails, the step and the reason.
+
+### Changed
+- The editing panels (Edit dots, Change times, Add a trip, Fix route, Split) take at most about half the screen
+  and scroll inside, so the map stays big. The travel mode is a compact drop-down instead of a block of chips
+  there and in the long-press sheet.
+
 ## [2.51.0] - 2026-10-26
 
 ### Changed

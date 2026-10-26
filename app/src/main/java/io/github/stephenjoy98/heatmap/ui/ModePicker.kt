@@ -10,7 +10,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -72,5 +87,46 @@ fun ColumnScope.ModeMenuItems(current: TravelMode?, onPick: (TravelMode) -> Unit
             onClick = { onPick(m) },
             modifier = if (sub) Modifier.padding(start = 20.dp) else Modifier,
         )
+    }
+}
+
+/**
+ * The travel mode as one compact field that opens a menu of every mode, for the editing panels, where the map
+ * needs the room more than a wall of chips does.
+ */
+@Composable
+fun ModeDropdown(
+    selected: TravelMode?,
+    onPick: (TravelMode) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "How did you travel?",
+) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Surface(
+            onClick = { open = true },
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        ) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (selected != null) {
+                    ModeDot(selected, 12.dp)
+                    Spacer(Modifier.width(10.dp))
+                }
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(selected?.fullLabel ?: "Pick a travel mode", style = MaterialTheme.typography.bodyLarge)
+                }
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose")
+            }
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            ModeMenuItems(current = selected) {
+                onPick(it)
+                open = false
+            }
+        }
     }
 }
