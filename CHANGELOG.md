@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.46.2] - 2026-10-26
+
+### Changed
+- Roads on the dark map are a bit darker, so your routes stand out more.
+
 ## [2.46.1] - 2026-10-25
 
 ### Changed

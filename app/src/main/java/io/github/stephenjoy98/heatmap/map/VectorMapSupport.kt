@@ -85,12 +85,12 @@ object VectorMaps {
 
     // Google-style dark: near-black greys…
     private val darkMuted = Palette(
-        c("#121212"), c("#161616"), c("#141A15"), c("#0A0E13"), c("#1C1C1C"), c("#262626"), c("#363636"),
+        c("#121212"), c("#161616"), c("#141A15"), c("#0A0E13"), c("#1C1C1C"), c("#1F1F1F"), c("#2B2B2B"),
         c("#121212"), c("#242424"), c("#3C3C3C"), c("#8E9196"), c("#121212"),
     )
     // …and the same with colour: blue water, green parks, lighter roads and buildings, brighter labels.
     private val darkVivid = Palette(
-        c("#0F141A"), c("#171C22"), c("#123A22"), c("#0B3358"), c("#2C323A"), c("#3E4650"), c("#7C8794"),
+        c("#0F141A"), c("#171C22"), c("#123A22"), c("#0B3358"), c("#2C323A"), c("#30363E"), c("#5C6570"),
         c("#0A0D11"), c("#5A4A6E"), c("#7A68A0"), c("#D2D6DC"), c("#0F141A"),
     )
     // OpenFreeMap's Positron, near enough…
