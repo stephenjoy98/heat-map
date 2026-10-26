@@ -233,9 +233,35 @@ object HeatRamps {
         HeatPalette.WHITE -> if (dark) plainWhite else plainDark
     }
 
-    /** Plain routes, no heat: every road you've used in white (near-black on the white map, where white wouldn't show). */
-    val plainWhite = build(floatArrayOf(0f, 240f, 240f, 240f), floatArrayOf(1f, 240f, 240f, 240f))
-    val plainDark = build(floatArrayOf(0f, 45f, 45f, 50f), floatArrayOf(1f, 45f, 45f, 50f))
+    /**
+     * Snow, plain routes without heat: every road you've used in white with a soft icy glow around it (dark grey
+     * on the white map, where white wouldn't show).
+     */
+    val plainWhite = plain(Color.rgb(245, 248, 255), Color.rgb(170, 205, 255))
+    val plainDark = plain(Color.rgb(45, 45, 50), Color.rgb(90, 90, 100))
+
+    /**
+     * One colour for the line however often it was travelled, and [glow] for the faint wide halo drawn around
+     * every route (a single pass of it lands near t = 0.02), fading into the line at its anti-aliased edges.
+     */
+    private fun plain(line: Int, glow: Int): IntArray = IntArray(256) { a ->
+        val t = a / 255f
+        when {
+            a == 0 -> Color.TRANSPARENT
+            t <= GLOW_T -> Color.argb((t / GLOW_T * GLOW_OPACITY * 255).roundToInt(), Color.red(glow), Color.green(glow), Color.blue(glow))
+            t >= HeatRenderer.PASS_ALPHA -> line
+            else -> {
+                val f = (t - GLOW_T) / (HeatRenderer.PASS_ALPHA - GLOW_T)
+                fun ch(g: Int, l: Int) = (g + (l - g) * f).roundToInt()
+                Color.argb(
+                    ((GLOW_OPACITY + (1f - GLOW_OPACITY) * f) * 255).roundToInt(),
+                    ch(Color.red(glow), Color.red(line)), ch(Color.green(glow), Color.green(line)), ch(Color.blue(glow), Color.blue(line)),
+                )
+            }
+        }
+    }
+    private const val GLOW_T = 0.025f
+    private const val GLOW_OPACITY = 0.5f
 
     /** A friend's heatmap: the other palette, so theirs and yours always look different. */
     fun friend(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {

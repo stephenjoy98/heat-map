@@ -31,7 +31,7 @@ up to your Google account, and lets you compare explored areas with friends.
   Light, Dark or System; the whole app follows.
 - **Heatmap tiles**: every continuous route is drawn into a density buffer so overlapping trips stack
   up. On the dark map roads used once are a cool dark red and your most travelled ones burn through red, orange and
-  yellow to white (about 30 visits for the hottest), or pick **Ice** in the layers sheet for darkest blue to white, or **White** for plain white routes without heat colours. The light map uses light orange through deep crimson.
+  yellow to white (about 30 visits for the hottest), or pick **Ice** in the layers sheet for darkest blue to white, or **Snow** for plain white routes with a soft glow, without heat colours. The light map uses light orange through deep crimson.
 - **Travel-mode filter**: the filter button (top left) slides out chips for All, Walking, Cycling,
   Driving, Car share, Transit and Other; a dot on the button shows when the map is filtered.
 - Routes or raw-points view, and very large histories automatically fall back to a density grid.

@@ -135,8 +135,8 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LayerTile("Fire", palette == HeatPalette.FIRE, { Prefs.setHeatPalette(HeatPalette.FIRE) }) { drawHeatArt(FIRE_STOPS) }
                 LayerTile("Ice", palette == HeatPalette.ICE, { Prefs.setHeatPalette(HeatPalette.ICE) }) { drawHeatArt(ICE_STOPS) }
-                // No heat: every route the same plain white.
-                LayerTile("White", palette == HeatPalette.WHITE, { Prefs.setHeatPalette(HeatPalette.WHITE) }) { drawHeatArt(WHITE_STOPS) }
+                // Snow, no heat: every route the same white, with a soft glow.
+                LayerTile("Snow", palette == HeatPalette.WHITE, { Prefs.setHeatPalette(HeatPalette.WHITE) }) { drawHeatArt(WHITE_STOPS) }
             }
             // Routes draws the lines you travelled; Dots draws where the recorded dots are, thicker where there are more.
             val display by Prefs.displayMode.collectAsStateWithLifecycle()

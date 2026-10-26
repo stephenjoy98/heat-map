@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.48.1] - 2026-10-26
+
+### Changed
+- The plain white routes option is called **Snow** now, and its routes have a soft icy glow around them.
+
 ## [2.48.0] - 2026-10-26
 
 ### Added
