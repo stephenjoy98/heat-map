@@ -35,6 +35,7 @@ them in the APK.
 | [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data) | Elevation from Mapzen, USGS, NASA SRTM, EU-DEM and others; see the [full attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). |
 | [JoyPixels](https://www.joypixels.com/) emoji artwork (flags and globes in the profile's place lists) | [JoyPixels Free License](https://www.joypixels.com/licenses), which requires attribution (shown under About). Downloaded at runtime; **not** covered by this project's GPL licence. |
 | [Valhalla](https://github.com/valhalla/valhalla) map matching on the FOSSGIS server | Valhalla is MIT-licensed; the public server has a [fair-use policy](https://valhalla.openstreetmap.de/). Only coordinates are sent. |
+| [Overpass API](https://overpass-api.de) for railways and ferry routes (OpenStreetMap data, ODbL) | Public instance with a [usage policy](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html); only the corners of a trip's area are sent. |
 
 ## Trademarks
 

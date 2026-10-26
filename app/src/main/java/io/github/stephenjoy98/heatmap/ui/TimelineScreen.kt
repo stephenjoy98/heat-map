@@ -143,6 +143,7 @@ import io.github.stephenjoy98.heatmap.data.TrackRules
 import io.github.stephenjoy98.heatmap.data.Units
 import io.github.stephenjoy98.heatmap.roads.RoadPath
 import io.github.stephenjoy98.heatmap.roads.Valhalla
+import io.github.stephenjoy98.heatmap.roads.TrackSnapper
 import kotlin.math.ln
 import kotlin.math.min
 
@@ -228,6 +229,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     var picked by remember { mutableStateOf<Set<Long>?>(null) }
     // A section long-pressed on the map, waiting for you to confirm what to do with it.
     var mapPick by remember { mutableStateOf<MapPick?>(null) }
+    // The trip (or trips) tapped in the list or long-pressed on the map, drawn on top so you can see which it is.
+    var highlight by remember { mutableStateOf<List<DoubleArray>>(emptyList()) }
+    LaunchedEffect(period) { highlight = emptyList() }
+    fun showTrips(trips: List<Trip>, box: GeoBox?) {
+        box?.let { frame(camera, it) }
+        scope.launch { highlight = withContext(Dispatchers.IO) { trips.map { store.tripDisplayPath(it.id) } } }
+    }
     val mapHaptics = LocalHapticFeedback.current
     val select = { ids: List<Long>, on: Boolean ->
         val now = picked.orEmpty()
@@ -282,20 +290,32 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         val a = pts[retime.range.first]
         val b = pts[retime.range.last]
         val costing = Valhalla.costing(fixMode) ?: "auto"
+        // Trains and boats follow the railway or ferry route instead of roads.
+        val network = TrackSnapper.networkFor(fixMode)
+        val stretch = pts.subList(retime.range.first, retime.range.last + 1)
         val stops = listOf(a.lat to a.lon) + vias + (b.lat to b.lon)
         roadsLoading = true
         roadsError = null
         scope.launch {
             val found = withContext(Dispatchers.IO) {
                 runCatching {
-                    if (vias.isEmpty()) Valhalla.routes(a.lat, a.lon, b.lat, b.lon, costing)
-                    else listOfNotNull(Valhalla.routeThrough(stops, costing))
+                    when {
+                        network != null && vias.isEmpty() -> listOfNotNull(
+                            TrackSnapper.snap(DoubleArray(stretch.size) { stretch[it].lat }, DoubleArray(stretch.size) { stretch[it].lon }, network)
+                                ?.let { RoadPath(it, null) }
+                        )
+                        network != null -> listOfNotNull(TrackSnapper.route(stops, network)?.let { RoadPath(it, null) })
+                        vias.isEmpty() -> Valhalla.routes(a.lat, a.lon, b.lat, b.lon, costing)
+                        else -> listOfNotNull(Valhalla.routeThrough(stops, costing))
+                    }
                 }
             }
             roads = found.getOrDefault(emptyList())
             chosenRoad = if (roads.isNotEmpty()) 0 else -1
             roadsError = when {
                 found.isFailure -> "Couldn't reach the routing service. Check your connection and try again."
+                roads.isEmpty() && network == TrackSnapper.Network.FERRY -> "No ferry route found between these points."
+                roads.isEmpty() && network != null -> "No railway found between these points."
                 roads.isEmpty() -> "No road found between these points."
                 else -> null
             }
@@ -554,6 +574,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                             if (pick != null) {
                                 mapHaptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 mapPick = pick
+                                highlight = withContext(Dispatchers.IO) {
+                                    val trip = pick.trip
+                                    if (trip != null) listOf(store.tripDisplayPath(trip.id))
+                                    else store.editablePoints(pick.window.first, pick.window.last + 1).let { pts ->
+                                        listOf(DoubleArray(pts.size * 2) { if (it % 2 == 0) pts[it / 2].lat else pts[it / 2].lon })
+                                    }
+                                }
                             }
                         }
                     },
@@ -590,9 +617,12 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                 retime.range = if (abs(i - r.first) <= abs(i - r.last)) i..r.last else r.first..i
                             }
                         }
+                        // A tap on the map lets go of a highlighted trip.
+                        highlight.isNotEmpty() -> { _, _ -> highlight = emptyList() }
                         else -> null
                     },
                 )
+                if (!editing && !rangeEditing && highlight.isNotEmpty()) TripHighlight(camera, highlight, Modifier.fillMaxSize())
                 ScaleBar(camera, Modifier.align(Alignment.BottomStart).padding(8.dp))
                 // Routes or dots: Dots shows every recorded dot of the day; tap one to pick it and delete it.
                 if (!rangeEditing && picked == null) {
@@ -761,7 +791,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                 when (entry) {
                                     is DayEntry.Move -> MoveRow(
                                         entry = entry,
-                                        onClick = { entry.box?.let { frame(camera, it) } },
+                                        onClick = { showTrips(listOf(entry.trip), entry.box) },
                                         onMode = { changeMode(entry.trip, it) },
                                         onRetime = { retiming = entry.trip },
                                         onSplit = { splitting = entry.trip },
@@ -771,17 +801,20 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                     )
                                     is DayEntry.Stay -> StayRow(
                                         entry = entry,
-                                        onClick = { camera.animateTo(entry.lat, entry.lon, 16f) },
+                                        onClick = {
+                                            highlight = emptyList()
+                                            camera.animateTo(entry.lat, entry.lon, 16f)
+                                        },
                                         onAddTrip = { adding = (entry.start + 1)..(entry.end - 1) },
                                     )
                                     is DayEntry.Group -> GroupRow(
                                         group = entry,
                                         expanded = expanded[entry.start] == true,
                                         onToggle = { expanded[entry.start] = expanded[entry.start] != true },
-                                        onClick = { entry.box?.let { frame(camera, it) } },
+                                        onClick = { showTrips(entry.moves.map { it.trip }, entry.box) },
                                         onModeAll = { m -> changeModes(entry.moves.map { it.trip }, m) },
                                         onJoin = { joinTrips(entry.moves.map { it.trip }) },
-                                        onSectionClick = { mv -> mv.box?.let { frame(camera, it) } },
+                                        onSectionClick = { mv -> showTrips(listOf(mv.trip), mv.box) },
                                         onSectionMode = { mv, m -> changeMode(mv.trip, m) },
                                         onSectionRetime = { mv -> retiming = mv.trip },
                                         onSectionSplit = { mv -> splitting = mv.trip },
@@ -1510,6 +1543,40 @@ private const val MAX_VIAS = 5
 private val roadColors = listOf(Color(0xFF3D9BFF), Color(0xFFFF7A1A), Color(0xFF66BB6A))
 
 /** Candidate roads (the picked one bold, others faint) and the points tapped to route through. */
+/**
+ * The trips picked in the list (or long-pressed on the map) drawn over everything else: a white line with a dark
+ * edge, green where it starts and red where it ends, so it's clear which section is meant.
+ */
+@Composable
+private fun TripHighlight(camera: MapCamera, paths: List<DoubleArray>, modifier: Modifier) {
+    Canvas(modifier) {
+        camera.cameraTick // Redraw whenever the camera moves.
+        val halo = Stroke(width = 9.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val line = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val drawn = paths.mapNotNull { pts ->
+            if (pts.size < 2) return@mapNotNull null
+            val path = Path()
+            for (k in 0 until pts.size / 2) {
+                val o = camera.toScreen(pts[k * 2], pts[k * 2 + 1]) ?: return@Canvas
+                if (k == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
+            }
+            path
+        }
+        drawn.forEach { drawPath(it, Color.Black.copy(alpha = 0.55f), style = halo) }
+        drawn.forEach { drawPath(it, Color.White, style = line) }
+        val first = paths.firstOrNull { it.size >= 2 } ?: return@Canvas
+        val last = paths.lastOrNull { it.size >= 2 } ?: return@Canvas
+        camera.toScreen(first[0], first[1])?.let {
+            drawCircle(Color.White, 8.dp.toPx(), it)
+            drawCircle(Color(0xFF43A047), 6.dp.toPx(), it)
+        }
+        camera.toScreen(last[last.size - 2], last[last.size - 1])?.let {
+            drawCircle(Color.White, 8.dp.toPx(), it)
+            drawCircle(Color(0xFFE53935), 6.dp.toPx(), it)
+        }
+    }
+}
+
 @Composable
 private fun RouteLinesOverlay(camera: MapCamera, roads: List<RoadPath>, chosen: Int, vias: List<Pair<Double, Double>>, modifier: Modifier) {
     val pin = MaterialTheme.colorScheme.tertiary

@@ -83,10 +83,13 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Snapping to roads**: finished trips are map-matched to OpenStreetMap with the free public
   [Valhalla](https://valhalla1.openstreetmap.de) service run by FOSSGIS, using the network for the trip's
   mode (footpaths, cycle routes, roads or bus routes). Only coordinates are sent, never times.
+- **Trains and boats** (the "Train or boat" kind, like SkyTrain and SeaBus) snap to OpenStreetMap's railways, or
+  its ferry routes for boats, fetched for the trip's area from the public [Overpass API](https://overpass-api.de)
+  (only the area's corners are sent). Fix route on such a trip follows the tracks or ferry route too.
 - **Asking which road**: where the recording strays more than ~40 m from the matched road for a few fixes,
   the Insights page asks "Which road did you take?" with a mini map of the options: the best match,
   alternative roads between the same points (labelled by street name), and the line as recorded.
-- Trips that stray almost everywhere (trail walks, trains) keep their smoothed recording. Changing a trip's
+- Trips that stray almost everywhere (trail walks, or a train with no railway mapped) keep their smoothed recording. Changing a trip's
   travel mode re-matches it. Both features can be switched off in Settings.
 
 ### Timeline tab
@@ -123,6 +126,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Red dots and "New" markers**: a red dot on the account button leads to what a notification was about (a new
   version under Settings › Updates, the changelog after an update); "New" marks sections that changed since you
   last opened them.
+- **Tap a trip** in the Timeline list to frame it on the map and draw it highlighted (white, green start, red end);
+  a long-pressed route is highlighted too, so it's clear which section is meant.
 - **Long-press a route on the Timeline map** to edit that section: confirm its mode, change its times or fix its
   route, undo a bad road match (draw the recorded route instead) or open its dots to delete or move stray ones; it
   finds road-matched lines that wander from the dots too. Grey dots outside any trip can be made a trip or join the
@@ -269,6 +274,7 @@ Requires JDK 17 and the Android SDK (API 36).
 | Recording service, activity tagging | `tracking/LocationTickerService.kt`, `tracking/ActivityTracker.kt` |
 | Trip splitting and travel-mode decisions | `tracking/TripDetector.kt` |
 | Road snapping, doubtful-stretch questions | `roads/RoadSnapper.kt`, `roads/Valhalla.kt` |
+| Train and boat snapping to railways and ferry routes | `roads/TrackSnapper.kt`, `roads/TrackNetwork.kt` |
 | Route smoothing | `map/Smoothing.kt` |
 | Storage (SQLite: points, trips, places cache, friends' routes) | `data/PointStore.kt` |
 | Heatmap rendering and map tiles | `map/HeatRenderer.kt`, `map/TileProviders.kt`, `map/TrackSources.kt` |

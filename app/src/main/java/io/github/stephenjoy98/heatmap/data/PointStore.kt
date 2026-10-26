@@ -1713,6 +1713,15 @@ class PointStore private constructor(context: Context) :
     // ---- Road snapping ----
 
     /** Trips that haven't been matched to roads yet, oldest first. */
+    /** Forgets the [status] road shapes of trips in [modeIds], so they're matched again. */
+    fun clearPaths(modeIds: Collection<Int>, status: Int) {
+        if (modeIds.isEmpty()) return
+        writableDatabase.execSQL(
+            "DELETE FROM trip_paths WHERE status = $status AND trip_id IN (SELECT id FROM trips WHERE mode IN (${modeIds.joinToString(",")}))"
+        )
+        changed()
+    }
+
     fun tripsWithoutPath(limit: Int = 20): List<Trip> =
         trips("WHERE id NOT IN (SELECT trip_id FROM trip_paths) ORDER BY start_time LIMIT $limit")
 

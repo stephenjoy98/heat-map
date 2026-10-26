@@ -12,6 +12,16 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.50.0] - 2026-10-26
+
+### Added
+- Tapping a trip on the Timeline (or a part of a group) highlights it on the map: a white line with a green start
+  and red end, so you can tell which section it is. A route you long-press is highlighted while its sheet is open.
+  Tap the map to let go.
+- Train and boat trips (SkyTrain, SeaBus and other "Train or boat" modes) now snap to OpenStreetMap's railways, or
+  its ferry routes for boats, instead of keeping the straight lines between recorded dots. Trips already recorded
+  are matched once in the background. Fix route on such a trip follows the tracks or ferry route as well.
+
 ## [2.49.1] - 2026-10-26
 
 ### Fixed

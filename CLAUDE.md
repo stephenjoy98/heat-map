@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.49.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.50.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -222,6 +222,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   (`undoSnackbar`); road/level answers undo via `RoadSnapper.answer(q, -1)` / `answerLevel(area, ASK)`; `questionsReset`
   brings answered questions back. Map full screen: `MapChrome.fullscreen` (MapScreen.kt) also hides the nav bar;
   Prefs `show_location_dot`. Snackbars use `SwipeSnackbarHost` (ui/SwipeSnackbar.kt, swipe to dismiss).
+- Track snapping (2.50.0): `roads/TrackSnapper` (Overpass `way[railway~rail|subway|light_rail|…]` or `way[route=ferry]` for the trip bbox ±0.01°, `out body;>;out skel qt;`; network by mode name: sea/ferry/boat/ship/water → FERRY (350 m), else RAIL (120 m); only for Kind.TRACK) + pure `roads/TrackNetwork` (graph of OSM ways densified to 40 m, grid index, samples every 150 m, bounded Dijkstra picking the candidate with least path + 3×offset so it keeps to one of parallel tracks; ≤30% samples may miss; unit-tested locally with kc). RoadSnapper uses it when `Valhalla.costing` is null (then `strays` check); Prefs `tracks_snapped_v1` cleared RECORDED paths of TRACK trips once (`PointStore.clearPaths`); Fix route uses it for TRACK modes. Timeline highlight (2.50.0): `highlight` paths drawn by `TripHighlight` (white on dark halo, green/red ends) for tapped rows/groups/sections and long-press picks; map tap or period change clears it.
 - RoadSnapper (2.41.1): `strays()` rejects matched shapes >250 m from the recorded line anywhere or >1.5× its length
   (+300 m) → STATUS_RECORDED; `recheckSnapped` ran once over existing paths with stricter limits (Prefs `snaps_rechecked_v1`).
 - `review/` (Insights data, Places, Health Connect steps), `profile/`, `timeline/`, `roads/` (Valhalla map

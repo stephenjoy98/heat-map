@@ -636,6 +636,11 @@ object Prefs {
         get() = sp.getBoolean("snaps_rechecked_v1", false)
         set(value) = sp.edit().putBoolean("snaps_rechecked_v1", value).apply()
 
+    /** Whether train and boat trips kept as recorded have been queued once for matching to their tracks. */
+    var tracksSnapped: Boolean
+        get() = sp.getBoolean("tracks_snapped_v1", false)
+        set(value) = sp.edit().putBoolean("tracks_snapped_v1", value).apply()
+
     /** Whether the whole history has been checked once for GPS blips (see PointStore.findSpikes). */
     var spikesCleaned: Boolean
         get() = sp.getBoolean("spikes_cleaned_v1", false)

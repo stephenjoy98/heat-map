@@ -24,6 +24,7 @@ import io.github.stephenjoy98.heatmap.data.RoadOption
 import io.github.stephenjoy98.heatmap.data.RoadQuestion
 import io.github.stephenjoy98.heatmap.data.TrackRules
 import io.github.stephenjoy98.heatmap.data.Trip
+import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.map.Smoothing
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import io.github.stephenjoy98.heatmap.ui.MainActivity
@@ -67,6 +68,11 @@ object RoadSnapper {
             recheckSnapped(store)
             Prefs.snapsRechecked = true
         }
+        if (!Prefs.tracksSnapped) {
+            // Trains and boats used to keep their recorded line: match them to their tracks once.
+            store.clearPaths(TravelMode.entries.filter { it.kind == TravelMode.Kind.TRACK }.map { it.id }, STATUS_RECORDED)
+            Prefs.tracksSnapped = true
+        }
         var questions = 0
         while (true) {
             val trips = store.tripsWithoutPath(10)
@@ -102,7 +108,17 @@ object RoadSnapper {
         val lon = DoubleArray(idx.size) { raw[idx[it] * 2 + 1] }
         val costing = Valhalla.costing(trip.mode)
         if (costing == null) {
-            // Trains and boats: keep the recorded line.
+            // Trains and boats: onto the railway or ferry route they ran on, or else the recorded line.
+            val onLines = TrackSnapper.networkFor(trip.mode)?.let { TrackSnapper.snap(lat, lon, it) }
+            if (onLines != null) {
+                val sLat = DoubleArray(onLines.size / 2) { onLines[it * 2] }
+                val sLon = DoubleArray(onLines.size / 2) { onLines[it * 2 + 1] }
+                if (!strays(lat, lon, sLat, sLon, STRAY_METERS * 1.6, STRAY_LENGTH_RATIO)) {
+                    val shape = Polyline.encode(sLat, sLon)
+                    store.saveTripPath(trip.id, STATUS_SNAPPED, shape, shape)
+                    return 0
+                }
+            }
             store.saveTripPath(trip.id, STATUS_RECORDED, null, null)
             return 0
         }
