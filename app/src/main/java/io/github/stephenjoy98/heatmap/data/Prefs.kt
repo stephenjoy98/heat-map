@@ -259,7 +259,7 @@ object Prefs {
         _savedPlaces.value = SavedPlace.decode(sp.getString("saved_places", null))
         _settingsAsPages.value = sp.getBoolean("settings_pages", true)
         _mapLayer.value = MapLayerType.entries.byName(sp.getString("map_layer", null)) ?: MapLayerType.DEFAULT
-        _buildings3d.value = sp.getBoolean("buildings_3d", "map_tilted", false)
+        _buildings3d.value = sp.getBoolean("buildings_3d", false)
         // Before 2.47.0 one switch did both: a map with 3D buildings was a tilted one.
         _mapTilted.value = sp.getBoolean("map_tilted", _buildings3d.value)
         _showLocationDot.value = sp.getBoolean("show_location_dot", true)
@@ -555,7 +555,7 @@ object Prefs {
     // (Not state like "recording now", sync bookkeeping or caches.)
     private val BACKED_UP_KEYS = listOf(
         "interval_sec", "auto_interval", "high_accuracy", "display_mode", "map_theme", "units", "dynamic_color",
-        "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "mode_filter", "ai_engine", "cloud_model",
+        "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "map_tilted", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
