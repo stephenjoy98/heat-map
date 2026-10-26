@@ -823,6 +823,32 @@ class PointStore private constructor(context: Context) :
                 first = false
             }
         }
+        // The drawn line can be a road-matched shape that strays from the dots (a long straight jump, say), so a
+        // long-press on it counts too.
+        readableDatabase.rawQuery(
+            """SELECT t.id, t.start_time, p.poly FROM trip_paths p JOIN trips t ON t.id = p.trip_id
+               WHERE p.poly IS NOT NULL AND t.start_time < $to AND t.end_time >= $from""",
+            null,
+        ).use { c ->
+            while (c.moveToNext()) {
+                val pts = Polyline.decode(c.getString(2))
+                var i = 0
+                while (i + 3 < pts.size) {
+                    val ax = (pts[i + 1] - lon) * mPerDegLon
+                    val ay = (pts[i] - lat) * mPerDegLat
+                    val dx = (pts[i + 3] - lon) * mPerDegLon - ax
+                    val dy = (pts[i + 2] - lat) * mPerDegLat - ay
+                    val len2 = dx * dx + dy * dy
+                    val k = if (len2 > 0) (-(ax * dx + ay * dy) / len2).coerceIn(0.0, 1.0) else 0.0
+                    val d = hypot(ax + k * dx, ay + k * dy)
+                    if (d < best) {
+                        best = d
+                        found = c.getLong(1) to c.getLong(0)
+                    }
+                    i += 2
+                }
+            }
+        }
         return found
     }
 

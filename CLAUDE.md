@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.48.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.49.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -167,7 +167,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`,
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
   then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked; on part of a trip addTrip splits it,
-  which is how "Snap to a road (all or part)" isolates a stretch); Split (2.42.0: `splitting` → `SplitPanel`, `retime.range.last` =
+  which is how "Snap to a road (all or part)" isolates a stretch); Map long-press (2.49.0: `sectionNear` also measures trips' drawn `trip_paths.poly`; MapPick sheet adds "Draw the recorded route instead of the road" (`saveTripPath(id, STATUS_RECORDED, null, null)`, undoable) and "Edit its dots" (opens Edit dots on that day)); Split (2.42.0: `splitting` → `SplitPanel`, `retime.range.last` =
   last dot of the first part → `PointStore.splitTrip(tripId, atTime)`, undoable); Routes/Dots segmented toggle on the map
   (Dots = Edit dots mode); trip, road and
   level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt; 2.46.3: trip question = pick chip (starts on the best guess) then Save; Timeline undo snackbar at TopCenter + statusBarsPadding so it never covers Skip/Save; one queue,

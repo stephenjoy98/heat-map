@@ -847,6 +847,17 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             onFix = { startFix(pick.window.first, pick.window.last, pick.trip?.mode ?: pick.prev?.mode ?: TravelMode.UNKNOWN) },
             onMakeTrip = { adding = pick.window },
             onJoin = { joinTrips(listOfNotNull(pick.prev, pick.next)) },
+            onEditDots = { trip ->
+                edit.day = Instant.ofEpochMilli(trip.startTime).atZone(ZoneId.systemDefault()).toLocalDate()
+                edit.showingDeleted = false
+                editing = true
+            },
+            onUnsnap = { trip ->
+                undoable("Showing the recorded route", trip.startTime, trip.endTime) {
+                    store.saveTripPath(trip.id, RoadSnapper.STATUS_RECORDED, null, null)
+                    DeleteResult(emptySet(), emptyList())
+                }
+            },
         )
     }
 
@@ -1171,14 +1182,14 @@ private fun Hint(text: String) {
  * A section long-pressed on the Timeline's map: a [trip], or dots outside any trip (trip null) between [prev]
  * and [next]. [window] is the stretch of time an edit starts from.
  */
-private class MapPick(val trip: Trip?, val prev: Trip?, val next: Trip?, val window: LongRange)
+private class MapPick(val trip: Trip?, val prev: Trip?, val next: Trip?, val window: LongRange, val snapped: Boolean = false)
 
 /** What's drawn nearest a long-press on the map, or null if no route is close. Call off the main thread. */
 private fun findMapPick(store: PointStore, from: Long, to: Long, lat: Double, lon: Double, maxM: Double): MapPick? {
     val (time, tripId) = store.sectionNear(from, to, lat, lon, maxM) ?: return null
     if (tripId > 0) {
         val trip = store.trip(tripId) ?: return null
-        return MapPick(trip, null, null, trip.startTime..trip.endTime)
+        return MapPick(trip, null, null, trip.startTime..trip.endTime, snapped = store.tripPathRow(trip.id)?.poly != null)
     }
     val day = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate()
     val dayStart = day.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -1202,6 +1213,8 @@ private fun MapPickDialog(
     onFix: () -> Unit,
     onMakeTrip: () -> Unit,
     onJoin: () -> Unit,
+    onEditDots: (Trip) -> Unit,
+    onUnsnap: (Trip) -> Unit,
 ) {
     val trip = pick.trip
     val prev = pick.prev
@@ -1248,6 +1261,9 @@ private fun MapPickDialog(
                 PickAction("Change times", Icons.Filled.Edit) { act { onRetime(trip) } }
                 PickAction("Split into two trips", null, R.drawable.ic_content_cut) { act { onSplit(trip) } }
                 PickAction("Snap to a road (all or part)", Icons.Filled.Place) { act(onFix) }
+                // A road match that went wrong (a straight line across the map, say): back to the recorded line.
+                if (pick.snapped) PickAction("Draw the recorded route instead of the road", null, R.drawable.ic_route) { act { onUnsnap(trip) } }
+                PickAction("Edit its dots (delete or move stray ones)", null, R.drawable.ic_open_with) { act { onEditDots(trip) } }
             } else {
                 if (canJoin && prev != null && next != null) PickAction("Join the ${prev.mode.label} and ${next.mode.label} trips around them", null) { act(onJoin) }
                 PickAction("Make them a trip", Icons.Filled.Add) { act(onMakeTrip) }

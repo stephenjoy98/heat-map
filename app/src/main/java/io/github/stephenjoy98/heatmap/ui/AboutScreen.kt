@@ -79,7 +79,7 @@ private val FEATURES = listOf(
     R.drawable.ic_fullscreen to "A full-screen map with only its buttons, and the blue location dot can be hidden",
     R.drawable.ic_explore to "An altimeter, a speedometer and a compass that turns the map north, then tilts it into 3D",
     R.drawable.ic_navigation to "Follow me: long-press the location button to keep your dot centred while you travel, recording every second, long-press again to stop",
-    R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there",
+    R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there, undo a bad road match or fix its dots",
     R.drawable.ic_system_update to "Red dots lead to what a notification was about, and \"New\" marks sections that changed since your last look",
     R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",
     R.drawable.ic_help_outline to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",

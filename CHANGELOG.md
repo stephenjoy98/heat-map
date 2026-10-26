@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.49.0] - 2026-10-26
+
+### Added
+- Long-pressing a route on the Timeline map now also finds road-matched lines that wander away from your dots,
+  like a long straight line across the map. Its sheet has two new options: **Draw the recorded route instead of
+  the road** (undoes a bad road match) and **Edit its dots** (opens Edit dots on that day to delete or move stray
+  dots).
+
 ## [2.48.1] - 2026-10-26
 
 ### Changed
