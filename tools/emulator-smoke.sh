@@ -224,6 +224,10 @@ back
 
 tap text "Profile"
 shot 14-profile 6
+# Areas: the map of explored squares, in red.
+tap text "AREAS ›"
+shot 14a-areas-map 6
+back
 back
 back
 tap text "Map"
