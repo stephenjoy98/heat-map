@@ -224,14 +224,14 @@ back
 
 tap text "Profile"
 shot 14-profile 6
-# Breakdowns as a pie chart, then back to bars.
-tap desc "Show as a pie chart"
-shot 14b-profile-pie 3
-tap desc "Show as bars"
 # Areas: the map of explored squares, in red.
 tap text "AREAS ›"
 shot 14a-areas-map 6
 back
+# Breakdowns as a pie chart (the card is further down), then back to bars.
+tap_scrolling desc "Show as a pie chart"
+shot 14b-profile-pie 3
+tap desc "Show as bars"
 back
 back
 tap text "Map"
