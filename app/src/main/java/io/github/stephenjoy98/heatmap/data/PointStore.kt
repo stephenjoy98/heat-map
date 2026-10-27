@@ -2079,6 +2079,14 @@ class PointStore private constructor(context: Context) :
                WHERE t >= $from AND t < $to"""
         )
 
+    /** The cells visited in the period, as [Cells] keys (for drawing areas explored on a map). */
+    fun cellKeys(from: Long, to: Long): LongArray =
+        readableDatabase.rawQuery(
+            "SELECT DISTINCT ${Cells.SQL_ROW}, ${Cells.SQL_COL} FROM points WHERE time >= $from AND time < $to", null
+        ).use { c ->
+            LongArray(c.count).also { out -> var i = 0; while (c.moveToNext()) out[i++] = Cells.pack(c.getInt(0), c.getInt(1)) }
+        }
+
     /** Every cell ever visited, as [Cells] keys. */
     fun allCells(): HashSet<Long> =
         readableDatabase.rawQuery("SELECT DISTINCT ${Cells.SQL_ROW}, ${Cells.SQL_COL} FROM points", null).use { c ->

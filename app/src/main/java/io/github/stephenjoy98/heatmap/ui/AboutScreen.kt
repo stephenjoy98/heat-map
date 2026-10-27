@@ -79,6 +79,8 @@ private val FEATURES = listOf(
     R.drawable.ic_fullscreen to "A full-screen map with only its buttons, and the blue location dot can be hidden",
     R.drawable.ic_explore to "An altimeter, a speedometer and a compass that turns the map north, then tilts it into 3D",
     R.drawable.ic_navigation to "Follow me: long-press the location button to keep your dot centred while you travel, recording every second, long-press again to stop",
+    R.drawable.ic_map to "A map of every area you've explored, by city, from the profile",
+    R.drawable.ic_cloud to "A carbon footprint estimate from every travel mode, with its breakdown",
     R.drawable.ic_route to "Trains and boats snap to railways and ferry routes from OpenStreetMap",
     R.drawable.ic_place to "Tap a trip on the Timeline to highlight it on the map",
     R.drawable.ic_edit to "Long-press a route on the Timeline map to edit that trip or the loose dots there, undo a bad road match or fix its dots",

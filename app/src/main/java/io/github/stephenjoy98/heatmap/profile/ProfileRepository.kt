@@ -2,6 +2,7 @@ package io.github.stephenjoy98.heatmap.profile
 
 import android.content.Context
 import io.github.stephenjoy98.heatmap.data.PointStore
+import io.github.stephenjoy98.heatmap.data.Carbon
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.data.Trip
 import io.github.stephenjoy98.heatmap.review.Places
@@ -49,14 +50,11 @@ class ProfileStats(
     /** Everything travelled, including the same routes again and again. */
     val totalKm: Double get() = kmByMode.values.sum()
 
-    /** Rough CO₂ from vehicle trips: ~170 g/km by car (driving or car share), ~50 g/km by bus or train. */
-    val co2Kg: Double
-        get() = ((kmByMode[TravelMode.DRIVE] ?: 0.0) + (kmByMode[TravelMode.RIDESHARE] ?: 0.0)) * 0.17 +
-            (kmByMode[TravelMode.TRANSIT] ?: 0.0) * 0.05
+    /** Rough CO₂ from vehicle trips, every mode by its kind (sub-modes and modes you added too); see [Carbon]. */
+    val co2Kg: Double get() = Carbon.kg(kmByMode)
 
     /** CO₂ walking and cycling avoided compared with driving the same distance. */
-    val savedKg: Double
-        get() = ((kmByMode[TravelMode.WALK] ?: 0.0) + (kmByMode[TravelMode.CYCLE] ?: 0.0)) * 0.17
+    val savedKg: Double get() = Carbon.savedKg(kmByMode)
 }
 
 /** Gathers the profile's statistics, for all time or one calendar year. Call off the main thread. */

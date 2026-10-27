@@ -12,6 +12,19 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.53.0] - 2026-10-27
+
+### Added
+- Tapping **Areas** on the profile opens a map, three quarters of the screen tall, with every square you've been to
+  filled red, and the squares counted by city below it.
+- Tap the carbon footprint card to see how it's worked out: each travel mode's km, its rate and the CO₂.
+
+### Fixed
+- The carbon footprint only counted trips tagged exactly Driving, RideShare or PublicTransit, so car pools,
+  shuttles, SkyTrain, buses and other sub-modes or modes you added counted as nothing. Every mode now counts by its
+  kind (car, bus, train or boat), with rates from the UK government's conversion factors: car 170 g/km (a car pool
+  half that), bus 100, train 35, SkyTrain or metro 30, ferry 20.
+
 ## [2.52.0] - 2026-10-26
 
 ### Added

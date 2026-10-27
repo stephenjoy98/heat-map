@@ -1,5 +1,6 @@
 package io.github.stephenjoy98.heatmap.ui
 
+import io.github.stephenjoy98.heatmap.data.Carbon
 import io.github.stephenjoy98.heatmap.R
 
 import androidx.compose.foundation.clickable
@@ -175,12 +176,20 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
             CarbonCard(s)
             // Stamps are hidden for now; more will be added to this section later.
             if (showAreas) {
-                ListDialog(
+                // The squares on a map (red), with the count by city below.
+                val zone = java.time.ZoneId.systemDefault()
+                val year = s.year
+                val (from, to) = if (year == null) 0L to Long.MAX_VALUE else {
+                    java.time.LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli() to
+                        java.time.LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+                }
+                AreasMapDialog(
                     title = "${formatCount(s.areas)} areas",
-                    explanation = "$AREA_EXPLANATION These are all the squares you've been to" +
-                        (if (s.year != null) " in ${s.year}" else "") + ", by city:",
+                    explanation = "$AREA_EXPLANATION The red squares on the map are all the ones you've been to" +
+                        (if (year != null) " in $year" else "") + ". By city:",
+                    from = from,
+                    to = to,
                     rows = s.areasByCity.map { (city, n) -> city to "$n ${if (n == 1) "area" else "areas"}" },
-                    empty = "No areas yet.",
                     onDismiss = { showAreas = false },
                 )
             }
@@ -501,7 +510,28 @@ private fun PlacesDialog(kind: PlaceKind, s: ProfileStats, source: Rect?, onDism
 @Composable
 private fun CarbonCard(s: ProfileStats) {
     val co2 = s.co2Kg
-    Card {
+    var details by remember { mutableStateOf(false) }
+    if (details) {
+        // Each mode's km, its rate and the CO₂ it adds up to, biggest first.
+        val rows = s.kmByMode.entries
+            .filter { it.value > 0.05 }
+            .sortedByDescending { it.value * Carbon.kgPerKm(it.key) }
+            .map { (mode, km) ->
+                val rate = Carbon.kgPerKm(mode)
+                mode.fullLabel to "${Units.distance(km)} × ${(rate * 1000).roundToInt()} g/km = ${(km * rate).roundToInt()} kg"
+            }
+        ListDialog(
+            title = "Carbon footprint",
+            explanation = "A rough estimate per person, by the kind of each travel mode: car 170 g/km (a car pool is shared " +
+                "with one other person, so 85), taxi or ride-hail 150, bus 100, train 35, SkyTrain or metro 30, ferry " +
+                "20, walking and cycling 0. Figures are the UK government's conversion factors (2024). \"Other\" " +
+                "trips aren't counted.",
+            rows = rows,
+            empty = "No trips yet.",
+            onDismiss = { details = false },
+        )
+    }
+    Card(Modifier.clickable { details = true }) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
