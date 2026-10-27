@@ -276,6 +276,14 @@ shot 16-fullscreen 2
 tap desc "Exit full screen"
 shot 17-fullscreen-exit 2
 
+# The widget's follow me button, as the widget sends it: opens the map following you.
+adb shell am start -n "$PKG/.ui.MainActivity" -a "$PKG.OPEN.follow" --es page follow > /dev/null 2>&1
+note "opened the app as the widget's follow me button does"
+shot 18-widget-follow 4
+# The widget itself: ask for a refresh so its drawing code runs (it shows only if placed on a home screen).
+adb shell am broadcast -a android.appwidget.action.APPWIDGET_UPDATE -n "$PKG/.widget.HeatmapWidget" > /dev/null 2>&1
+sleep 3
+
 kill "$REC" 2> /dev/null
 wait "$REC" 2> /dev/null
 sleep 3

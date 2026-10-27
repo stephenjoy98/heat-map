@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.54.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.55.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -203,6 +203,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   System), page-per-section by default (Prefs "settings_pages"), the "One list" choice and Units live on the
   General page; sections switch with an AnimatedContent shared-axis slide. `PageHost` keeps the page under the top one
   composed so popping never flashes the tabs.
+- Widget (2.55.0): `widget/HeatmapWidget` (classic AppWidgetProvider + RemoteViews, no Glance; layout `widget_heatmap.xml`, info `xml/widget_heatmap_info.xml`, 30 min updatePeriod) — `Render` CoroutineWorker draws `HeatRenderer.renderTile(OwnTracks)` around `store.latest()` (0.06° wide, rounded, blue dot), today's km, follow button bitmap in the palette glow; `requestUpdate(force)` (unique work, ≤ every 10 min unless forced) called at the end of `TripDetector.process`. Follow button → `MainActivity.openIntent(PAGE_FOLLOW)` → map tab, pages cleared, `FollowRequest.pending` → MapScreen starts following once `dotAt` exists.
 - `update/` (2.30.0): `Updater` (GitHub releases/latest → `Release`; newer = higher SemVer, or same version with a
   different `<!-- build: sha -->` marker in the notes vs `BuildConfig.BUILD_COMMIT` from CI's GITHUB_SHA; downloads to
   cacheDir/updates (re-fetches release details first; 404/size change → retry 4× 30 s apart, because CI's --clobber

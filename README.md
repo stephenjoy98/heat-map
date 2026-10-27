@@ -111,6 +111,9 @@ up to your Google account, and lets you compare explored areas with friends.
   you narrow the range to. **Routes / Dots** on the Timeline map shows every dot; tap one to delete it.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
+- **Mini heatmap widget** (home screen, resizable from 2×2): your heatmap around where you are in your heat colours,
+  today's km, and a follow me button that opens the map following you. Refreshes about every 30 minutes and as
+  trips are worked out.
 - **Follow me**: long-press the location button to keep your dot in the middle of the map while you travel,
   shown as a trace cursor (a dark disc with a white arrow, glowing in your routes' colour; a thin disc on the 3D map) pointing your way. The map turns so your way is always up, and
   goes back to north up when you stop. Drag the map to look around

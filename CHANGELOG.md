@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.55.0] - 2026-10-27
+
+### Added
+- **Mini heatmap widget** for the home screen: your heatmap in your heat colours around where you are, today's km,
+  and a follow me button that opens the map already following you. Tap the map to open the app. It refreshes
+  about every 30 minutes, and as your trips are worked out (at most every 10 minutes). Long-press the home screen
+  › Widgets › Location Ticker to add it; it can be resized.
+
 ## [2.54.0] - 2026-10-27
 
 ### Added

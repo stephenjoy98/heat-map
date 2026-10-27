@@ -183,6 +183,15 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             else -> null
         }
     }
+    // The widget's follow me button: start following as soon as there's a position to follow.
+    val followAsked by FollowRequest.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(followAsked, dotAt != null) {
+        if (followAsked && dotAt != null) {
+            lastFollowAt = 0L
+            following = true
+            FollowRequest.pending.value = false
+        }
+    }
     // The arrow on the dot: which way you're going, while you're moving.
     val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
     // The way you were last heading, kept while you stop, for turning the map in 3D follow me.
@@ -713,4 +722,9 @@ private fun missingStartPermissions(context: Context): Array<String> {
         needed += Manifest.permission.ACTIVITY_RECOGNITION
     }
     return needed.toTypedArray()
+}
+
+/** Set when the map should start following you as soon as it can (from the home screen widget). */
+object FollowRequest {
+    val pending = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
