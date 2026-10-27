@@ -167,8 +167,8 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
             TimeCapturedCard(s)
             Card {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("BY TRAVEL MODE", style = capsLabel)
-                    ModeBreakdownRows(s.kmByMode)
+                    BreakdownHeader("BY TRAVEL MODE", capsLabel)
+                    ModeBreakdown(s.kmByMode)
                 }
             }
             MostVisitedTile(s, Modifier)

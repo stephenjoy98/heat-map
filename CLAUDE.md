@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.53.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.54.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -197,7 +197,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   day (bump the key when per-day backup content grows). 3D ribbons and heatmaps are always drawn on the phone. Shared routes (`users/{uid}/routes`) hold mode + polyline + distance, no times or heights. Friend profile page
   `FriendProfileScreen` (`Page.FRIEND`): stats + heatmap of `friend_routes` framed by `PointStore.friendBounds`.
 - Profile (2.53.0): `data/Carbon` (kg CO₂/km by mode kind + name words: car 0.17, pool /2, taxi/ride 0.15, bus 0.10, rail 0.035, sky/metro/light 0.03, ferry 0.02; DESNZ 2024) used by `ProfileStats.co2Kg/savedKg`; carbon card tap → breakdown `ListDialog`. Areas tap → `AreasMapDialog` (ui/AreasMap.kt: full-screen Dialog, map 75% height, `PointStore.cellKeys` squares filled red #E53935 at 55%, city list below).
-- `ui/Breakdowns.kt`: `ModeBreakdownRows` (top-level modes with children summed, tap to expand; used on Insights
+- `ui/Breakdowns.kt` (2.54.0): `BreakdownHeader` (title + bars/pie toggle, Prefs `breakdown_pie`, shared and backed up), `BarsOrPie(slices) { bars }`, `PieChart` (ring of `ChartSlice`s + legend with %), `modeSlices`/`ModeBreakdown`; used by Profile and Insights mode cards, friend's mode card, Satellites. `ModeBreakdownRows` (top-level modes with children summed, tap to expand; used on Insights
   and Profile), `ListDialog`, `AREA_EXPLANATION`. `PointStore.kmByArea` / `cellsByArea` + `ReviewRepository.byCity`
   give km and areas per city. Settings: `SettingsPage` enum with a `group` (Recording / Map and trips / App /
   System), page-per-section by default (Prefs "settings_pages"), the "One list" choice and Units live on the

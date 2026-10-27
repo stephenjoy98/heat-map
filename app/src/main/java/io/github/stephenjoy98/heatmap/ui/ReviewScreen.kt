@@ -209,8 +209,8 @@ private fun StatTile(value: String, label: String, modifier: Modifier, onClick: 
 private fun ModeBreakdown(d: ReviewData) {
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("By travel mode", style = MaterialTheme.typography.titleMedium)
-            ModeBreakdownRows(d.kmByMode)
+            BreakdownHeader("By travel mode", MaterialTheme.typography.titleMedium)
+            ModeBreakdown(d.kmByMode)
         }
     }
 }
@@ -298,7 +298,7 @@ private fun SatellitesCard(store: PointStore, d: ReviewData) {
     var showing by remember { mutableStateOf(false) }
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Satellites", style = MaterialTheme.typography.titleMedium)
+            BreakdownHeader("Satellites", MaterialTheme.typography.titleMedium)
             live?.let {
                 Text(
                     "Right now: ${it.used} of ${it.visible} satellites in view fixing your position",
@@ -322,6 +322,10 @@ private fun SatellitesCard(store: PointStore, d: ReviewData) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val max = systems.maxOf { it.third }.coerceAtLeast(1)
+                val slices = systems.map { (c, count, fixes) ->
+                    ChartSlice(Satellites.system(c), fixes.toDouble(), systemColor(c), "${if (count == 1) "1 satellite" else "$count satellites"} · used ${formatCount(fixes)} times")
+                }
+                BarsOrPie(slices) { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 systems.forEach { (c, count, fixes) ->
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -348,6 +352,7 @@ private fun SatellitesCard(store: PointStore, d: ReviewData) {
                         )
                     }
                 }
+                } }
                 TextButton(onClick = { showing = true }) { Text("See all satellites") }
             }
         }

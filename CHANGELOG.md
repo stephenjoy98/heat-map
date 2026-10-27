@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.54.0] - 2026-10-27
+
+### Added
+- A button at the top right of the "By travel mode" cards (profile and Insights), a friend's "How they get around"
+  and Insights' Satellites switches the bars to a pie chart with each share as a percentage, and back. The choice
+  is remembered for all of them.
+
 ## [2.53.0] - 2026-10-27
 
 ### Added

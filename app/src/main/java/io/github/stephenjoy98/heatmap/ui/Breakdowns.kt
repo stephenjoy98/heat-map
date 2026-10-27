@@ -37,6 +37,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.review.Insights
+import io.github.stephenjoy98.heatmap.R
+import io.github.stephenjoy98.heatmap.data.Prefs
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.Canvas
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.roundToInt
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Distance by travel mode, one bar per top-level mode. A mode with sub-modes (PublicTransit: SkyTrain, Bus,
@@ -143,3 +157,95 @@ fun ListDialog(title: String, explanation: String, rows: List<Pair<String, Strin
 const val AREA_EXPLANATION =
     "The map is divided into squares about 220 m across. An area is one of those squares with at least one of " +
         "your dots in it."
+
+/** One part of a pie chart: what it is, how much, its colour and the value as shown beside it. */
+class ChartSlice(val label: String, val value: Double, val color: Color, val valueText: String)
+
+/**
+ * A card's title with a button on the right that switches its breakdown between bars and a pie chart. The choice
+ * is shared by every such card and remembered.
+ */
+@Composable
+fun BreakdownHeader(title: String, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
+    val pie by Prefs.breakdownPie.collectAsStateWithLifecycle()
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = style, modifier = Modifier.weight(1f))
+        val label = if (pie) "Show as bars" else "Show as a pie chart"
+        Tip(label) {
+            IconButton(onClick = { Prefs.setBreakdownPie(!pie) }, modifier = Modifier.size(36.dp).semantics { contentDescription = label }) {
+                // The button shows what you'd switch to.
+                MaterialIcon(if (pie) R.drawable.ic_bar_chart else R.drawable.ic_pie_chart, size = 22)
+            }
+        }
+    }
+}
+
+/** Bars or a pie chart, whichever the cards are set to, fading from one to the other. */
+@Composable
+fun BarsOrPie(slices: List<ChartSlice>, bars: @Composable () -> Unit) {
+    val pie by Prefs.breakdownPie.collectAsStateWithLifecycle()
+    Crossfade(targetState = pie && slices.any { it.value > 0 }, label = "breakdown") { asPie ->
+        if (asPie) PieChart(slices) else bars()
+    }
+}
+
+/** A ring chart of [slices] (largest first) beside a legend with each one's share and value. */
+@Composable
+fun PieChart(slices: List<ChartSlice>) {
+    val shown = slices.filter { it.value > 0 }.sortedByDescending { it.value }
+    val total = shown.sumOf { it.value }
+    if (total <= 0) return
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.size(132.dp)) {
+            val stroke = 26.dp.toPx()
+            val inset = stroke / 2
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            drawArc(track, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(stroke))
+            // A thin gap between slices so neighbours with similar colours stay apart.
+            val gap = if (shown.size > 1) 1.5f else 0f
+            var start = -90f
+            for (s in shown) {
+                val sweep = (s.value / total * 360).toFloat()
+                if (sweep > gap) {
+                    drawArc(s.color, start + gap / 2, sweep - gap, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(stroke))
+                }
+                start += sweep
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (s in shown) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).background(s.color, androidx.compose.foundation.shape.CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Text(s.label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(
+                        "${(s.value / total * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+                Text(
+                    s.valueText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 18.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Travel modes as pie slices: top-level modes with their sub-modes added in, like the bars. */
+fun modeSlices(kmByMode: Map<TravelMode, Double>): List<ChartSlice> =
+    (TravelMode.topLevel + TravelMode.UNKNOWN).map { m ->
+        val km = m.withChildren.sumOf { kmByMode[it] ?: 0.0 }
+        ChartSlice(m.label, km, Color(m.color), Insights.km(km))
+    }
+
+/** The travel mode bars, or the pie chart: for the "By travel mode" cards. */
+@Composable
+fun ModeBreakdown(kmByMode: Map<TravelMode, Double>) {
+    BarsOrPie(modeSlices(kmByMode)) { ModeBreakdownRows(kmByMode) }
+}

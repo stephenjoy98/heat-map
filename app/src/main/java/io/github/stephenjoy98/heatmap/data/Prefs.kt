@@ -78,6 +78,15 @@ object Prefs {
     }
 
     /** Whether the blue dot for where you are shows on the map (Map layers › My location). */
+    /** Breakdown cards (travel modes, satellites) as a pie chart instead of bars. */
+    private val _breakdownPie = MutableStateFlow(false)
+    val breakdownPie: StateFlow<Boolean> = _breakdownPie
+
+    fun setBreakdownPie(on: Boolean) {
+        _breakdownPie.value = on
+        sp.edit().putBoolean("breakdown_pie", on).apply()
+    }
+
     private val _showLocationDot = MutableStateFlow(true)
     val showLocationDot: StateFlow<Boolean> = _showLocationDot
 
@@ -263,6 +272,7 @@ object Prefs {
         // Before 2.47.0 one switch did both: a map with 3D buildings was a tilted one.
         _mapTilted.value = sp.getBoolean("map_tilted", _buildings3d.value)
         _showLocationDot.value = sp.getBoolean("show_location_dot", true)
+        _breakdownPie.value = sp.getBoolean("breakdown_pie", false)
         _routes3d.value = sp.getBoolean("routes_3d", true)
         _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
         _snapToRoads.value = sp.getBoolean("snap_roads", true)
@@ -559,7 +569,7 @@ object Prefs {
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
-        "show_location_dot", "map_colour_roads", "heat_palette", "routes_3d",
+        "show_location_dot", "breakdown_pie", "map_colour_roads", "heat_palette", "routes_3d",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */

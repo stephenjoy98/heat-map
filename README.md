@@ -174,6 +174,7 @@ up to your Google account, and lets you compare explored areas with friends.
   on a ~60 m grid, unlike km travelled; and countries, cities and continents, each tappable for the full list, with JoyPixels flags and globes);
   and an estimated **carbon footprint** from every travel mode by its kind (tap it for the breakdown). Tap
   **Areas** for a map of every square you've been to, in red, with the count by city.
+  The breakdown cards (travel modes, satellites) switch between bars and a pie chart with the button at their top right.
   Filter by all time or by year.
 
 ### Insights page

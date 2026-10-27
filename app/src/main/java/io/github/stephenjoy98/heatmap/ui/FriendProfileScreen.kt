@@ -147,8 +147,10 @@ fun FriendProfileScreen(friend: Friend, onBack: () -> Unit, onCompare: () -> Uni
                 if (friend.kmByMode.isNotEmpty()) {
                     ElevatedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("How ${friend.name} gets around", style = MaterialTheme.typography.titleMedium)
+                            BreakdownHeader("How ${friend.name} gets around", MaterialTheme.typography.titleMedium)
                             val max = friend.kmByMode.values.maxOrNull()?.coerceAtLeast(0.01) ?: 1.0
+                            val slices = friend.kmByMode.map { (mode, km) -> ChartSlice(mode.label, km, Color(mode.color), Insights.km(km)) }
+                            BarsOrPie(slices) { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             friend.kmByMode.entries.sortedByDescending { it.value }.forEach { (mode, km) ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(mode.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(96.dp))
@@ -163,6 +165,7 @@ fun FriendProfileScreen(friend: Friend, onBack: () -> Unit, onCompare: () -> Uni
                                     Text(Insights.km(km), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
                                 }
                             }
+                            } }
                         }
                     }
                 }
