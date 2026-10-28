@@ -95,7 +95,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.R
-import io.github.stephenjoy98.heatmap.widget.FollowWidget
+import io.github.stephenjoy98.heatmap.tracking.FollowMode
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
@@ -168,7 +168,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val altitude = liveFix?.takeIf { System.currentTimeMillis() - it.time < 60_000 }?.let { LocationTickerService.altitudeOf(it) }
     // Follow me (long-press the location button, long-press again to stop): the map glides along with the dot.
     // Dragging the map doesn't stop it; the map comes back to you a few seconds after you let go.
-    var following by rememberSaveable { mutableStateOf(false) }
+    var following by remember { mutableStateOf(FollowMode.on.value) }
     var lastFollowAt by remember { mutableLongStateOf(0L) }
     var lastPanAt by remember { mutableLongStateOf(0L) }
     val haptics = LocalHapticFeedback.current
@@ -184,34 +184,17 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             else -> null
         }
     }
-    // The widget's follow me button: start following as soon as there's a position to follow.
-    val followAsked by FollowRequest.pending.collectAsStateWithLifecycle()
-    LaunchedEffect(followAsked, dotAt != null) {
-        if (followAsked && dotAt != null) {
-            lastFollowAt = 0L
-            following = true
-            FollowRequest.pending.value = false
-        }
-    }
-    // The widget's button while following: stop, as a long-press on the location button does.
+    // Follow me is app-wide (the home screen widget turns it on and off too): keep the map in step with it.
     LaunchedEffect(Unit) {
-        FollowRequest.stop.collect { asked ->
-            if (asked) {
-                FollowRequest.stop.value = false
-                if (following) {
-                    following = false
-                    camera.northUp()
-                }
+        FollowMode.on.collect { on ->
+            if (on != following) {
+                if (on) lastFollowAt = 0L else camera.northUp()
+                following = on
             }
         }
     }
-    // Tell the widget whether follow me is on, so its button shows it and turns it off.
-    LaunchedEffect(following) {
-        if (FollowRequest.active.value != following) {
-            FollowRequest.active.value = following
-            FollowWidget.requestUpdate(context, force = true)
-        }
-    }
+    // Following records every second, with the app open or not, until follow me is turned off.
+    LaunchedEffect(following) { FollowMode.set(context, following) }
     // The arrow on the dot: which way you're going, while you're moving.
     val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
     // The way you were last heading, kept while you stop, for turning the map in 3D follow me.
@@ -229,29 +212,6 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
         if (!centered && latest != null) {
             camera.moveTo(latest.lat, latest.lon, 15f)
             centered = true
-        }
-    }
-
-    // While following you with the app on screen, record every second; back to the usual interval when follow me
-    // stops or the app goes to the background.
-    val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val boost = following && lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
-    LaunchedEffect(boost) {
-        if (Prefs.followBoost.value != boost) {
-            Prefs.setFollowBoost(boost)
-            if (Prefs.tracking.value) LocationTickerService.start(context)
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            if (FollowRequest.active.value) {
-                FollowRequest.active.value = false
-                FollowWidget.requestUpdate(context, force = true)
-            }
-            if (Prefs.followBoost.value) {
-                Prefs.setFollowBoost(false)
-                if (Prefs.tracking.value) LocationTickerService.start(context)
-            }
         }
     }
 
@@ -746,14 +706,4 @@ private fun missingStartPermissions(context: Context): Array<String> {
         needed += Manifest.permission.ACTIVITY_RECOGNITION
     }
     return needed.toTypedArray()
-}
-
-/** Follow me and the home screen widget: the widget's button starts and stops it, and shows whether it's on. */
-object FollowRequest {
-    /** Set when the map should start following you as soon as it can. */
-    val pending = kotlinx.coroutines.flow.MutableStateFlow(false)
-    /** Set when the map should stop following you. */
-    val stop = kotlinx.coroutines.flow.MutableStateFlow(false)
-    /** Whether the map is following you now. */
-    val active = kotlinx.coroutines.flow.MutableStateFlow(false)
 }

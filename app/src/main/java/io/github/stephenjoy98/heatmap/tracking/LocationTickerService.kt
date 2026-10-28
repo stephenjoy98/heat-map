@@ -391,6 +391,8 @@ class LocationTickerService : Service() {
 
         fun stop(context: Context) {
             Prefs.setTracking(false)
+            // Stopping recording ends follow me too, so the next recording starts at the usual interval.
+            Prefs.setFollowBoost(false)
             context.stopService(Intent(context, LocationTickerService::class.java))
         }
     }

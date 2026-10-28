@@ -276,10 +276,6 @@ shot 16-fullscreen 2
 tap desc "Exit full screen"
 shot 17-fullscreen-exit 2
 
-# The widget's follow me button, as the widget sends it: opens the map following you.
-adb shell am start -n "$PKG/.ui.MainActivity" -a "$PKG.OPEN.follow" --es page follow > /dev/null 2>&1
-note "opened the app as the widget's follow me button does"
-shot 18-widget-follow 4
 # The widget itself can't be placed here; ask for a refresh so its drawing code runs.
 adb shell am broadcast -a android.appwidget.action.APPWIDGET_UPDATE -n "$PKG/.widget.FollowWidget" > /dev/null 2>&1
 sleep 3
@@ -289,15 +285,33 @@ wait "$REC" 2> /dev/null
 sleep 3
 adb pull /sdcard/run.mp4 "$OUT/run.mp4" > /dev/null 2>&1 && note "saved run.mp4"
 
-# The widget's button while following: stops follow me. Its receiver isn't exported, so this needs a root shell.
+# The widget's follow me button, as the widget sends it (its receiver isn't exported, so this needs a root shell):
+# from the home screen it turns follow me on without opening the app (recording every second, shown in the
+# notification), and the map follows when the app comes back; a second tap turns it off.
 if adb root > /dev/null 2>&1; then
     sleep 3
     adb wait-for-device
-    adb shell am broadcast -a io.github.stephenjoy98.heatmap.STOP_FOLLOW -n "$PKG/.widget.FollowWidget" > /dev/null 2>&1
-    note "sent the widget's stop follow me"
-    shot 19-widget-stop-follow 4
+    toggle() { adb shell am broadcast -a io.github.stephenjoy98.heatmap.TOGGLE_FOLLOW -n "$PKG/.widget.FollowWidget" > /dev/null 2>&1; }
+    adb shell input keyevent KEYCODE_HOME
+    sleep 2
+    toggle
+    note "widget button on the home screen: follow me on"
+    sleep 4
+    adb shell cmd statusbar expand-notifications
+    shot 18-widget-follow-notification 3
+    adb shell cmd statusbar collapse
+    adb shell am start -n "$PKG/.ui.MainActivity" > /dev/null 2>&1
+    note "opened the app while follow me is on"
+    shot 19-widget-follow-map 5
+    adb shell input keyevent KEYCODE_HOME
+    sleep 2
+    toggle
+    note "widget button again: follow me off"
+    sleep 3
+    adb shell am start -n "$PKG/.ui.MainActivity" > /dev/null 2>&1
+    shot 20-widget-follow-off 5
 else
-    note "no root shell: skipped the widget's stop follow me"
+    note "no root shell: skipped the widget's follow me button"
 fi
 
 adb logcat -d > "$OUT/logcat.txt"

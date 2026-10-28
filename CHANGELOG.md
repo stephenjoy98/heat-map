@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.58.0] - 2026-10-28
+
+### Changed
+- The **Follow me** widget's button now turns follow me on and off right from the home screen, without opening
+  the app: while it's on, Location Ticker records every second with GPS (it starts recording if it was stopped),
+  and the widget says "Following you". Open the app and the map is already following you.
+- Follow me now keeps recording every second when you leave the app, until you turn it off (long-press the
+  location button, or tap the widget's button). Before, it went back to the usual interval in the background.
+
 ## [2.57.0] - 2026-10-28
 
 ### Changed

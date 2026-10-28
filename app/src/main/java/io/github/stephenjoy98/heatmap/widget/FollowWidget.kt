@@ -12,6 +12,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.widget.RemoteViews
+import android.widget.Toast
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -20,7 +21,7 @@ import androidx.work.WorkerParameters
 import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.HeatPalette
 import io.github.stephenjoy98.heatmap.data.Prefs
-import io.github.stephenjoy98.heatmap.ui.FollowRequest
+import io.github.stephenjoy98.heatmap.tracking.FollowMode
 import io.github.stephenjoy98.heatmap.ui.MainActivity
 import io.github.stephenjoy98.heatmap.ui.formatInterval
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +34,7 @@ import kotlin.math.roundToInt
 
 /**
  * The follow me widget (2 wide, 1 high): whether you're recording and how often on the left (tap: the map), and on
- * the right a button that turns follow me on (opening the map following you) and off.
+ * the right a button that turns follow me ([FollowMode]: recording every second) on and off without opening the app.
  *
  * Android refreshes it about every 30 minutes; the app redraws it straight away when the recording status changes
  * ([watchStatus]) or follow me turns on or off. Drawing happens in [Render], off the main thread.
@@ -44,9 +45,12 @@ class FollowWidget : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_STOP_FOLLOW) {
-            // Follow me lives on the map; if the app was closed since, it's already off and this just redraws.
-            if (FollowRequest.active.value) FollowRequest.stop.value = true
+        if (intent.action == ACTION_TOGGLE_FOLLOW) {
+            // Straight from the home screen, without opening the app: on = record every second (starting recording
+            // if it was off), off = back to the usual interval.
+            val on = !FollowMode.on.value
+            FollowMode.set(context, on, startRecording = true)
+            Toast.makeText(context, if (on) "Follow me on: recording every second" else "Follow me off", Toast.LENGTH_SHORT).show()
             requestUpdate(context, force = true)
             return
         }
@@ -70,7 +74,7 @@ class FollowWidget : AppWidgetProvider() {
     companion object {
         // Auto recording can change its interval every few seconds; don't redraw more often than this unasked.
         private const val MIN_GAP_MS = 60_000L
-        private const val ACTION_STOP_FOLLOW = "io.github.stephenjoy98.heatmap.STOP_FOLLOW"
+        private const val ACTION_TOGGLE_FOLLOW = "io.github.stephenjoy98.heatmap.TOGGLE_FOLLOW"
 
         @Volatile
         private var lastRender = 0L
@@ -92,7 +96,7 @@ class FollowWidget : AppWidgetProvider() {
         fun watchStatus(context: Context) {
             val app = context.applicationContext
             CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-                combine(Prefs.tracking, Prefs.liveIntervalSec, Prefs.autoInterval, Prefs.atPlace) { _, _, _, _ -> status() }
+                combine(Prefs.tracking, Prefs.liveIntervalSec, Prefs.autoInterval, Prefs.atPlace, Prefs.followBoost) { _, _, _, _, _ -> status() }
                     .distinctUntilChanged()
                     .collect { requestUpdate(app, force = true) }
             }
@@ -104,6 +108,7 @@ class FollowWidget : AppWidgetProvider() {
             val every = "every ${formatInterval(Prefs.liveIntervalSec.value)}"
             val place = Prefs.atPlace.value
             return when {
+                FollowMode.on.value -> "Following you" to every
                 place != null -> "Recording at ${place.name}" to every
                 Prefs.autoInterval.value -> "Recording · Auto" to every
                 else -> "Recording" to every
@@ -118,19 +123,15 @@ class FollowWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_status, value)
             views.setOnClickPendingIntent(R.id.widget_trip, MainActivity.openIntent(context, MainActivity.PAGE_MAP))
 
-            val on = FollowRequest.active.value
+            val on = FollowMode.on.value
             views.setImageViewBitmap(R.id.widget_follow, followButton(Prefs.heatPalette.value, on, (68 * density).roundToInt()))
-            views.setContentDescription(R.id.widget_follow, if (on) "Follow me is on; tap to stop" else "Follow me is off; tap to follow you on the map")
-            val tap = if (on) {
-                PendingIntent.getBroadcast(
-                    context, 0,
-                    Intent(context, FollowWidget::class.java).setAction(ACTION_STOP_FOLLOW),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-            } else {
-                MainActivity.openIntent(context, MainActivity.PAGE_FOLLOW)
-            }
-            views.setOnClickPendingIntent(R.id.widget_follow, tap)
+            views.setContentDescription(R.id.widget_follow, if (on) "Follow me is on; tap to stop" else "Follow me is off; tap to record every second")
+            val toggle = PendingIntent.getBroadcast(
+                context, 0,
+                Intent(context, FollowWidget::class.java).setAction(ACTION_TOGGLE_FOLLOW),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            views.setOnClickPendingIntent(R.id.widget_follow, toggle)
             return views
         }
 

@@ -151,8 +151,6 @@ class MainActivity : ComponentActivity() {
         const val PAGE_UPDATES = "updates"
         const val PAGE_CHANGELOG = "changelog"
         const val PAGE_QUESTIONS = "questions"
-        /** The map, already following you (the widget's follow me button). */
-        const val PAGE_FOLLOW = "follow"
         /** The map tab, uncovered (the widget's recording status). */
         const val PAGE_MAP = "map"
 
@@ -166,7 +164,6 @@ class MainActivity : ComponentActivity() {
                 PAGE_UPDATES -> 10
                 PAGE_CHANGELOG -> 11
                 PAGE_QUESTIONS -> 12
-                PAGE_FOLLOW -> 14
                 PAGE_MAP -> 15
                 else -> 13
             }
@@ -245,12 +242,6 @@ private fun AppScaffold(
             MainActivity.PAGE_MAP -> {
                 tab = MainActivity.TAB_MAP
                 stack.clear()
-            }
-            MainActivity.PAGE_FOLLOW -> {
-                // The map tab, uncovered, following you as soon as there's a position.
-                tab = MainActivity.TAB_MAP
-                stack.clear()
-                FollowRequest.pending.value = true
             }
             MainActivity.PAGE_CHANGELOG -> {
                 // The full changelog replaces the "What's new" popup.
