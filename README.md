@@ -111,8 +111,8 @@ up to your Google account, and lets you compare explored areas with friends.
   you narrow the range to. **Routes / Dots** on the Timeline map shows every dot; tap one to delete it.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
-- **Follow me widget** (home screen, 2×1): your current trip's distance (or your last trip's) on the left, and a
-  button on the right that turns follow me on and off. It glows in your route colour while follow me is on.
+- **Follow me widget** (home screen, 2×1): whether you're recording and how often on the left (tap for the map),
+  and a big button on the right that turns follow me on and off. It glows in your route colour while follow me is on.
 - **Follow me**: long-press the location button to keep your dot in the middle of the map while you travel,
   shown as a trace cursor (a dark disc with a white arrow, glowing in your routes' colour; a thin disc on the 3D map) pointing your way. The map turns so your way is always up, and
   goes back to north up when you stop. Drag the map to look around

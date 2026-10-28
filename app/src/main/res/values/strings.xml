@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Location Ticker</string>
     <string name="widget_follow_name">Follow me</string>
-    <string name="widget_follow_description">Your current trip distance and a button that turns follow me on and off</string>
+    <string name="widget_follow_description">Whether you are recording, and a button that turns follow me on and off</string>
     <string name="channel_name">Location recording</string>
     <string name="channel_description">Shown while your location is being recorded</string>
     <string name="questions_channel_name">Trip questions</string>

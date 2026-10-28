@@ -18,23 +18,25 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.github.stephenjoy98.heatmap.R
-import io.github.stephenjoy98.heatmap.data.CurrentTrip
 import io.github.stephenjoy98.heatmap.data.HeatPalette
-import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
-import io.github.stephenjoy98.heatmap.data.TrackRules
-import io.github.stephenjoy98.heatmap.review.Insights
 import io.github.stephenjoy98.heatmap.ui.FollowRequest
 import io.github.stephenjoy98.heatmap.ui.MainActivity
+import io.github.stephenjoy98.heatmap.ui.formatInterval
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * The follow me widget (2 wide, 1 high): the current trip's distance on the left (or the last trip's when you're
- * not on one), and on the right a button that turns follow me on (opening the map following you) and off.
+ * The follow me widget (2 wide, 1 high): whether you're recording and how often on the left (tap: the map), and on
+ * the right a button that turns follow me on (opening the map following you) and off.
  *
- * Android refreshes it about every 30 minutes; the app also asks for a refresh as dots are processed (at most
- * every [MIN_GAP_MS]) and straight away when follow me turns on or off. Drawing happens in [Render], off the main
- * thread.
+ * Android refreshes it about every 30 minutes; the app redraws it straight away when the recording status changes
+ * ([watchStatus]) or follow me turns on or off. Drawing happens in [Render], off the main thread.
  */
 class FollowWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -66,6 +68,7 @@ class FollowWidget : AppWidgetProvider() {
     }
 
     companion object {
+        // Auto recording can change its interval every few seconds; don't redraw more often than this unasked.
         private const val MIN_GAP_MS = 60_000L
         private const val ACTION_STOP_FOLLOW = "io.github.stephenjoy98.heatmap.STOP_FOLLOW"
 
@@ -85,24 +88,38 @@ class FollowWidget : AppWidgetProvider() {
             )
         }
 
+        /** Watches recording, its interval and saved places for the life of the app, redrawing when the status text changes. */
+        fun watchStatus(context: Context) {
+            val app = context.applicationContext
+            CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+                combine(Prefs.tracking, Prefs.liveIntervalSec, Prefs.autoInterval, Prefs.atPlace) { _, _, _, _ -> status() }
+                    .distinctUntilChanged()
+                    .collect { requestUpdate(app, force = true) }
+            }
+        }
+
+        /** The two lines on the left: e.g. "Recording · Auto" over "every 15 s", "Recording at Home", or "Paused". */
+        private fun status(): Pair<String, String> {
+            if (!Prefs.tracking.value) return "Recording" to "Paused"
+            val every = "every ${formatInterval(Prefs.liveIntervalSec.value)}"
+            val place = Prefs.atPlace.value
+            return when {
+                place != null -> "Recording at ${place.name}" to every
+                Prefs.autoInterval.value -> "Recording · Auto" to every
+                else -> "Recording" to every
+            }
+        }
+
         private fun views(context: Context): RemoteViews {
             val density = context.resources.displayMetrics.density
-            val store = PointStore.get(context)
             val views = RemoteViews(context.packageName, R.layout.widget_follow)
-
-            val current = currentTripMeters(store)
-            if (current != null) {
-                views.setTextViewText(R.id.widget_label, "Current trip")
-                views.setTextViewText(R.id.widget_distance, Insights.km(current / 1000))
-            } else {
-                val last = runCatching { store.latestTrip() }.getOrNull()
-                views.setTextViewText(R.id.widget_label, if (last != null) "Last trip" else "No trips yet")
-                views.setTextViewText(R.id.widget_distance, last?.let { Insights.km(it.distanceM / 1000) } ?: "–")
-            }
-            views.setOnClickPendingIntent(R.id.widget_trip, MainActivity.openIntent(context))
+            val (label, value) = status()
+            views.setTextViewText(R.id.widget_label, label)
+            views.setTextViewText(R.id.widget_status, value)
+            views.setOnClickPendingIntent(R.id.widget_trip, MainActivity.openIntent(context, MainActivity.PAGE_MAP))
 
             val on = FollowRequest.active.value
-            views.setImageViewBitmap(R.id.widget_follow, followButton(Prefs.heatPalette.value, on, (48 * density).roundToInt()))
+            views.setImageViewBitmap(R.id.widget_follow, followButton(Prefs.heatPalette.value, on, (68 * density).roundToInt()))
             views.setContentDescription(R.id.widget_follow, if (on) "Follow me is on; tap to stop" else "Follow me is off; tap to follow you on the map")
             val tap = if (on) {
                 PendingIntent.getBroadcast(
@@ -115,22 +132,6 @@ class FollowWidget : AppWidgetProvider() {
             }
             views.setOnClickPendingIntent(R.id.widget_follow, tap)
             return views
-        }
-
-        /** Metres since you last stopped, along the newest run of dots, while recording; null when not on a trip. */
-        private fun currentTripMeters(store: PointStore): Double? {
-            if (!Prefs.tracking.value) return null
-            val pts = runCatching { store.pendingPoints() }.getOrNull() ?: return null
-            val last = pts.lastOrNull() ?: return null
-            if (System.currentTimeMillis() - last.time > TrackRules.maxGapMs(last.intervalMs)) return null
-            var s = pts.size - 1
-            while (s > 0 && !TrackRules.isBreak(pts[s - 1].time, pts[s - 1].lat, pts[s - 1].lon, pts[s].time, pts[s].lat, pts[s].lon, pts[s].intervalMs)) s--
-            val run = pts.subList(s, pts.size)
-            return CurrentTrip.meters(
-                LongArray(run.size) { run[it].time },
-                DoubleArray(run.size) { run[it].lat },
-                DoubleArray(run.size) { run[it].lon },
-            )
         }
 
         /**

@@ -11,6 +11,7 @@ import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import io.github.stephenjoy98.heatmap.update.UpdateWorker
 import io.github.stephenjoy98.heatmap.update.Updater
+import io.github.stephenjoy98.heatmap.widget.FollowWidget
 import org.maplibre.android.MapLibre
 
 class TickerApp : Application() {
@@ -42,6 +43,9 @@ class TickerApp : Application() {
             }
         )
         UpdateWorker.schedule(this)
+
+        // The follow me widget shows whether you're recording and how often: redraw it when that changes.
+        FollowWidget.watchStatus(this)
 
         if (FirebaseGate.isConfigured(this)) {
             Account.init(this)

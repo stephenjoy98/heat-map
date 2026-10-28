@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.57.0] - 2026-10-28
+
+### Changed
+- The **Follow me** widget now shows whether you're recording and how often ("Recording · Auto, every 15 s",
+  "Recording at Home", or "Paused") instead of the trip distance, and it updates as soon as that changes. Tapping
+  it opens the map. The follow me button is bigger and the text smaller.
+
 ## [2.56.0] - 2026-10-28
 
 ### Changed

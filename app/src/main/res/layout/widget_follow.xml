@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Follow me widget (2 wide, 1 high): the current trip's distance on the left, the follow me toggle on the right. -->
+<!-- Follow me widget (2 wide, 1 high): recording status on the left, the follow me toggle on the right. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
     android:layout_width="match_parent"
@@ -8,7 +8,7 @@
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="16dp"
-    android:paddingEnd="6dp">
+    android:paddingEnd="4dp">
 
     <LinearLayout
         android:id="@+id/widget_trip"
@@ -23,25 +23,29 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="1"
-            android:text="Current trip"
+            android:ellipsize="end"
+            android:text="Recording"
             android:textColor="#A9ABB3"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <TextView
-            android:id="@+id/widget_distance"
+            android:id="@+id/widget_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="1"
-            android:text="–"
+            android:ellipsize="end"
+            android:text="Paused"
             android:textColor="#ECEDF0"
-            android:textSize="22sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
     </LinearLayout>
 
     <ImageView
         android:id="@+id/widget_follow"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
+        android:layout_width="68dp"
+        android:layout_height="match_parent"
+        android:adjustViewBounds="true"
         android:contentDescription="Follow me"
-        android:padding="2dp" />
+        android:maxHeight="68dp"
+        android:scaleType="fitCenter" />
 </LinearLayout>

@@ -153,6 +153,8 @@ class MainActivity : ComponentActivity() {
         const val PAGE_QUESTIONS = "questions"
         /** The map, already following you (the widget's follow me button). */
         const val PAGE_FOLLOW = "follow"
+        /** The map tab, uncovered (the widget's recording status). */
+        const val PAGE_MAP = "map"
 
         /**
          * What a notification opens: the app on [page] (or just the app). Each page gets its own request code
@@ -165,6 +167,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_CHANGELOG -> 11
                 PAGE_QUESTIONS -> 12
                 PAGE_FOLLOW -> 14
+                PAGE_MAP -> 15
                 else -> 13
             }
             val intent = Intent(context, MainActivity::class.java)
@@ -237,6 +240,10 @@ private fun AppScaffold(
                 TimelineTabs.questions = true
                 tab = MainActivity.TAB_TIMELINE
                 // Questions live on a tab, so close any pages covering it.
+                stack.clear()
+            }
+            MainActivity.PAGE_MAP -> {
+                tab = MainActivity.TAB_MAP
                 stack.clear()
             }
             MainActivity.PAGE_FOLLOW -> {
