@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.58.1] - 2026-10-28
+
+### Changed
+- Turning follow me off switches recording to **Auto**, which adapts to how you're moving, even if you had a
+  fixed interval before.
+- Arriving at one of your saved places turns follow me off and switches recording to Auto, so it slows down
+  while you're there. (Starting the app or follow me while already at the place doesn't count as arriving.)
+
 ## [2.58.0] - 2026-10-28
 
 ### Changed

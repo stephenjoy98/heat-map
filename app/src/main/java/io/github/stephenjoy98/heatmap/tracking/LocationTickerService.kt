@@ -167,6 +167,8 @@ class LocationTickerService : Service() {
 
     /** The saved place the latest fix was in. */
     private var currentPlace: SavedPlace? = null
+    /** Whether the latest fix was outside every saved place. */
+    private var fixOutsidePlaces = false
 
     private fun requestUpdates() {
         // Follow me on the map: every second, with GPS, until it's turned off.
@@ -251,9 +253,18 @@ class LocationTickerService : Service() {
 
         val place = PlaceZones.find(Prefs.savedPlaces.value, location.latitude, location.longitude, currentPlace)
         if (place?.id != currentPlace?.id) {
+            // Only a real arrival from outside, not the first fix after starting at home (follow me would end at once).
+            val arrived = place != null && currentPlace == null && fixOutsidePlaces
             currentPlace = place
             Prefs.setAtPlace(place)
+            // Arriving at a saved place: follow me ends and recording goes automatic (it slows down while you stay).
+            if (arrived && (Prefs.followBoost.value || !Prefs.autoInterval.value)) {
+                Prefs.setFollowBoost(false)
+                FollowMode.autoRecording()
+                requestUpdates()
+            }
         }
+        fixOutsidePlaces = place == null
         reconsider(ActivityTracker.current, location)
 
         // Look for finished trips every couple of minutes rather than on every fix.
