@@ -88,6 +88,8 @@ jobs:
             printf 'Beta build: the newest changes before they go into a stable release.\n\n%s\n' "$(cat notes.md)" > notes.md
           fi
           printf '\n---\nInstall **location-ticker-%s.apk** (signed release build). The debug build is for testing.\n' "$VERSION" >> notes.md
+          # Before-and-after pictures of what changed (docs/screenshots/<version>/), below the line the app reads up to.
+          python3 -I tools/release_shots.py docs/screenshots "$VERSION" "$last_stable" "$GITHUB_SHA" "$GITHUB_REPOSITORY" >> notes.md
           printf '\n<!-- build: %s -->\n' "$GITHUB_SHA" >> notes.md
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/location-ticker-$VERSION.apk"

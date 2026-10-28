@@ -27,6 +27,17 @@ travel stats, Insights (AI write-ups), backup and friends.
 - **Google Maps was removed in 2.15.0** at the user's request (OSM only). `LatLng` in UI code is
   `org.maplibre.android.geometry.LatLng`. Don't reintroduce Google Maps.
 
+## Workflow rules from the user (2026-10-28)
+
+- **Mockup first for any UI change**: before coding a new or changed screen, widget or control, draw a mockup
+  (Pillow, in the scratchpad; before/after side by side when something changes), send it with SendUserFile, and
+  wait for the user to approve or fine-tune it. Code only the approved design.
+- **Before-and-after pictures in every release** with a visible change: put side-by-side "Before | After" PNGs
+  (labelled, from the ci-screenshots branch: the previous run vs the new one, or mockups when the emulator can't
+  show it, e.g. widgets) in `docs/screenshots/<x.y.z>/<what-changed>.png`. CI's `tools/release_shots.py` adds them
+  to the GitHub release notes under "Before and after" (after the `---`, so the in-app update sheet skips them).
+  Keep each under ~400 KB (resize to ~1200 px wide).
+
 ## How to work in this environment
 
 - **No Android SDK locally.** CI (`.github/workflows/android.yml`, builds assembleDebug + assembleRelease
