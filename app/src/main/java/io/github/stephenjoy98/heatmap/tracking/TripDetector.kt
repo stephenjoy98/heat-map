@@ -1,7 +1,7 @@
 package io.github.stephenjoy98.heatmap.tracking
 
 import io.github.stephenjoy98.heatmap.data.Prefs
-import io.github.stephenjoy98.heatmap.widget.HeatmapWidget
+import io.github.stephenjoy98.heatmap.widget.FollowWidget
 import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
@@ -61,8 +61,8 @@ object TripDetector {
             if (!progressed) break
         }
         if (questions > 0) notifyQuestions(context, store.tripsNeedingReview().size)
-        // The home screen widget shows the newest dots and today's km (at most every 10 minutes).
-        runCatching { HeatmapWidget.requestUpdate(context) }
+        // The home screen widget shows the current trip's distance (at most every minute).
+        runCatching { FollowWidget.requestUpdate(context) }
         return questions
     }
 

@@ -60,7 +60,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.55.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.56.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -203,7 +203,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   System), page-per-section by default (Prefs "settings_pages"), the "One list" choice and Units live on the
   General page; sections switch with an AnimatedContent shared-axis slide. `PageHost` keeps the page under the top one
   composed so popping never flashes the tabs.
-- Widget (2.55.0): `widget/HeatmapWidget` (classic AppWidgetProvider + RemoteViews, no Glance; layout `widget_heatmap.xml`, info `xml/widget_heatmap_info.xml`, 30 min updatePeriod) — `Render` CoroutineWorker draws `HeatRenderer.renderTile(OwnTracks)` around `store.latest()` (0.06° wide, rounded, blue dot), today's km, follow button bitmap in the palette glow; `requestUpdate(force)` (unique work, ≤ every 10 min unless forced) called at the end of `TripDetector.process`. Follow button → `MainActivity.openIntent(PAGE_FOLLOW)` → map tab, pages cleared, `FollowRequest.pending` → MapScreen starts following once `dotAt` exists.
+- Widget (2.56.0; 2.55.0's mini heatmap was dropped at the user's request): `widget/FollowWidget` (classic AppWidgetProvider + RemoteViews, no Glance; `widget_follow.xml`, `xml/widget_follow_info.xml`, 2×1, min 110×40 dp, 30 min updatePeriod). Left: current trip distance (`data/CurrentTrip.meters` over the newest unbroken pending run: since the last stay of ≥5 min within 100 m, ≥150 m, only while tracking; else "Last trip" = `PointStore.latestTrip()`), tap opens the app. Right: follow toggle bitmap (on = glow in palette colour). `FollowRequest` (MapScreen.kt): `pending` (start, from `MainActivity.openIntent(PAGE_FOLLOW)` → map tab, pages cleared), `stop` (widget broadcast `STOP_FOLLOW` to FollowWidget.onReceive), `active` (mirrors MapScreen's `following`; changes force a widget redraw). Off → activity PendingIntent; on → broadcast, so no activity start from the background. `requestUpdate(force)` (unique work, ≤ every 1 min unless forced) at the end of `TripDetector.process` (every ~2 min while recording).
 - `update/` (2.30.0): `Updater` (GitHub releases/latest → `Release`; newer = higher SemVer, or same version with a
   different `<!-- build: sha -->` marker in the notes vs `BuildConfig.BUILD_COMMIT` from CI's GITHUB_SHA; downloads to
   cacheDir/updates (re-fetches release details first; 404/size change → retry 4× 30 s apart, because CI's --clobber

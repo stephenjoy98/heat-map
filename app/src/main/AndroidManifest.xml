@@ -100,15 +100,15 @@
             android:exported="false" />
 
         <receiver
-            android:name=".widget.HeatmapWidget"
+            android:name=".widget.FollowWidget"
             android:exported="false"
-            android:label="@string/widget_heatmap_name">
+            android:label="@string/widget_follow_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_heatmap_info" />
+                android:resource="@xml/widget_follow_info" />
         </receiver>
     </application>
 </manifest>

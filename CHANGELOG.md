@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.56.0] - 2026-10-28
+
+### Changed
+- The home screen widget is now a small **Follow me** bar, 2 wide and 1 high, without the mini heatmap. On the
+  left it shows how far you've gone on your current trip (since you last stopped for 5 minutes), or your last
+  trip's distance when you're not on one; tap it to open the app. On the right, the follow me button turns follow
+  me on (opening the map following you) and off again. It glows in your route colour while follow me is on. If
+  you added the Mini heatmap widget, add the new Follow me widget in its place.
+
 ## [2.55.0] - 2026-10-27
 
 ### Added

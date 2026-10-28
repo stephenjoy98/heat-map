@@ -280,14 +280,25 @@ shot 17-fullscreen-exit 2
 adb shell am start -n "$PKG/.ui.MainActivity" -a "$PKG.OPEN.follow" --es page follow > /dev/null 2>&1
 note "opened the app as the widget's follow me button does"
 shot 18-widget-follow 4
-# The widget itself: ask for a refresh so its drawing code runs (it shows only if placed on a home screen).
-adb shell am broadcast -a android.appwidget.action.APPWIDGET_UPDATE -n "$PKG/.widget.HeatmapWidget" > /dev/null 2>&1
+# The widget itself can't be placed here; ask for a refresh so its drawing code runs.
+adb shell am broadcast -a android.appwidget.action.APPWIDGET_UPDATE -n "$PKG/.widget.FollowWidget" > /dev/null 2>&1
 sleep 3
 
 kill "$REC" 2> /dev/null
 wait "$REC" 2> /dev/null
 sleep 3
 adb pull /sdcard/run.mp4 "$OUT/run.mp4" > /dev/null 2>&1 && note "saved run.mp4"
+
+# The widget's button while following: stops follow me. Its receiver isn't exported, so this needs a root shell.
+if adb root > /dev/null 2>&1; then
+    sleep 3
+    adb wait-for-device
+    adb shell am broadcast -a io.github.stephenjoy98.heatmap.STOP_FOLLOW -n "$PKG/.widget.FollowWidget" > /dev/null 2>&1
+    note "sent the widget's stop follow me"
+    shot 19-widget-stop-follow 4
+else
+    note "no root shell: skipped the widget's stop follow me"
+fi
 
 adb logcat -d > "$OUT/logcat.txt"
 adb logcat -d -b crash > "$OUT/crash.txt"

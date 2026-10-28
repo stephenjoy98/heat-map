@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Location Ticker</string>
-    <string name="widget_heatmap_name">Mini heatmap</string>
-    <string name="widget_heatmap_description">Your heatmap around where you are, with a follow-me shortcut</string>
+    <string name="widget_follow_name">Follow me</string>
+    <string name="widget_follow_description">Your current trip distance and a button that turns follow me on and off</string>
     <string name="channel_name">Location recording</string>
     <string name="channel_description">Shown while your location is being recorded</string>
     <string name="questions_channel_name">Trip questions</string>

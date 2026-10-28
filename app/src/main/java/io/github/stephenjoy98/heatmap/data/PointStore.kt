@@ -1609,6 +1609,9 @@ class PointStore private constructor(context: Context) :
         return days
     }
 
+    /** The trip that ended last, if any. */
+    fun latestTrip(): Trip? = trips("ORDER BY end_time DESC LIMIT 1").firstOrNull()
+
     fun tripsNeedingReview(): List<Trip> = trips("WHERE needs_review = 1 ORDER BY start_time DESC")
 
     fun tripsNotUploaded(limit: Int = 400): List<Trip> = trips("WHERE uploaded = 0 ORDER BY start_time LIMIT $limit")

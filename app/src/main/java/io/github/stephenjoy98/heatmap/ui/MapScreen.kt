@@ -95,6 +95,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.R
+import io.github.stephenjoy98.heatmap.widget.FollowWidget
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
@@ -192,6 +193,25 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             FollowRequest.pending.value = false
         }
     }
+    // The widget's button while following: stop, as a long-press on the location button does.
+    LaunchedEffect(Unit) {
+        FollowRequest.stop.collect { asked ->
+            if (asked) {
+                FollowRequest.stop.value = false
+                if (following) {
+                    following = false
+                    camera.northUp()
+                }
+            }
+        }
+    }
+    // Tell the widget whether follow me is on, so its button shows it and turns it off.
+    LaunchedEffect(following) {
+        if (FollowRequest.active.value != following) {
+            FollowRequest.active.value = following
+            FollowWidget.requestUpdate(context, force = true)
+        }
+    }
     // The arrow on the dot: which way you're going, while you're moving.
     val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
     // The way you were last heading, kept while you stop, for turning the map in 3D follow me.
@@ -224,6 +244,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     }
     DisposableEffect(Unit) {
         onDispose {
+            if (FollowRequest.active.value) {
+                FollowRequest.active.value = false
+                FollowWidget.requestUpdate(context, force = true)
+            }
             if (Prefs.followBoost.value) {
                 Prefs.setFollowBoost(false)
                 if (Prefs.tracking.value) LocationTickerService.start(context)
@@ -724,7 +748,12 @@ private fun missingStartPermissions(context: Context): Array<String> {
     return needed.toTypedArray()
 }
 
-/** Set when the map should start following you as soon as it can (from the home screen widget). */
+/** Follow me and the home screen widget: the widget's button starts and stops it, and shows whether it's on. */
 object FollowRequest {
+    /** Set when the map should start following you as soon as it can. */
     val pending = kotlinx.coroutines.flow.MutableStateFlow(false)
+    /** Set when the map should stop following you. */
+    val stop = kotlinx.coroutines.flow.MutableStateFlow(false)
+    /** Whether the map is following you now. */
+    val active = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
