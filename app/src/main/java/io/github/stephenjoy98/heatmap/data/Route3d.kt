@@ -35,6 +35,10 @@ object Route3d {
     // Sharp bends would make the mitred corners shoot out; cap how far they reach.
     private const val MAX_MITER = 3.0
     private const val METERS_PER_DEGREE = 111_320.0
+    // Dots closer together than this (recording every second, or standing still) are merged first: with hops
+    // shorter than the ribbon is wide, GPS wobble crosses a piece's edges into a bow-tie, which the map leaves out
+    // (gaps in the ribbon and curtain).
+    private const val MIN_HOP_M = 8.0
 
     fun build(tracks: List<List<ElevationPoint>>, baseline: Double, maxSegments: Int = 8_000): List<Segment> {
         val routes = tracks.filter { it.size >= 2 }
@@ -42,24 +46,21 @@ object Route3d {
         val hops = routes.sumOf { it.size - 1 }
         // Thin out very long histories so the map stays responsive.
         val step = max(1, (hops + maxSegments - 1) / maxSegments)
-        class Hop(val corners: DoubleArray, val h0: Double, val h1: Double)
+        class Hop(val corners: DoubleArray, val plain: DoubleArray, val h0: Double, val h1: Double)
         val all = ArrayList<Hop>(minOf(hops, maxSegments) + 1)
         for (route in routes) {
-            val pts = if (step == 1) route else route.filterIndexed { i, _ -> i % step == 0 || i == route.lastIndex }
+            val pts = spaced(if (step == 1) route else route.filterIndexed { i, _ -> i % step == 0 || i == route.lastIndex })
             if (pts.size < 2) continue
             val heights = smooth(pts).map { ((it - baseline) * EXAGGERATION).coerceAtLeast(0.0) + LIFT_M }
             val (left, right) = offsets(pts) ?: continue
             for (i in 0 until pts.size - 1) {
-                all += Hop(
-                    doubleArrayOf(
-                        left[i * 2], left[i * 2 + 1],
-                        left[i * 2 + 2], left[i * 2 + 3],
-                        right[i * 2 + 2], right[i * 2 + 3],
-                        right[i * 2], right[i * 2 + 1],
-                    ),
-                    heights[i],
-                    heights[i + 1],
+                val corners = doubleArrayOf(
+                    left[i * 2], left[i * 2 + 1],
+                    left[i * 2 + 2], left[i * 2 + 3],
+                    right[i * 2 + 2], right[i * 2 + 3],
+                    right[i * 2], right[i * 2 + 1],
                 )
+                all += Hop(corners, strip(pts[i], pts[i + 1]), heights[i], heights[i + 1])
             }
         }
         // Each piece of ribbon has a flat top, so a climb would show as stairs. Hops that rise or fall are cut
@@ -70,24 +71,59 @@ object Route3d {
         val out = ArrayList<Segment>(minOf(wanted, MAX_TOTAL_PIECES) + all.size)
         for (hop in all) {
             val n = ceil(abs(hop.h1 - hop.h0) / stepM).toInt().coerceIn(1, MAX_PIECES)
-            val c = hop.corners
-            for (k in 0 until n) {
+            fun pieces(c: DoubleArray) = List(n) { k ->
                 val t0 = k.toDouble() / n
                 val t1 = (k + 1).toDouble() / n
                 // Corners 0→1 run along the left edge and 3→2 along the right one.
                 fun along(from: Int, to: Int, t: Double, axis: Int) = c[from * 2 + axis] + (c[to * 2 + axis] - c[from * 2 + axis]) * t
-                out += Segment(
-                    doubleArrayOf(
-                        along(0, 1, t0, 0), along(0, 1, t0, 1),
-                        along(0, 1, t1, 0), along(0, 1, t1, 1),
-                        along(3, 2, t1, 0), along(3, 2, t1, 1),
-                        along(3, 2, t0, 0), along(3, 2, t0, 1),
-                    ),
-                    hop.h0 + (hop.h1 - hop.h0) * (t0 + t1) / 2,
+                doubleArrayOf(
+                    along(0, 1, t0, 0), along(0, 1, t0, 1),
+                    along(0, 1, t1, 0), along(0, 1, t1, 1),
+                    along(3, 2, t1, 0), along(3, 2, t1, 1),
+                    along(3, 2, t0, 0), along(3, 2, t0, 1),
                 )
             }
+            // A sharp turn can still cross the mitred edges: draw that hop as a plain strip instead.
+            val mitred = pieces(hop.corners)
+            val chosen = if (mitred.any { crossed(it) }) pieces(hop.plain) else mitred
+            chosen.forEachIndexed { k, c -> out += Segment(c, hop.h0 + (hop.h1 - hop.h0) * (k + 0.5) / n) }
         }
         return out
+    }
+
+    /** The route with dots closer than [MIN_HOP_M] to the last one kept dropped; the last dot is always kept. */
+    private fun spaced(pts: List<ElevationPoint>): List<ElevationPoint> {
+        if (pts.size < 3) return pts
+        val out = ArrayList<ElevationPoint>(pts.size)
+        out += pts[0]
+        for (i in 1 until pts.size - 1) if (meters(out.last(), pts[i]) >= MIN_HOP_M) out += pts[i]
+        val last = pts.last()
+        if (out.size > 1 && meters(out.last(), last) < MIN_HOP_M) out[out.lastIndex] = last else out += last
+        return out
+    }
+
+    /** Whether a piece's outline (corners 0-1-2-3) crosses itself, which the map can't fill. */
+    private fun crossed(c: DoubleArray): Boolean {
+        fun side(a: Int, b: Int, p: Int) =
+            (c[b * 2 + 1] - c[a * 2 + 1]) * (c[p * 2] - c[a * 2]) - (c[b * 2] - c[a * 2]) * (c[p * 2 + 1] - c[a * 2 + 1])
+        fun cross(a: Int, b: Int, p: Int, q: Int) = side(a, b, p) * side(a, b, q) < 0 && side(p, q, a) * side(p, q, b) < 0
+        return cross(0, 1, 2, 3) || cross(1, 2, 3, 0)
+    }
+
+    /** A plain strip along one hop, [HALF_WIDTH_M] either side, in the same corner order as the mitred pieces. */
+    private fun strip(a: ElevationPoint, b: ElevationPoint): DoubleArray {
+        val metersPerLon = METERS_PER_DEGREE * cos(Math.toRadians((a.lat + b.lat) / 2))
+        val dx = (b.lon - a.lon) * metersPerLon
+        val dy = (b.lat - a.lat) * METERS_PER_DEGREE
+        val len = sqrt(dx * dx + dy * dy).coerceAtLeast(1e-6)
+        val offLat = dx / len * HALF_WIDTH_M / METERS_PER_DEGREE
+        val offLon = -dy / len * HALF_WIDTH_M / metersPerLon
+        return doubleArrayOf(
+            a.lat + offLat, a.lon + offLon,
+            b.lat + offLat, b.lon + offLon,
+            b.lat - offLat, b.lon - offLon,
+            a.lat - offLat, a.lon - offLon,
+        )
     }
 
     /**

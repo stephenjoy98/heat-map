@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.59.1] - 2026-10-30
+
+### Fixed
+- Gaps in 3D routes: where dots were close together (recording every second, or slow and wobbly GPS), pieces of
+  the ribbon and the wall under it went missing. Close dots are merged first, and a sharp turn draws a plain
+  piece instead of a crossed one the map would skip.
+
 ## [2.59.0] - 2026-10-30
 
 ### Added

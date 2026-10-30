@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.59.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.59.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -134,7 +134,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   `ExploredDistance` (new-ground km on a ~60 m grid, per-square credit capped at the diagonal),
   `Route3d` (3D route geometry: continuous mitred ribbon, median + 200 m distance smoothing, sloping hops cut into
   pieces ≤0.15 m apart in height (2.30.3, cap 18k pieces) so slopes don't show as stairs, heights above a
-  fixed `PointStore.altitudeBaseline()` (5th percentile, cached 10 min), exaggerated 1.5×. 2.28.0 tried heights above
+  fixed `PointStore.altitudeBaseline()` (5th percentile, cached 10 min), exaggerated 1.5×; 2.59.1: dots <8 m apart merged (`spaced`) and pieces whose outline self-crosses (`crossed`, also checked per slope slice) drawn as a plain `strip` — MapLibre drops bow-tie polygons, which showed as gaps; 2.28.0 tried heights above
   the ground (Terrarium DEM) at true scale plus overlap removal; the user found it "barely looks 3D" and it was
   reverted in 2.29.1 — don't redo that without asking;
   `drape` lays dot heights along a display line; loader `map/Route3dTracks` uses snapped polys / smoothed
