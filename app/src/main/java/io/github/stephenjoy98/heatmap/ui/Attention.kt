@@ -44,7 +44,7 @@ object Attention {
      * sections where you'd find what's new; their marker shows until the section is opened.
      */
     private val NEW_IN = mapOf(
-        TIMELINE to "2.52.0",
+        TIMELINE to "2.59.0",
         INSIGHTS to "2.54.0",
         PROFILE to "2.54.0",
         settings("battery") to "2.32.0",

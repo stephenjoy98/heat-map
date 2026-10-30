@@ -12,6 +12,18 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.59.0] - 2026-10-30
+
+### Added
+- **Select stays on the Timeline**, not just trips: long-press a stay (a saved place or "Stayed here") and pick
+  **Select…**, or tap stays while selecting. **Join** makes everything picked into one trip, stays included;
+  **Change mode** changes the picked trips and turns each picked stay into a trip of that mode. Both can be undone.
+
+### Fixed
+- "Which road did you take?" no longer saves as soon as you tap a road: tap one (it's drawn bold on the map, the
+  others fade), then **Save**, like the travel mode question. It starts on the best match.
+- The number of waiting questions sits beside "Questions" on the Timeline instead of covering the word.
+
 ## [2.58.1] - 2026-10-28
 
 ### Changed

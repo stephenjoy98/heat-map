@@ -730,11 +730,24 @@ fun TripPreviewLinesMap(
     modifier: Modifier = Modifier,
     interactive: Boolean = false,
     endpoints: Boolean = false,
+    emphasis: Int? = null,
 ) {
     val dark = isDarkTheme()
     val all = remember(lines) { lines.flatMap { it.points } }
     val holder = rememberVectorMap()
     MapBrightness(holder, dark)
+    // The line at [emphasis] (if any) bold and the others faded, changed in place so the map keeps its zoom.
+    val emphasized by rememberUpdatedState(emphasis)
+    fun emphasize(style: org.maplibre.android.maps.Style) {
+        lines.forEachIndexed { i, l ->
+            val e = emphasized
+            (style.getLayer("preview-line-$i") as? LineLayer)?.setProperties(
+                PropertyFactory.lineWidth(if (e == i) maxOf(l.widthDp, 6.5f) else l.widthDp),
+                PropertyFactory.lineOpacity(if (e == null || e == i) 1f else 0.35f),
+            )
+        }
+    }
+    LaunchedEffect(emphasis) { holder.withMap { m -> m.style?.let { emphasize(it) } } }
     LaunchedEffect(lines, dark) {
         holder.styleLook = null // Reload so the lines are added to a fresh style.
         holder.setLook(MapLook(dark)) { style ->
@@ -750,6 +763,7 @@ fun TripPreviewLinesMap(
                     )
                 )
             }
+            emphasize(style)
             val first = lines.firstOrNull()?.points
             if (endpoints && first != null && first.size >= 2) {
                 listOf("start" to (first.first() to 0xFF43A047.toInt()), "end" to (first.last() to 0xFFE53935.toInt())).forEach { (id, v) ->

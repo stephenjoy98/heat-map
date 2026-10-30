@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.graphics.Color
 import io.github.stephenjoy98.heatmap.data.Polyline
 import io.github.stephenjoy98.heatmap.data.RoadQuestion
@@ -225,12 +228,17 @@ private fun RoadQuestionCard(
         var road = 0
         question.options.map { if (it.recorded) recordedColor else optionColors[road++ % optionColors.size] }
     }
+    // Roads first, the recorded line last so it's drawn on top, thin.
+    val order = remember(question.id) { question.options.indices.sortedBy { question.options[it].recorded } }
     val lines = remember(question.id) {
-        question.options.mapIndexed { n, o ->
+        order.map { n ->
+            val o = question.options[n]
             val pts = Polyline.decode(o.poly)
             PreviewLine(List(pts.size / 2) { LatLng(pts[it * 2], pts[it * 2 + 1]) }, colors[n], if (o.recorded) 2.5f else 4.5f)
-        }.sortedByDescending { it.widthDp } // Recorded line on top, thin.
+        }
     }
+    // Two steps, like "How did you travel?": pick a road (the best match to start with; it's drawn bold), then Save.
+    var chosen by remember(question.id) { mutableStateOf(question.options.indexOfFirst { !it.recorded }.coerceAtLeast(0)) }
     QuestionCard("Which road did you take?", left, modifier) {
         trip?.let {
             val start = Date(it.startTime)
@@ -241,21 +249,34 @@ private fun RoadQuestionCard(
             )
         }
         Spacer(Modifier.height(8.dp))
-        TripPreviewLinesMap(lines, Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)), interactive = true)
+        TripPreviewLinesMap(
+            lines,
+            Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)),
+            interactive = true,
+            emphasis = order.indexOf(chosen),
+        )
         Spacer(Modifier.height(8.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             question.options.forEachIndexed { n, option ->
-                AssistChip(
-                    onClick = { onAnswer(n) },
+                FilterChip(
+                    selected = n == chosen,
+                    onClick = { chosen = n },
                     label = { Text(option.label) },
-                    leadingIcon = { Box(Modifier.size(10.dp).background(colors[n], CircleShape)) },
+                    leadingIcon = {
+                        if (n == chosen) {
+                            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        } else {
+                            Box(Modifier.size(10.dp).background(colors[n], CircleShape))
+                        }
+                    },
                 )
             }
         }
-        if (onSkip != null) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onSkip) { Text("Skip") }
-            }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f))
+            if (onSkip != null) TextButton(onClick = onSkip) { Text("Skip") }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { onAnswer(chosen) }) { Text("Save") }
         }
     }
 }

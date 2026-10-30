@@ -484,6 +484,32 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         Unit
     }
     val changeMode = { trip: Trip, mode: TravelMode -> changeModes(listOf(trip), mode) }
+    // Picked trips and stays together (stays are picked by -start, see stayKey): Change mode turns each stay into a
+    // trip of that mode and changes the trips, all in one undoable step.
+    val changePicked = { trips: List<Trip>, stays: List<DayEntry.Stay>, mode: TravelMode ->
+        if (stays.isEmpty()) {
+            changeModes(trips, mode)
+        } else {
+            val from = minOf(trips.minOfOrNull { it.startTime } ?: Long.MAX_VALUE, stays.minOf { it.start })
+            val to = maxOf(trips.maxOfOrNull { it.endTime } ?: Long.MIN_VALUE, stays.maxOf { it.end })
+            val n = trips.size + stays.size
+            undoable(if (n == 1) "Changed to ${mode.fullLabel}" else "$n changed to ${mode.fullLabel}", from, to) {
+                val days = HashSet<String>()
+                val remote = ArrayList<String>()
+                if (trips.isNotEmpty()) {
+                    store.setTripModes(trips.map { it.id }, mode)
+                    trips.forEach { days += Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).toLocalDate().toString() }
+                }
+                for (s in stays) {
+                    val r = store.addTrip(s.start + 1, s.end - 1, mode)
+                    days += r.days
+                    remote += r.removedRemoteIds
+                }
+                DeleteResult(days, remote)
+            }
+        }
+        Unit
+    }
     // Joins trips into one, from the first one's start to the last one's end, taking in any loose dots
     // between them. It keeps the mode of the longest of them.
     val joinTrips = { trips: List<Trip> ->
@@ -492,6 +518,19 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             val start = trips.minOf { it.startTime }
             val end = trips.maxOf { it.endTime }
             undoable("${trips.size} trips joined", start, end) { store.addTrip(start, end, mode) }
+        }
+        Unit
+    }
+    // Joins picked trips and stays into one trip, from the first one's start to the last one's end (the stays in
+    // it become part of the trip). It keeps the mode of the longest trip, or Other if only stays were picked.
+    val joinPicked = { trips: List<Trip>, stays: List<DayEntry.Stay> ->
+        if (stays.isEmpty()) {
+            joinTrips(trips)
+        } else if (trips.size + stays.size >= 2) {
+            val mode = trips.maxByOrNull { it.distanceM }?.mode ?: TravelMode.UNKNOWN
+            val start = minOf(trips.minOfOrNull { it.startTime } ?: Long.MAX_VALUE, stays.minOf { it.start + 1 })
+            val end = maxOf(trips.maxOfOrNull { it.endTime } ?: Long.MIN_VALUE, stays.maxOf { it.end - 1 })
+            undoable("Joined into one trip", start, end) { store.addTrip(start, end, mode) }
         }
         Unit
     }
@@ -584,8 +623,13 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     selected = TimelineTabs.questions,
                     onClick = { TimelineTabs.questions = true },
                     text = {
-                        BadgedBox(badge = { if (waiting > 0) Badge { Text(if (waiting > 99) "99+" else waiting.toString()) } }) {
+                        // The count beside the word, not over it.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Questions")
+                            if (waiting > 0) {
+                                Spacer(Modifier.width(6.dp))
+                                Badge { Text(if (waiting > 99) "99+" else waiting.toString()) }
+                            }
                         }
                     },
                 )
@@ -913,6 +957,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                             camera.animateTo(entry.lat, entry.lon, 16f)
                                         },
                                         onAddTrip = { adding = (entry.start + 1)..(entry.end - 1) },
+                                        picked = picked?.contains(stayKey(entry)),
+                                        onSelect = { on -> select(listOf(stayKey(entry)), on) },
                                     )
                                     is DayEntry.Group -> GroupRow(
                                         group = entry,
@@ -959,14 +1005,18 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                     }
                 }
                 picked?.let { ids ->
+                    val flat = data?.entries.orEmpty().flattened()
+                    val pickedTrips = flat.filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }
+                    val pickedStays = flat.filterIsInstance<DayEntry.Stay>().filter { stayKey(it) in ids }
                     SelectionBar(
-                        count = ids.size,
+                        trips = pickedTrips.size,
+                        stays = pickedStays.size,
                         onJoin = {
-                            joinTrips(data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids })
+                            joinPicked(pickedTrips, pickedStays)
                             picked = null
                         },
                         onMode = { mode ->
-                            changeModes(data?.entries.orEmpty().flattened().filterIsInstance<DayEntry.Move>().map { it.trip }.filter { it.id in ids }, mode)
+                            changePicked(pickedTrips, pickedStays, mode)
                             picked = null
                         },
                         onCancel = { picked = null },
@@ -1616,7 +1666,8 @@ private fun SplitPanel(trip: Trip, state: DotEditState, loading: Boolean, onCanc
 
 /** While picking trips: how many are picked, joining them into one, and a menu to change all of their modes at once. */
 @Composable
-private fun SelectionBar(count: Int, onJoin: () -> Unit, onMode: (TravelMode) -> Unit, onCancel: () -> Unit) {
+private fun SelectionBar(trips: Int, stays: Int, onJoin: () -> Unit, onMode: (TravelMode) -> Unit, onCancel: () -> Unit) {
+    val count = trips + stays
     var menu by remember { mutableStateOf(false) }
     Surface(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -1628,7 +1679,12 @@ private fun SelectionBar(count: Int, onJoin: () -> Unit, onMode: (TravelMode) ->
         Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Tip("Stop selecting") { IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Stop selecting") } }
             Text(
-                if (count == 0) "Tap trips to select them" else if (count == 1) "1 trip selected" else "$count trips selected",
+                when {
+                    count == 0 -> "Tap trips or stays to select them"
+                    stays == 0 -> if (trips == 1) "1 trip selected" else "$trips trips selected"
+                    trips == 0 -> if (stays == 1) "1 stay selected" else "$stays stays selected"
+                    else -> "${if (trips == 1) "1 trip" else "$trips trips"}, ${if (stays == 1) "1 stay" else "$stays stays"}"
+                },
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f),
             )
@@ -1879,19 +1935,32 @@ private fun polylineKm(pts: DoubleArray): Double {
     return m / 1000
 }
 
-/** A stay between trips. Long-press it to add a trip in its place (if you were moving after all). */
+/** How a stay is kept among the picked trip ids: by its start, negated, so it can't clash with a trip id. */
+private fun stayKey(stay: DayEntry.Stay): Long = -stay.start
+
+/**
+ * A stay between trips. Long-press it to add a trip in its place (if you were moving after all), or to start
+ * selecting with it; while selecting, a tap picks it like a trip.
+ */
 @Composable
-private fun StayRow(entry: DayEntry.Stay, onClick: () -> Unit, onAddTrip: () -> Unit) {
+private fun StayRow(
+    entry: DayEntry.Stay,
+    onClick: () -> Unit,
+    onAddTrip: () -> Unit,
+    picked: Boolean?,
+    onSelect: (Boolean) -> Unit,
+) {
     var menu by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     Box {
         TimelineRow(
             color = MaterialTheme.colorScheme.outline,
-            onClick = onClick,
+            onClick = { if (picked != null) onSelect(!picked) else onClick() },
             onLongClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                menu = true
+                if (picked != null) onSelect(!picked) else menu = true
             },
+            picked = picked,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
@@ -1911,6 +1980,14 @@ private fun StayRow(entry: DayEntry.Stay, onClick: () -> Unit, onAddTrip: () -> 
                 onClick = {
                     menu = false
                     onAddTrip()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Select…") },
+                leadingIcon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
+                onClick = {
+                    menu = false
+                    onSelect(true)
                 },
             )
         }

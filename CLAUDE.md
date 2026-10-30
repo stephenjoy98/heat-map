@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.58.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.59.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -174,14 +174,14 @@ travel stats, Insights (AI write-ups), backup and friends.
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
   the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back
   same-mode trips (long-press expands; `flattened()` for lookups); multi-select (`picked` set,
-  `SelectionBar`, `setTripModes`); add a trip (`adding` window → `RetimePanel` with trip=null (2.49.1: a window with no dots inside starts on the dots either side, never the middle of the day) →
+  `SelectionBar`, `setTripModes`; 2.59.0: stays selectable too, keyed by `stayKey` = -start in the same set, "Select…" in StayRow's menu, `joinPicked` (addTrip over first..last incl. stays, longest trip's mode or Other) and `changePicked` (setTripModes + addTrip per stay, one undo)); add a trip (`adding` window → `RetimePanel` with trip=null (2.49.1: a window with no dots inside starts on the dots either side, never the middle of the day) →
   `PointStore.addTrip`, which splits a trip it lands inside); Fix route (`fixing` window → `RouteFixPanel`; 2.51.0: `fixCurrent` = drawn paths of trips in the range (or the dots) shown with `TripHighlight` under `RouteLinesOverlay`; save only after a preview: "Show snapped route" (`previewSnap`: Valhalla.match or TrackSnapper.snap on the stretch, RoadPath streetName `AUTO_MATCH`) or a road from Find roads, then "Save this route"; range change clears roads; 2.52.0: `runSnap` logs steps via `roads/SnapLog` (TrackSnapper/Valhalla steps, failure reason incl. exception class) into `SnapProgressDialog`; editing panels capped at `panelMax` (46% of screen height, scroll inside) and use `ModeDropdown` (ModePicker.kt) instead of ModeChips (chips stay in the Questions card and RecordingSheet);
   vias by tapping the map, `Valhalla.routes`/`routeThrough`, `RouteLinesOverlay`; save = `addTrip` to join,
   then `saveTripPath(createdTripId, STATUS_SNAPPED, poly, poly)` if a road was picked; on part of a trip addTrip splits it,
   which is how "Snap to a road (all or part)" isolates a stretch); Map long-press (2.49.0: `sectionNear` also measures trips' drawn `trip_paths.poly`; MapPick sheet adds "Draw the recorded route instead of the road" (`saveTripPath(id, STATUS_RECORDED, null, null)`, undoable) and "Edit its dots" (opens Edit dots on that day)); Split (2.42.0: `splitting` → `SplitPanel`, `retime.range.last` =
   last dot of the first part → `PointStore.splitTrip(tripId, atTime)`, undoable); Routes/Dots segmented toggle on the map
   (Dots = Edit dots mode); trip, road and
-  level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt; 2.46.3: trip question = pick chip (starts on the best guess) then Save; Timeline undo snackbar at TopCenter + statusBarsPadding so it never covers Skip/Save; one queue,
+  level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt; 2.46.3: trip question = pick chip (starts on the best guess) then Save; 2.59.0: road question the same (FilterChips, starts on best match, `TripPreviewLinesMap(emphasis)` bolds the pick and fades others in place without refitting); tab badge beside the "Questions" text (Row, not BadgedBox); Timeline undo snackbar at TopCenter + statusBarsPadding so it never covers Skip/Save; one queue,
   answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton (2.39.1: dial with N/E/S/W + NE/SE/SW/NW ticks fixed, needle turns by -bearing;

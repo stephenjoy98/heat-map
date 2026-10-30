@@ -195,6 +195,35 @@ tap text "Questions"
 shot 04-questions 3
 tap text "Trips"
 sleep 2
+# Long-press a stay: "Select…" starts selecting with it; the bar counts trips and stays.
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+stay_xy=$(python3 -I - "$OUT/.ui.xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(0)
+for node in root.iter("node"):
+    if node.get("text") == "Stayed here":
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+)
+if [ -n "$stay_xy" ]; then
+    # shellcheck disable=SC2086
+    set -- $stay_xy
+    adb shell input swipe "$1" "$2" "$1" "$2" 900
+    note "long-pressed a stay at $stay_xy"
+    shot 04a-stay-menu 2
+    tap text "Select…"
+    shot 04b-stay-selected 3
+    tap desc "Stop selecting"
+    sleep 2
+else
+    note "MISSING a \"Stayed here\" row to long-press"
+fi
 
 tap desc "Account"
 shot 05-account 3

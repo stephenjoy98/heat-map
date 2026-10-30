@@ -72,7 +72,7 @@ private val FEATURES = listOf(
     R.drawable.ic_track_changes to "Say what trip you're on from the recording tile, or let the app work it out",
     R.drawable.ic_directions_bike to "Travel modes and sub-modes you can add, rename, recolour and delete",
     R.drawable.ic_calendar_month to "A Timeline by day, week, month or year, with back-to-back trips grouped",
-    R.drawable.ic_edit to "Edit trips: change their mode or times, select several, add trips, delete, restore, move or add dots",
+    R.drawable.ic_edit to "Edit trips: change their mode or times, select several trips and stays to join or change together, add trips, delete, restore, move or add dots",
     R.drawable.ic_merge to "Join several trips into one, with the loose dots between them",
     R.drawable.ic_content_cut to "Split a trip in two, snap all or part of a trip to a road, and switch the maps between routes and dots",
     R.drawable.ic_undo to "Undo any change on the Timeline or any answer to a question",
