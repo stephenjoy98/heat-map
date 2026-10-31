@@ -15,6 +15,8 @@ import android.widget.FrameLayout
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.withContext
+import io.github.stephenjoy98.heatmap.data.Units
+import androidx.compose.runtime.produceState
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.FlowPreview
@@ -197,13 +199,15 @@ fun AppMap(
     // Loads routes with heights for an area; with 3D buildings on, they're drawn as a 3D route. Runs off
     // the main thread.
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)? = null,
+    // Your current height above sea level, for the 3D location (the marker raised by it on a tilted map).
+    altitude: Double? = null,
 ) {
     val dark = isDarkTheme()
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val tilted by Prefs.mapTilted.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading, navMarker, tilted)
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading, navMarker, tilted, altitude)
 }
 
 /** How the base map looks: theme, terrain shading and 3D buildings (shown flat or tilted). */
@@ -502,9 +506,15 @@ private fun VectorAppMap(
     navMarker: Boolean,
     // Tilted into 3D (compass or two fingers); 3D routes are raised only then.
     tilted: Boolean,
+    altitude: Double?,
 ) {
     val holder = rememberVectorMap(cacheKey)
     val context = LocalContext.current
+    val location3d by Prefs.location3d.collectAsStateWithLifecycle()
+    // Heights in 3D are measured from the same low point as 3D routes, so the raised marker sits on its route.
+    val altitudeBase by produceState(Double.NaN, location3d) {
+        if (location3d) value = withContext(Dispatchers.IO) { runCatching { PointStore.get(context).altitudeBaseline() }.getOrDefault(Double.NaN) }
+    }
     LaunchedEffect(holder, bottomInset) {
         val dp = context.resources.displayMetrics.density
         holder.withMap { m -> m.uiSettings.setAttributionMargins((12 * dp).toInt(), 0, 0, ((ATTRIBUTION_BOTTOM_DP + bottomInset.value) * dp).toInt()) }
@@ -617,6 +627,9 @@ private fun VectorAppMap(
             HeatPalette.WHITE -> if (look.dark) android.graphics.Color.rgb(150, 150, 155) else android.graphics.Color.rgb(60, 60, 65)
         }
         overlay.navHeadingUp = navMarker
+        overlay.altitude = if (location3d && tilted) altitude else null
+        overlay.altitudeBaseline = altitudeBase
+        overlay.altitudeLabel = altitude?.let { Units.length(it) }
     }
 
     LaunchedEffect(refreshKey) {

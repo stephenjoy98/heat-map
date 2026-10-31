@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.60.0] - 2026-10-31
+
+### Added
+- **None** next to Routes and Dots in the map's layers sheet (and in Settings › Map): hides all your routes and
+  dots, flat and 3D, so you see just the map and where you are.
+- **3D location** under Map details: on a tilted map your location marker rises above the ground by your current
+  height (on the same scale as 3D routes), on a thin line down to a shadow where you are, with your height beside it.
+- The blue location dot pulses gently: a soft ring grows out of it and fades every two seconds.
+
 ## [2.59.1] - 2026-10-30
 
 ### Fixed

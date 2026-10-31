@@ -112,16 +112,19 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             Spacer(Modifier.height(20.dp))
             Text("Map details", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Four tiles: a little closer together so their labels fit on narrower phones.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LayerTile("3D buildings", buildings, { Prefs.setBuildings3d(!buildings) }) { drawBuildingsArt(it) }
                 val dot by Prefs.showLocationDot.collectAsStateWithLifecycle()
                 LayerTile("My location", dot, { Prefs.setShowLocationDot(!dot) }) { drawLocationArt(it) }
                 val raised by Prefs.routes3d.collectAsStateWithLifecycle()
                 LayerTile("3D routes", raised, { Prefs.setRoutes3d(!raised) }) { drawRaisedRouteArt(it) }
+                val lifted by Prefs.location3d.collectAsStateWithLifecycle()
+                LayerTile("3D location", lifted, { Prefs.setLocation3d(!lifted) }) { drawRaisedLocationArt(it) }
             }
             if (!buildings) {
                 Text(
-                    "3D routes show when the map is tilted into 3D.",
+                    "3D routes and the 3D location show when the map is tilted into 3D.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 6.dp),
@@ -145,13 +148,19 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                 SegmentedButton(
                     selected = display == DisplayMode.ROUTES,
                     onClick = { Prefs.setDisplayMode(DisplayMode.ROUTES) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                 ) { Text("Routes") }
                 SegmentedButton(
                     selected = display == DisplayMode.POINTS,
                     onClick = { Prefs.setDisplayMode(DisplayMode.POINTS) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                 ) { Text("Dots") }
+                // None: no routes or dots of yours at all, just the map.
+                SegmentedButton(
+                    selected = display == DisplayMode.NONE,
+                    onClick = { Prefs.setDisplayMode(DisplayMode.NONE) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                ) { Text("None") }
             }
             Spacer(Modifier.height(20.dp))
             // Map colours, folded away until you want it: muted to vivid, and whether roads join in.
@@ -358,6 +367,20 @@ private fun DrawScope.drawLocationArt(c: ArtColors) {
     drawCircle(blue.copy(alpha = 0.25f), radius = h * 0.26f, center = centre)
     drawCircle(Color.White, radius = h * 0.13f, center = centre)
     drawCircle(blue, radius = h * 0.1f, center = centre)
+}
+
+/** The blue dot raised on a thin line above its shadow on the ground: the 3D location. */
+private fun DrawScope.drawRaisedLocationArt(c: ArtColors) {
+    val w = size.width
+    val h = size.height
+    val blue = if (c.selected) Color(0xFF1A73E8) else c.accent
+    val ground = Offset(w * 0.5f, h * 0.8f)
+    val top = Offset(w * 0.5f, h * 0.34f)
+    drawOval(c.line.copy(alpha = 0.6f), topLeft = Offset(ground.x - w * 0.18f, ground.y - h * 0.06f), size = androidx.compose.ui.geometry.Size(w * 0.36f, h * 0.12f))
+    drawLine(c.line, ground, top, strokeWidth = h * 0.04f)
+    drawCircle(blue.copy(alpha = 0.25f), radius = h * 0.22f, center = top)
+    drawCircle(Color.White, radius = h * 0.13f, center = top)
+    drawCircle(blue, radius = h * 0.1f, center = top)
 }
 
 /** A map-type picture filling its tile. */

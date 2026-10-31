@@ -95,6 +95,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import org.maplibre.android.geometry.LatLng
 import io.github.stephenjoy98.heatmap.R
+import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.tracking.FollowMode
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.PointStore
@@ -203,8 +204,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     // Routes at their recorded heights, for the 3D buildings view.
     val route3d = remember(filter) { { box: GeoBox -> Route3dTracks.load(store, box, filter) } }
     val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
+    // None (layers sheet): no routes or dots of yours, flat or 3D.
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads, palette) {
-        listOf(MapLayer("heat-$palette", HeatTiles(OwnTracks(store, filter), HeatRamps.own(palette, dark), mode, tilePx)))
+        if (mode == DisplayMode.NONE) emptyList()
+        else listOf(MapLayer("heat-$palette", HeatTiles(OwnTracks(store, filter), HeatRamps.own(palette, dark), mode, tilePx)))
     }
 
     LaunchedEffect(stats) {
@@ -233,7 +236,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             refreshKey = changes,
             latest = if (showDot) dotAt else null,
             cacheKey = "map",
-            route3d = route3d,
+            route3d = if (mode == DisplayMode.NONE) null else route3d,
+            altitude = altitude,
             bottomInset = navPad,
             heading = heading,
             navMarker = following,

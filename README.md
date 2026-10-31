@@ -111,6 +111,8 @@ up to your Google account, and lets you compare explored areas with friends.
   you narrow the range to. **Routes / Dots** on the Timeline map shows every dot; tap one to delete it.
 - **Select several trips** (long-press › Select) and change their mode together, or tap **Join** to make them
   one trip (also "Join into one trip" in a group's menu); loose dots between them are taken in.
+- **Map layers**: routes, dots or **None**; **3D location** raises your marker by your height on a tilted map;
+  the blue dot pulses.
 - **Select trips and stays** on the Timeline (long-press › Select…) to join them into one trip or change their
   mode together.
 - **Follow me widget** (home screen, 2×1): whether you're recording and how often on the left (tap for the map),

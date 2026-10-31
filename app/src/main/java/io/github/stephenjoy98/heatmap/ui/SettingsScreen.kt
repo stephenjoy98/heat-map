@@ -343,7 +343,7 @@ fun SettingsScreen(
                     Text("Show", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
                     SegmentedChoice(
-                        options = listOf(DisplayMode.ROUTES to "Routes", DisplayMode.POINTS to "Points"),
+                        options = listOf(DisplayMode.ROUTES to "Routes", DisplayMode.POINTS to "Points", DisplayMode.NONE to "None"),
                         selected = mode,
                         onSelect = Prefs::setDisplayMode,
                     )

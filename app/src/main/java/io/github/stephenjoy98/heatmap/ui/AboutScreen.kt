@@ -80,6 +80,7 @@ private val FEATURES = listOf(
     R.drawable.ic_explore to "An altimeter, a speedometer and a compass that turns the map north, then tilts it into 3D",
     R.drawable.ic_navigation to "Follow me: long-press the location button to keep your dot centred while you travel, recording every second, long-press again to stop",
     R.drawable.ic_map to "A home screen widget showing your recording status, with a button that turns follow me on and off without opening the app",
+    R.drawable.ic_map to "Show routes, dots or neither; raise your location marker by your height in 3D; a pulsing location dot",
     R.drawable.ic_pie_chart to "Breakdowns as bars or a pie chart, switched with one button",
     R.drawable.ic_map to "A map of every area you've explored, by city, from the profile",
     R.drawable.ic_cloud to "A carbon footprint estimate from every travel mode, with its breakdown",

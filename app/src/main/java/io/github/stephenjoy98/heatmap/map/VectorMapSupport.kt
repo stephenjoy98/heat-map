@@ -513,6 +513,61 @@ class TileOverlayView(context: Context) : View(context) {
         style = Paint.Style.STROKE
     }
 
+    /**
+     * 3D location: your height above sea level, or null to draw the marker on the ground. On a tilted map the
+     * marker is raised by your height above [altitudeBaseline] (×1.5, like 3D routes), on a thin line down to a
+     * shadow where you are, with [altitudeLabel] beside it.
+     */
+    var altitude: Double? = null
+        set(value) {
+            if (value == field) return
+            field = value
+            invalidate()
+        }
+    var altitudeBaseline: Double = Double.NaN
+    var altitudeLabel: String? = null
+    private val stalk = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 225, 225, 230) }
+    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(110, 0, 0, 0) }
+    private val labelBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(225, 40, 40, 44) }
+    private val labelText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(236, 237, 240)
+        textSize = 12 * resources.displayMetrics.scaledDensity
+    }
+    private val labelRect = android.graphics.RectF()
+
+    // The pulse: a soft ring grows out of the blue dot and fades, over and over.
+    private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var pulseT = 0f
+    private val pulse = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = PULSE_MS
+        repeatCount = ValueAnimator.INFINITE
+        interpolator = android.view.animation.DecelerateInterpolator()
+        addUpdateListener { a ->
+            pulseT = a.animatedValue as Float
+            // Only while the blue dot is showing (follow me's marker has its own glow instead).
+            if (shown != null && !navMarker) postInvalidateOnAnimation()
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!pulse.isStarted) pulse.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        pulse.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible && isAttachedToWindow) {
+            if (!pulse.isStarted) pulse.start()
+        } else {
+            pulse.cancel()
+        }
+    }
+
     var latest: LatLng? = null
         set(value) {
             if (value == field) return
@@ -595,8 +650,27 @@ class TileOverlayView(context: Context) : View(context) {
         }
         shown?.let {
             val p = projection.toScreenLocation(it)
+            val tilt = map.cameraPosition.tilt.toFloat()
+            // 3D location: lift the marker by your height, seen from the camera's tilt.
+            val alt = altitude
+            val raise = if (alt != null && !altitudeBaseline.isNaN() && tilt > 2f) {
+                val metres = ((alt - altitudeBaseline) * HEIGHT_EXAGGERATION).coerceAtLeast(0.0)
+                val mpp = projection.getMetersPerPixelAtLatitude(it.latitude).coerceAtLeast(1e-3)
+                (metres / mpp * kotlin.math.sin(Math.toRadians(tilt.toDouble()))).toFloat().coerceAtMost(height * 0.4f)
+            } else 0f
+            if (alt != null && tilt > 2f) {
+                val squash = cos(Math.toRadians(tilt.toDouble())).toFloat().coerceAtLeast(0.35f)
+                navOval.set(p.x - 11 * density, p.y - 11 * density * squash, p.x + 11 * density, p.y + 11 * density * squash)
+                canvas.drawOval(navOval, shadow)
+                if (raise > 0f) {
+                    stalk.strokeWidth = 2 * density
+                    canvas.drawLine(p.x, p.y, p.x, p.y - raise, stalk)
+                }
+            }
+            val y = p.y - raise
             if (navMarker) {
-                drawNavMarker(canvas, p.x, p.y, map.cameraPosition.bearing.toFloat(), map.cameraPosition.tilt.toFloat())
+                drawNavMarker(canvas, p.x, y, map.cameraPosition.bearing.toFloat(), tilt)
+                drawAltitudeLabel(canvas, p.x + 22 * density, y)
                 return
             }
             heading?.let { h ->
@@ -604,17 +678,35 @@ class TileOverlayView(context: Context) : View(context) {
                 canvas.save()
                 canvas.rotate(h - map.cameraPosition.bearing.toFloat(), p.x, p.y)
                 arrow.reset()
-                arrow.moveTo(p.x, p.y - 15 * density)
-                arrow.lineTo(p.x + 6 * density, p.y - 8 * density)
-                arrow.lineTo(p.x - 6 * density, p.y - 8 * density)
+                arrow.moveTo(p.x, y - 15 * density)
+                arrow.lineTo(p.x + 6 * density, y - 8 * density)
+                arrow.lineTo(p.x - 6 * density, y - 8 * density)
                 arrow.close()
                 canvas.drawPath(arrow, dot)
                 canvas.restore()
             }
-            canvas.drawCircle(p.x, p.y, 14 * density, halo)
-            canvas.drawCircle(p.x, p.y, 7 * density, ring)
-            canvas.drawCircle(p.x, p.y, 5 * density, dot)
+            // The pulse ring, growing from the dot to well past its halo and fading out.
+            val pr = (7 + 26 * pulseT) * density
+            pulsePaint.color = Color.rgb(66, 133, 244)
+            pulsePaint.alpha = (110 * (1f - pulseT)).toInt()
+            canvas.drawCircle(p.x, y, pr, pulsePaint)
+            canvas.drawCircle(p.x, y, 14 * density, halo)
+            canvas.drawCircle(p.x, y, 7 * density, ring)
+            canvas.drawCircle(p.x, y, 5 * density, dot)
+            if (raise > 0f) drawAltitudeLabel(canvas, p.x + 20 * density, y)
         }
+    }
+
+    /** Your height in a small dark pill to the right of the raised marker. */
+    private fun drawAltitudeLabel(canvas: Canvas, x: Float, y: Float) {
+        val text = altitudeLabel ?: return
+        if (altitude == null) return
+        val w = labelText.measureText(text)
+        val padH = 8 * density
+        val h = labelText.textSize + 8 * density
+        labelRect.set(x, y - h / 2, x + w + padH * 2, y + h / 2)
+        canvas.drawRoundRect(labelRect, h / 2, h / 2, labelBg)
+        canvas.drawText(text, x + padH, y + labelText.textSize * 0.35f, labelText)
     }
 
     /**
@@ -673,5 +765,8 @@ class TileOverlayView(context: Context) : View(context) {
         const val GLOW_STEPS = 16
         const val GLOW_STEP_DP = 0.8f
         const val GLOW_ALPHA = 16
+        const val PULSE_MS = 2_000L
+        // Same as 3D routes, so the raised marker sits at its route's height.
+        const val HEIGHT_EXAGGERATION = 1.5
     }
 }

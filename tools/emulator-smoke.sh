@@ -184,6 +184,15 @@ shot 02e-map-white 4
 tap desc "Map layers"
 tap_scrolling text "Fire"
 back
+# None hides every route and dot; 3D location raises the marker (only seen tilted), turned on for the 3D shots.
+tap desc "Map layers"
+tap_scrolling text "None"
+back
+shot 02f-map-none 4
+tap desc "Map layers"
+tap_scrolling text "Routes"
+tap_scrolling text "3D location"
+back
 
 tap text "Timeline"
 shot 03-timeline 5

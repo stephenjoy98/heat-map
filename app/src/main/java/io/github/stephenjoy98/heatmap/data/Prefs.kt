@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 
-enum class DisplayMode { ROUTES, POINTS }
+enum class DisplayMode { ROUTES, POINTS, NONE }
 
 enum class MapTheme { SYSTEM, DARK, LIGHT }
 
@@ -71,6 +71,15 @@ object Prefs {
     /** Whether routes are raised to their recorded heights when the map is in 3D (Map layers › 3D routes). */
     private val _routes3d = MutableStateFlow(true)
     val routes3d: StateFlow<Boolean> = _routes3d
+
+    /** 3D location: on a tilted map, your location marker is raised by your height (like 3D routes). */
+    private val _location3d = MutableStateFlow(false)
+    val location3d: StateFlow<Boolean> = _location3d
+
+    fun setLocation3d(on: Boolean) {
+        _location3d.value = on
+        sp.edit().putBoolean("location_3d", on).apply()
+    }
 
     fun setRoutes3d(on: Boolean) {
         _routes3d.value = on
@@ -274,6 +283,7 @@ object Prefs {
         _showLocationDot.value = sp.getBoolean("show_location_dot", true)
         _breakdownPie.value = sp.getBoolean("breakdown_pie", false)
         _routes3d.value = sp.getBoolean("routes_3d", true)
+        _location3d.value = sp.getBoolean("location_3d", false)
         _dirtyBackupDays.value = sp.getStringSet("dirty_backup_days", null)?.toSet() ?: emptySet()
         _snapToRoads.value = sp.getBoolean("snap_roads", true)
     }
@@ -569,7 +579,7 @@ object Prefs {
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
-        "show_location_dot", "breakdown_pie", "map_colour_roads", "heat_palette", "routes_3d",
+        "show_location_dot", "breakdown_pie", "map_colour_roads", "heat_palette", "routes_3d", "location_3d",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */
