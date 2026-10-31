@@ -1,0 +1,84 @@
+Location Ticker 2.60.0 on 14 (API 34)
+Performing Streamed Install
+Success
+Starting: Intent { cmp=io.github.stephenjoy98.heatmap/.ui.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: io.github.stephenjoy98.heatmap/.ui.MainActivity
+TotalTime: 8869
+WaitTime: 8911
+Complete
+screenshot 01-map
+tapped desc "Start recording" at 143 1984
+screenshot 02-recording
+tapped desc "Map layers" at 985 1789
+screenshot 02a-layers
+tapped text "Map colours" at 184 2183
+dragged Map colours to Vivid
+screenshot 02b-layers-vivid
+tapped text "Ice" at 396 1506
+screenshot 02d-layers-ice
+screenshot 02c-map-vivid
+tapped desc "Map layers" at 985 1789
+tapped text "Snow" at 637 1882
+screenshot 02e-map-white
+tapped desc "Map layers" at 985 1789
+tapped text "Fire" at 154 1882
+tapped desc "Map layers" at 985 1789
+tapped text "None" at 863 2009
+screenshot 02f-map-none
+tapped desc "Map layers" at 985 1789
+tapped text "Routes" at 216 2009
+tapped text "3D location" at 816 1357
+tapped text "Timeline" at 814 2274
+screenshot 03-timeline
+tapped text "Dots" at 433 759
+screenshot 03a-timeline-dots
+tapped text "Routes" at 180 381
+tapped text "Questions" at 810 359
+screenshot 04-questions
+tapped text "Trips" at 270 359
+MISSING a "Stayed here" row to long-press
+tapped desc "Account" at 1006 212
+screenshot 05-account
+tapped text "Settings" at 301 2148
+screenshot 06-settings
+tapped text "General" at 264 2179
+screenshot 07-settings-general
+tapped text "Battery" at 258 1174
+screenshot 08-settings-battery
+tapped text "Battery saver" at 306 1955
+screenshot 09-battery-saver
+tapped text "User" at 224 920
+tapped text "Updates" at 270 1985
+screenshot 10-settings-updates
+tapped text "Insights" at 299 1902
+screenshot 11-insights
+screenshot 12-insights-lower
+screenshot 13-insights-bottom
+tapped text "Profile" at 284 1270
+screenshot 14-profile
+tapped text "AREAS ›" at 802 1660
+screenshot 14a-areas-map
+tapped desc "Show as a pie chart" at 929 1889
+screenshot 14b-profile-pie
+tapped desc "Show as bars" at 929 1889
+tapped text "Map" at 264 2274
+screenshot 15-map-after
+long-pressed the location button (follow me)
+screenshot 15a-follow
+dragged the map while following (it should keep following)
+screenshot 15b-follow-drag
+long-pressed it again to stop following
+tapped desc "Full screen" at 985 1186
+screenshot 16-fullscreen
+tapped desc "Exit full screen" at 985 1702
+screenshot 17-fullscreen-exit
+saved run.mp4
+widget button on the home screen: follow me on
+screenshot 18-widget-follow-notification
+opened the app while follow me is on
+screenshot 19-widget-follow-map
+widget button again: follow me off
+screenshot 20-widget-follow-off
+No crashes
