@@ -12,6 +12,16 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.62.0] - 2026-11-01
+
+### Added
+- **Time at your places** on your Profile: how long you've spent at each saved place (home, work…), with a bar
+  each and the share of your recorded time, for the period picked with the year chips. Tap the card for this
+  week or this month. Time with recording off isn't counted.
+- **Pick an icon for each place**: 20 to choose from (home, work, school, gym, shop, restaurant, café, park,
+  hospital, church, family, heart, star, flag, city, building, pets, sports, library, pin) in the place editor
+  (Settings › Places). The icon shows on the Timeline's stays there, in Settings › Places and on the Profile card.
+
 ## [2.61.1] - 2026-11-01
 
 ### Changed

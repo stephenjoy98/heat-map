@@ -46,11 +46,12 @@ object Attention {
     private val NEW_IN = mapOf(
         TIMELINE to "2.59.0",
         INSIGHTS to "2.54.0",
-        PROFILE to "2.54.0",
+        PROFILE to "2.62.0",
         settings("battery") to "2.32.0",
         settings("updates") to "2.33.0",
         settings("general") to "2.31.0",
         settings("modes") to "2.61.0",
+        settings("places") to "2.62.0",
     )
 
     // Goes up when something is marked seen, so markers drawn from it update.

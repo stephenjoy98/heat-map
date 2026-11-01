@@ -77,6 +77,7 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.ModeColors
 import io.github.stephenjoy98.heatmap.data.PeriodStat
+import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.map.Route3dTracks
@@ -1963,7 +1964,14 @@ private fun StayRow(
             picked = picked,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                // A saved place's own icon (house, briefcase, dumbbell…); a pin elsewhere.
+                val places by Prefs.savedPlaces.collectAsStateWithLifecycle()
+                val saved = remember(places, entry) { PlaceIcons.placeFor(places, entry.lat, entry.lon, entry.place) }
+                if (saved != null) {
+                    MaterialIcon(PlaceIcons.res(saved), size = 16, tint = MaterialTheme.colorScheme.primary)
+                } else {
+                    Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                }
                 Spacer(Modifier.width(4.dp))
                 Text(entry.place ?: "Stayed here", style = MaterialTheme.typography.titleSmall)
             }

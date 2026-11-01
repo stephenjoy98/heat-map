@@ -77,6 +77,7 @@ import io.github.stephenjoy98.heatmap.cloud.Account
 import io.github.stephenjoy98.heatmap.cloud.FirebaseGate
 import io.github.stephenjoy98.heatmap.cloud.SyncWorker
 import io.github.stephenjoy98.heatmap.data.PointStore
+import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.profile.ProfileRepository
 import io.github.stephenjoy98.heatmap.profile.ProfileStats
 import io.github.stephenjoy98.heatmap.profile.Stamp
@@ -172,6 +173,7 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
                 }
             }
             MostVisitedTile(s, Modifier)
+            PlaceTimeCard(s.year, changes)
             PlacesCard(s, onExplore)
             CarbonCard(s)
             // Stamps are hidden for now; more will be added to this section later.
@@ -195,6 +197,100 @@ fun ProfileScreen(resumeTick: Int, onBack: () -> Unit, onExplore: () -> Unit) {
             }
         }
     }
+    }
+}
+
+private val PLACE_BAR_COLORS = listOf(ChartColors.Blue, ChartColors.Magenta, ChartColors.Green, ChartColors.Orange, ChartColors.Amber, ChartColors.Red)
+
+/** The stretch of time "Time at your places" covers; a tap moves on to the next. */
+private enum class PlacePeriod(val label: String) { CHOSEN(""), WEEK("This week"), MONTH("This month") }
+
+/**
+ * Time at your places: how long you've spent at each saved place (home, work…), with its icon and a bar, over the
+ * period picked with the year chips; tap for this week or this month instead.
+ */
+@Composable
+private fun PlaceTimeCard(year: Int?, changes: Any?) {
+    val context = LocalContext.current
+    val places by Prefs.savedPlaces.collectAsStateWithLifecycle()
+    var period by rememberSaveable { mutableStateOf(PlacePeriod.CHOSEN) }
+    val zone = ZoneId.systemDefault()
+    val today = java.time.LocalDate.now(zone)
+    val (from, to) = when (period) {
+        PlacePeriod.WEEK -> today.with(java.time.DayOfWeek.MONDAY).atStartOfDay(zone).toInstant().toEpochMilli() to Long.MAX_VALUE
+        PlacePeriod.MONTH -> today.withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli() to Long.MAX_VALUE
+        PlacePeriod.CHOSEN -> if (year == null) 0L to Long.MAX_VALUE else
+            java.time.LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli() to
+                java.time.LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+    }
+    val times by produceState<Pair<Map<Long, Long>, Long>?>(null, places, from, to, changes) {
+        value = withContext(Dispatchers.IO) { PointStore.get(context).timeAtPlaces(places, from, to) }
+    }
+    if (places.isEmpty()) return
+    Card(Modifier.clickable { period = PlacePeriod.entries[(period.ordinal + 1) % PlacePeriod.entries.size] }) {
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("TIME AT YOUR PLACES", style = capsLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val t = times
+            val label = if (period == PlacePeriod.CHOSEN) (year?.toString() ?: "All time") else period.label
+            if (t == null) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                val at = t.first.values.sum()
+                val share = if (t.second > 0) (at * 100 / t.second).toInt() else 0
+                Text(
+                    "$label · $share% of your recorded time",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val rows = places.map { it to (t.first[it.id] ?: 0L) }.sortedByDescending { it.second }
+                val max = rows.maxOf { it.second }.coerceAtLeast(1L)
+                rows.forEachIndexed { i, (place, ms) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) { MaterialIcon(PlaceIcons.res(place), size = 22) }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(place.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                            Spacer(Modifier.height(6.dp))
+                            Box(Modifier.fillMaxWidth().height(6.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(3.dp))) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth((ms.toFloat() / max).coerceIn(0.02f, 1f))
+                                        .height(6.dp)
+                                        .background(PLACE_BAR_COLORS[i % PLACE_BAR_COLORS.size], RoundedCornerShape(3.dp)),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(horizontalAlignment = Alignment.End) {
+                            val hours = ms / 3_600_000.0
+                            Text(
+                                if (hours >= 10) "%,d h".format(hours.roundToInt()) else String.format(Locale.US, "%.1f h", hours),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            val days = hours / 24
+                            if (days >= 1) {
+                                Text(
+                                    if (days >= 10) "${days.roundToInt()} days" else String.format(Locale.US, "%.1f days", days),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Text(
+                "Tap for " + PlacePeriod.entries[(period.ordinal + 1) % PlacePeriod.entries.size].let {
+                    if (it == PlacePeriod.CHOSEN) (year?.toString() ?: "all time") else it.label.lowercase()
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

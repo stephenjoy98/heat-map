@@ -79,13 +79,6 @@ private val PLACE_INTERVALS = listOf(60, 300, 600, 900, 1800)
 /** A spot suggested from your history, with a street name when one could be found. */
 private class Suggestion(val lat: Double, val lon: Double, val hours: Double, val name: String?)
 
-private fun kindIcon(kind: PlaceKind): ImageVector = when (kind) {
-    PlaceKind.HOME -> Icons.Filled.Home
-    PlaceKind.WORK -> WorkIcon
-    PlaceKind.SCHOOL -> Icons.Filled.Star
-    PlaceKind.OTHER -> Icons.Filled.Place
-}
-
 /**
  * Settings → Places: home, work, school and other places you spend time. While you're at one and settled,
  * recording slows to the interval set for it (every 5 minutes, say); when you start moving and leave, it goes
@@ -120,7 +113,7 @@ fun PlacesSection() {
                 Modifier.fillMaxWidth().clickable { editing = p }.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(kindIcon(p.kind), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                MaterialIcon(PlaceIcons.res(p), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(p.name, style = MaterialTheme.typography.bodyLarge)
@@ -244,6 +237,8 @@ private fun PlaceEditor(
     var kind by remember { mutableStateOf(place.kind) }
     var radius by remember { mutableFloatStateOf(place.radiusM.toFloat()) }
     var interval by remember { mutableIntStateOf(place.intervalSec) }
+    // Null follows the kind (Home's house, Work's briefcase…) until an icon is picked.
+    var icon by remember { mutableStateOf(place.icon) }
     LaunchedEffect(Unit) { camera.moveTo(place.lat, place.lon, if (place.lat == 0.0 && place.lon == 0.0) 2f else 16f) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -255,7 +250,7 @@ private fun PlaceEditor(
                     TextButton(
                         onClick = {
                             val c = camera.center ?: (place.lat to place.lon)
-                            onSave(place.copy(name = name.trim().ifEmpty { kind.label }, kind = kind, lat = c.first, lon = c.second, radiusM = radius.roundToInt(), intervalSec = interval))
+                            onSave(place.copy(name = name.trim().ifEmpty { kind.label }, kind = kind, lat = c.first, lon = c.second, radiusM = radius.roundToInt(), intervalSec = interval, icon = icon))
                         },
                     ) { Text("Save") }
                 }
@@ -313,7 +308,7 @@ private fun PlaceEditor(
                                     kind = k
                                 },
                                 label = { Text(k.label) },
-                                leadingIcon = { Icon(kindIcon(k), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                leadingIcon = { MaterialIcon(PlaceIcons.res(PlaceIcons.defaultKey(k)), size = 18) },
                             )
                         }
                     }
@@ -324,6 +319,24 @@ private fun PlaceEditor(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Icon", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    val shown = icon ?: PlaceIcons.defaultKey(kind)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PlaceIcons.all.forEach { (key, res) ->
+                            val picked = key == shown
+                            Surface(
+                                onClick = { icon = if (key == PlaceIcons.defaultKey(kind)) null else key },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (picked) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                border = if (picked) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
+                                modifier = Modifier.size(52.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) { MaterialIcon(res, size = 26) }
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Size: ${Units.length(radius.toDouble())} around the pin", style = MaterialTheme.typography.labelLarge)
                     Slider(value = radius, onValueChange = { radius = (it / 10).roundToInt() * 10f }, valueRange = 50f..500f)
@@ -350,17 +363,4 @@ private fun PlaceEditor(
             }
         }
     }
-}
-
-/** A briefcase, for work places; the core icon set has none. */
-private val WorkIcon: ImageVector by lazy {
-    ImageVector.Builder("Work", 24.dp, 24.dp, 24f, 24f).apply {
-        addPath(
-            pathData = androidx.compose.ui.graphics.vector.addPathNodes(
-                "M20,6h-4L16,4c0,-1.11 -0.89,-2 -2,-2h-4c-1.11,0 -2,0.89 -2,2v2L4,6c-1.11,0 -1.99,0.89 -1.99,2L2,19c0,1.11 " +
-                    "0.89,2 2,2h16c1.11,0 2,-0.89 2,-2L22,8c0,-1.11 -0.89,-2 -2,-2zM14,6h-4L10,4h4v2z"
-            ),
-            fill = androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Black),
-        )
-    }.build()
 }

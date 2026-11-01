@@ -427,6 +427,34 @@ class PointStore private constructor(context: Context) :
         return Stats(total, today, latest())
     }
 
+    /**
+     * Time spent at each saved place between [from] and [to], in milliseconds by place id, and all the recorded
+     * time then: the gaps between consecutive dots (up to [MAX_PLACE_GAP_MS], so time with recording off doesn't
+     * count) where both dots are in the same place.
+     */
+    fun timeAtPlaces(places: List<SavedPlace>, from: Long, to: Long): Pair<Map<Long, Long>, Long> {
+        val out = HashMap<Long, Long>()
+        var total = 0L
+        readableDatabase.rawQuery("SELECT time, lat, lon FROM points WHERE time >= ? AND time < ? ORDER BY time", arrayOf(from.toString(), to.toString())).use { c ->
+            var prevTime = -1L
+            var prevPlace: SavedPlace? = null
+            while (c.moveToNext()) {
+                val t = c.getLong(0)
+                val place = if (places.isEmpty()) null else PlaceZones.find(places, c.getDouble(1), c.getDouble(2), prevPlace)
+                if (prevTime >= 0) {
+                    val gap = t - prevTime
+                    if (gap in 1..MAX_PLACE_GAP_MS) {
+                        total += gap
+                        if (place != null && place.id == prevPlace?.id) out[place.id] = (out[place.id] ?: 0L) + gap
+                    }
+                }
+                prevTime = t
+                prevPlace = place
+            }
+        }
+        return out to total
+    }
+
     fun latest(): LocationPoint? =
         readableDatabase.rawQuery("SELECT $POINT_COLS FROM points ORDER BY time DESC LIMIT 1", null).use { c ->
             if (c.moveToFirst()) c.toPoint() else null
@@ -2218,6 +2246,8 @@ class PointStore private constructor(context: Context) :
         if (modes.containsAll(TravelMode.entries)) "" else " AND mode IN (${modes.joinToString(",") { it.id.toString() }.ifEmpty { "-1" }})"
 
     companion object {
+        // Longer gaps between dots mean recording was off: that time isn't counted at a place.
+        const val MAX_PLACE_GAP_MS = 60 * 60_000L
         // Trips closer together than this have no stay between them (the Timeline shows stays from 5 min).
         private const val ADJACENT_MS = 5 * 60_000L
 
