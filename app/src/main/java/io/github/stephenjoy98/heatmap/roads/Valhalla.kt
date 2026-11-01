@@ -24,7 +24,7 @@ object Valhalla {
         TravelMode.Kind.FOOT -> "pedestrian"
         TravelMode.Kind.BIKE -> "bicycle"
         TravelMode.Kind.PUBLIC -> "bus"
-        TravelMode.Kind.TRACK -> null
+        TravelMode.Kind.TRACK, TravelMode.Kind.IDLE -> null
         else -> "auto"
     }
 

@@ -73,6 +73,13 @@ object RoadSnapper {
             store.clearPaths(TravelMode.entries.filter { it.kind == TravelMode.Kind.TRACK }.map { it.id }, STATUS_RECORDED)
             Prefs.tracksSnapped = true
         }
+        if (!Prefs.idleUnsnapped) {
+            // Idle trips matched to roads before Idle existed: back to their recorded dots.
+            val idle = TravelMode.entries.filter { it.kind == TravelMode.Kind.IDLE }.map { it.id }
+            store.clearPaths(idle, STATUS_SNAPPED)
+            store.clearPaths(idle, STATUS_WAITING)
+            Prefs.idleUnsnapped = true
+        }
         var questions = 0
         while (true) {
             val trips = store.tripsWithoutPath(10)

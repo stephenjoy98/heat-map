@@ -241,6 +241,12 @@ object Prefs {
             sp.edit().putBoolean("modes_seeded_v1", true).apply()
             saveModes()
         }
+        if (!sp.getBoolean("idle_mode_v1", false)) {
+            // Added before the map filter loads below, so a map showing every mode shows Idle too.
+            TravelMode.seedIdle()
+            sp.edit().putBoolean("idle_mode_v1", true).putBoolean("idle_unsnapped_v1", false).apply()
+            saveModes()
+        }
         ModeColors.replace(ModeColors.decode(sp.getString("mode_colors", null)))
         _modeFilter.value = sp.getStringSet("mode_filter", null)
             ?.mapNotNull { it.toIntOrNull()?.let(TravelMode::fromId) }?.toSet()
@@ -577,7 +583,7 @@ object Prefs {
         "interval_sec", "auto_interval", "high_accuracy", "display_mode", "map_theme", "units", "dynamic_color",
         "smooth_routes", "snap_roads", "map_layer", "buildings_3d", "map_tilted", "mode_filter", "ai_engine", "cloud_model",
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
-        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "auto_update", "update_wifi_only", "update_frequency",
+        "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "idle_mode_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
         "show_location_dot", "breakdown_pie", "map_colour_roads", "heat_palette", "routes_3d", "location_3d",
     )
@@ -657,6 +663,11 @@ object Prefs {
         set(value) = sp.edit().putBoolean("snaps_rechecked_v1", value).apply()
 
     /** Whether train and boat trips kept as recorded have been queued once for matching to their tracks. */
+    /** False until Idle trips that were matched to roads before the Idle kind existed have been put back (once). */
+    var idleUnsnapped: Boolean
+        get() = sp.getBoolean("idle_unsnapped_v1", true)
+        set(value) = sp.edit().putBoolean("idle_unsnapped_v1", value).apply()
+
     var tracksSnapped: Boolean
         get() = sp.getBoolean("tracks_snapped_v1", false)
         set(value) = sp.edit().putBoolean("tracks_snapped_v1", value).apply()

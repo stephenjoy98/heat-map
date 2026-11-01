@@ -50,6 +50,7 @@ object Attention {
         settings("battery") to "2.32.0",
         settings("updates") to "2.33.0",
         settings("general") to "2.31.0",
+        settings("modes") to "2.61.0",
     )
 
     // Goes up when something is marked seen, so markers drawn from it update.

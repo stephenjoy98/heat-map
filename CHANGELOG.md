@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.61.0] - 2026-11-01
+
+### Added
+- **Idle** travel mode, for time spent sitting somewhere rather than travelling. Idle trips keep their recorded
+  dots and are never matched to roads, rails or ferry routes, and they count no CO₂. If you already had a mode
+  called Idle it becomes this kind, and any of its trips that were matched to roads go back to how they were
+  recorded. Modes you add can be of the Idle kind too (Settings › Travel modes).
+
 ## [2.60.0] - 2026-10-31
 
 ### Added

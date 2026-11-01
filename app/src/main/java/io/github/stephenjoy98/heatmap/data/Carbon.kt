@@ -5,7 +5,7 @@ package io.github.stephenjoy98.heatmap.data
  * add count too) and a few words in its name. Figures are the UK government's greenhouse gas conversion factors
  * (DESNZ 2024), rounded: average car 170 g/km, taxi or ride-hail 150 g/km, local bus 100 g/km, train 35 g/km,
  * light rail or metro 30 g/km, foot-passenger ferry 20 g/km. A car pool is shared with one other person on
- * average. Walking, cycling and Other count as nothing.
+ * average. Walking, cycling, Other and Idle count as nothing.
  */
 object Carbon {
     const val CAR_KG_PER_KM = 0.17
@@ -14,7 +14,7 @@ object Carbon {
         val name = mode.fullLabel.lowercase()
         fun has(vararg words: String) = words.any { it in name }
         return when (mode.kind) {
-            TravelMode.Kind.FOOT, TravelMode.Kind.BIKE, TravelMode.Kind.OTHER -> 0.0
+            TravelMode.Kind.FOOT, TravelMode.Kind.BIKE, TravelMode.Kind.OTHER, TravelMode.Kind.IDLE -> 0.0
             TravelMode.Kind.CAR -> when {
                 has("pool") -> CAR_KG_PER_KM / 2
                 has("taxi", "uber", "lyft", "ride") -> 0.15

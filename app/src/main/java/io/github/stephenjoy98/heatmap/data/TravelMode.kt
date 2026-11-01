@@ -33,11 +33,13 @@ class TravelMode private constructor(
         CAR("Car"),
         PUBLIC("Bus"),
         TRACK("Train or boat"),
-        OTHER("Other");
+        OTHER("Other"),
+        // Not travelling: sitting somewhere. Its trips keep their recorded dots, never snapped to roads or tracks.
+        IDLE("Idle");
 
         companion object {
             /** The kinds a mode you add can have. */
-            val choosable = listOf(FOOT, BIKE, CAR, PUBLIC, TRACK)
+            val choosable = listOf(FOOT, BIKE, CAR, PUBLIC, TRACK, IDLE)
         }
     }
 
@@ -208,6 +210,19 @@ class TravelMode private constructor(
                 if (!has("Bus")) create("Bus", 0xFFFFA000, Kind.PUBLIC, TRANSIT.id)
                 if (!has("SeaBus")) create("SeaBus", 0xFF00ACC1, Kind.TRACK, TRANSIT.id)
             }
+        }
+
+        /**
+         * Idle, for time spent sitting somewhere rather than travelling (added once): an existing mode called Idle
+         * becomes the Idle kind, otherwise a new one is added. Returns it.
+         */
+        internal fun seedIdle(): TravelMode {
+            val existing = entries.firstOrNull { it.label.equals("Idle", ignoreCase = true) }
+            if (existing != null) {
+                if (!existing.builtIn) edit(existing, existing.label, existing.defaultColor, Kind.IDLE, existing.parentId)
+                return existing
+            }
+            return create("Idle", 0xFF616161, Kind.IDLE)
         }
     }
 }
