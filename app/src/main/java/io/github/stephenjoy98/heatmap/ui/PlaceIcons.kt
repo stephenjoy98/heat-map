@@ -6,29 +6,29 @@ import io.github.stephenjoy98.heatmap.data.PlaceKind
 import io.github.stephenjoy98.heatmap.data.SavedPlace
 import io.github.stephenjoy98.heatmap.data.TrackRules
 
-/** The icons a saved place can have (Material outlined), by the key saved with the place. */
+/** The icons a saved place can have (Material filled, so they all look alike), by the key saved with the place. */
 object PlaceIcons {
     val all: List<Pair<String, Int>> = listOf(
-        "home" to R.drawable.ic_home,
-        "work" to R.drawable.ic_work,
-        "school" to R.drawable.ic_school,
-        "gym" to R.drawable.ic_fitness_center,
-        "shop" to R.drawable.ic_local_grocery_store,
-        "restaurant" to R.drawable.ic_restaurant,
-        "cafe" to R.drawable.ic_local_cafe,
-        "park" to R.drawable.ic_park,
-        "hospital" to R.drawable.ic_local_hospital,
-        "church" to R.drawable.ic_church,
-        "family" to R.drawable.ic_family_restroom,
-        "heart" to R.drawable.ic_favorite,
-        "star" to R.drawable.ic_star,
-        "flag" to R.drawable.ic_flag,
-        "city" to R.drawable.ic_location_city,
-        "building" to R.drawable.ic_apartment,
-        "pets" to R.drawable.ic_pets,
-        "sports" to R.drawable.ic_sports_soccer,
-        "library" to R.drawable.ic_local_library,
-        "pin" to R.drawable.ic_place,
+        "home" to R.drawable.ic_place_home,
+        "work" to R.drawable.ic_place_work,
+        "school" to R.drawable.ic_place_school,
+        "gym" to R.drawable.ic_place_gym,
+        "shop" to R.drawable.ic_place_shop,
+        "restaurant" to R.drawable.ic_place_restaurant,
+        "cafe" to R.drawable.ic_place_cafe,
+        "park" to R.drawable.ic_place_park,
+        "hospital" to R.drawable.ic_place_hospital,
+        "church" to R.drawable.ic_place_church,
+        "family" to R.drawable.ic_place_family,
+        "heart" to R.drawable.ic_place_heart,
+        "star" to R.drawable.ic_place_star,
+        "flag" to R.drawable.ic_place_flag,
+        "city" to R.drawable.ic_place_city,
+        "building" to R.drawable.ic_place_building,
+        "pets" to R.drawable.ic_place_pets,
+        "sports" to R.drawable.ic_place_sports,
+        "library" to R.drawable.ic_place_library,
+        "pin" to R.drawable.ic_place_pin,
     )
     private val byKey = all.toMap()
 
@@ -46,7 +46,7 @@ object PlaceIcons {
     fun res(place: SavedPlace): Int = byKey.getValue(key(place))
 
     @DrawableRes
-    fun res(key: String): Int = byKey[key] ?: R.drawable.ic_place
+    fun res(key: String): Int = byKey[key] ?: R.drawable.ic_place_pin
 
     /** The saved place a stay was at: by position, or else by its name. */
     fun placeFor(places: List<SavedPlace>, lat: Double, lon: Double, name: String?): SavedPlace? =

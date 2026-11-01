@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material icon "star" (outlined) by Google, Apache License 2.0. -->
+<!-- Material icon "restaurant" (filled) by Google, Apache License 2.0. For saved places. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -7,5 +7,5 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FF000000"
-        android:pathData="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z" />
+        android:pathData="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z" />
 </vector>

@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.62.1] - 2026-11-01
+
+### Fixed
+- The place editor's map had shrunk to a strip: it keeps about 40% of the screen again, with the settings
+  scrolling below it.
+- Place icons all look alike now (solid), instead of a mix of outlines and solid shapes.
+
 ## [2.62.0] - 2026-11-01
 
 ### Added

@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -254,10 +255,11 @@ private fun PlaceEditor(
                         },
                     ) { Text("Save") }
                 }
+                // The map keeps a fixed share of the screen; the settings below scroll under it.
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .weight(1f)
+                        .height((LocalConfiguration.current.screenHeightDp * 0.4f).dp)
                         .padding(horizontal = 12.dp)
                         .clip(RoundedCornerShape(20.dp)),
                 ) {
@@ -286,7 +288,7 @@ private fun PlaceEditor(
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
-                Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp)) {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp)) {
                     OutlinedButton(onClick = {
                         scope.launch {
                             val p = withContext(Dispatchers.IO) { PointStore.get(context).latest() }
