@@ -247,6 +247,11 @@ object Prefs {
             sp.edit().putBoolean("idle_mode_v1", true).putBoolean("idle_unsnapped_v1", false).apply()
             saveModes()
         }
+        if (!sp.getBoolean("idle_grey_v1", false)) {
+            TravelMode.greyIdle()
+            sp.edit().putBoolean("idle_grey_v1", true).apply()
+            saveModes()
+        }
         ModeColors.replace(ModeColors.decode(sp.getString("mode_colors", null)))
         _modeFilter.value = sp.getStringSet("mode_filter", null)
             ?.mapNotNull { it.toIntOrNull()?.let(TravelMode::fromId) }?.toSet()

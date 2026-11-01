@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.61.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.61.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -127,7 +127,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   Since 2.19.0: sub-modes via `parentId` (one level; `topLevel`, `ordered`, `children`, `withChildren`,
   `fullLabel`); built-ins renamable (Prefs "mode_labels"); defaults seeded once ("modes_seeded_v1":
   CarPool, RideShare › Bike/Car, PublicTransit › SkyTrain/Bus/SeaBus); Kind.TRACK = no road matching
-  (`Valhalla.costing` returns null); Kind.IDLE (2.61.0, user's request: sitting somewhere, not travelling) = no road or track matching, 0 CO₂, choosable; `TravelMode.seedIdle()` once (Prefs `idle_mode_v1`: an existing "Idle" mode gets the kind, else a custom Idle #616161) and RoadSnapper clears SNAPPED/WAITING paths of IDLE trips once (`Prefs.idleUnsnapped`, `idle_unsnapped_v1`). Pickers: `ModeChips` / `ModeMenuItems` (ModePicker.kt). Map filter chips
+  (`Valhalla.costing` returns null); Kind.IDLE (2.61.0, user's request: sitting somewhere, not travelling) = no road or track matching, 0 CO₂, choosable; `TravelMode.seedIdle()` once (Prefs `idle_mode_v1`: an existing "Idle" mode gets the kind, else a custom Idle in Other's grey; 2.61.1 `greyIdle()` once (Prefs `idle_grey_v1`) at the user's request) and RoadSnapper clears SNAPPED/WAITING paths of IDLE trips once (`Prefs.idleUnsnapped`, `idle_unsnapped_v1`). Pickers: `ModeChips` / `ModeMenuItems` (ModePicker.kt). Map filter chips
   are top-level and toggle `withChildren`. Deleting a sub-mode moves its trips to the parent.
   `Prefs.currentMode` (set from `RecordingSheet`, opened by tapping the record tile) tags new dots' `mode`;
   cleared when tracking stops; TripDetector follows a majority of tagged dots.

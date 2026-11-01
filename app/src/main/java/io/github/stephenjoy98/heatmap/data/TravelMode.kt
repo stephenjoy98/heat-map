@@ -212,6 +212,11 @@ class TravelMode private constructor(
             }
         }
 
+        /** Idle modes in the same grey as Other (unidentified trips), at the user's request. */
+        internal fun greyIdle() {
+            added.filter { it.kind == Kind.IDLE }.forEach { edit(it, it.label, UNKNOWN.defaultColor, Kind.IDLE, it.parentId) }
+        }
+
         /**
          * Idle, for time spent sitting somewhere rather than travelling (added once): an existing mode called Idle
          * becomes the Idle kind, otherwise a new one is added. Returns it.
@@ -222,7 +227,7 @@ class TravelMode private constructor(
                 if (!existing.builtIn) edit(existing, existing.label, existing.defaultColor, Kind.IDLE, existing.parentId)
                 return existing
             }
-            return create("Idle", 0xFF616161, Kind.IDLE)
+            return create("Idle", UNKNOWN.defaultColor, Kind.IDLE)
         }
     }
 }

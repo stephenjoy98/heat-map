@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.61.1] - 2026-11-01
+
+### Changed
+- Idle is drawn in the same grey as Other (trips the app couldn't identify).
+
 ## [2.61.0] - 2026-11-01
 
 ### Added
