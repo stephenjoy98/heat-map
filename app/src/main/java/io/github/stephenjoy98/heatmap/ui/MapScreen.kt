@@ -271,13 +271,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             onMapClick = if (orbiting) { _, _ -> orbiting = false } else null,
         )
         if (orbiting) {
-            // "Orbiting · tap to stop", under the top row.
+            // "Orbiting · tap to stop", below the top row and the scale bar (which shows while the map turns).
             Surface(
                 onClick = { orbiting = false },
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
                 shadowElevation = 3.dp,
-                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 96.dp),
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 150.dp),
             ) {
                 Text("Orbiting · tap to stop", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
