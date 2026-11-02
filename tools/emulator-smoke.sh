@@ -185,6 +185,32 @@ tap desc "Map layers"
 tap_scrolling text "Fire"
 back
 # None hides every route and dot; 3D location raises the marker (only seen tilted), turned on for the 3D shots.
+# The altimeter opens "Check your height" (GPS, ground from terrain, barometer).
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+alt_xy=$(python3 -I - "$OUT/.ui.xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(0)
+for node in root.iter("node"):
+    d = node.get("content-desc") or ""
+    if d.endswith("above sea level") or d == "Height unknown":
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+)
+if [ -n "$alt_xy" ]; then
+    # shellcheck disable=SC2086
+    adb shell input tap $alt_xy
+    note "tapped the altimeter at $alt_xy"
+    shot 02g-altitude-check 6
+    back
+else
+    note "MISSING the altimeter"
+fi
 tap desc "Map layers"
 tap_scrolling text "None"
 back

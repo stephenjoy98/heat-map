@@ -161,6 +161,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val density = LocalDensity.current
     // Live GPS pauses while a page covers the map.
     val covered = LocalCovered.current
+    // The altimeter's "Check your height" sheet.
+    var altitudeCheck by remember { mutableStateOf(false) }
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
     val signal = rememberFixQuality(liveFix)
     // For the speedometer: the live fix's speed while it's recent.
@@ -209,6 +211,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
         if (mode == DisplayMode.NONE) emptyList()
         else listOf(MapLayer("heat-$palette", HeatTiles(OwnTracks(store, filter), HeatRamps.own(palette, dark), mode, tilePx)))
     }
+
+    if (altitudeCheck) AltitudeCheckSheet(liveFix, onClose = { altitudeCheck = false })
 
     LaunchedEffect(stats) {
         val latest = stats?.latest
@@ -337,7 +341,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                 Row(Modifier.align(Alignment.TopStart), verticalAlignment = Alignment.Top) {
                     if (hasLocation) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Altimeter(altitude)
+                            Altimeter(altitude, onClick = { altitudeCheck = true })
                             Spacer(Modifier.height(12.dp))
                             Speedometer(speed)
                         }

@@ -153,10 +153,11 @@ fun Speedometer(speedMs: Float?, modifier: Modifier = Modifier) {
 
 /** Your height above sea level from GPS, in m or ft as chosen in Settings, in a badge like the compass. */
 @Composable
-fun Altimeter(meters: Double?, modifier: Modifier = Modifier) {
+fun Altimeter(meters: Double?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     val value = meters?.let { Units.lengthValue(it).toString() } ?: "–"
-    Tip("Your height above sea level, from GPS", modifier) {
+    Tip("Your height above sea level, from GPS; tap to check it", modifier) {
         Surface(
+            onClick = onClick,
             shape = CircleShape,
             color = controlColor(),
             shadowElevation = 3.dp,

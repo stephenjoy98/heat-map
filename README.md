@@ -35,6 +35,7 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Travel-mode filter**: the filter button (top left) slides out chips for All, Walking, Cycling,
   Driving, Car share, Transit and Other; a dot on the button shows when the map is filtered.
 - Routes or raw-points view, and very large histories automatically fall back to a density grid.
+- **Check your height**: tap the altimeter to compare GPS with the ground height and the barometer.
 - **Time at your places** on the Profile, and an icon of your choice for each saved place.
 - **Idle** travel mode for time spent sitting somewhere: never matched to roads, no CO₂.
 - **Map layers** (layers button on the right, like Google Maps): **Default** or **Terrain** map type

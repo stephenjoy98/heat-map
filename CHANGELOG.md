@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.63.0] - 2026-11-02
+
+### Added
+- **Check your height**: tap the altimeter on the map to compare the GPS height with the ground height where you
+  are (from the terrain data the map's hillshading uses) and, on phones with one, the barometer. A line says whether
+  they agree (within 25 m) or how far apart they are, with a tip on which to trust. The barometer is set against
+  the ground height when you first open it and every few hours after, so it shows how your height changes.
+
 ## [2.62.1] - 2026-11-01
 
 ### Fixed
