@@ -43,6 +43,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -93,25 +95,47 @@ fun LayersButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * the map into 3D, and the next one lays it flat again.
  */
 @Composable
-fun CompassButton(camera: MapCamera, modifier: Modifier = Modifier) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun CompassButton(
+    camera: MapCamera,
+    modifier: Modifier = Modifier,
+    // In 3D, a long-press starts circling your location (see MapScreen's orbit); a tap while orbiting stops it.
+    orbiting: Boolean = false,
+    onOrbit: (() -> Unit)? = null,
+) {
     val tilted by Prefs.mapTilted.collectAsStateWithLifecycle()
     val rotated = ((camera.bearing % 360f) + 360f) % 360f in 1f..359f
     val action = when {
+        orbiting -> "Stop circling"
         rotated -> "Turn the map back to north"
         tilted -> "Lay the map flat"
         else -> "Tilt the map into 3D"
     }
-    Tip(action, modifier) {
+    val onTap = {
+        when {
+            orbiting -> onOrbit?.invoke()
+            rotated -> camera.northUp()
+            else -> Prefs.setMapTilted(!tilted)
+        }
+        Unit
+    }
+    val canOrbit = tilted && onOrbit != null
+    val button = @Composable {
         Surface(
-            onClick = { if (rotated) camera.northUp() else Prefs.setMapTilted(!tilted) },
             shape = CircleShape,
             color = controlColor(),
             shadowElevation = 3.dp,
-            modifier = Modifier.size(48.dp).semantics { contentDescription = "Compass: $action" },
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .combinedClickable(onClick = onTap, onLongClick = if (canOrbit && !orbiting) onOrbit else null)
+                .semantics { contentDescription = "Compass: $action" + if (canOrbit && !orbiting) "; long-press to circle your location" else "" },
         ) {
             CompassNeedle(bearing = camera.bearing, modifier = Modifier.size(48.dp))
         }
     }
+    // The tooltip also opens on a long-press, so it steps aside when a long-press circles the map.
+    if (canOrbit) Box(modifier) { button() } else Tip(action, modifier) { button() }
 }
 
 /**

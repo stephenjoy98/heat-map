@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.63.2**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.64.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -185,7 +185,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton (2.39.1: dial with N/E/S/W + NE/SE/SW/NW ticks fixed, needle turns by -bearing;
-  the user tried a fixed needle + turning dial and asked for this way round): north up, then toggles 3D via Prefs.buildings3d; `Altimeter` (live fix, `LocationTickerService.altitudeOf`; 2.63.0 tap → `AltitudeCheckSheet` (ui/AltitudeCheck.kt, mockup approved): GPS ± verticalAccuracy, ground = `AltitudeSources.groundHeight` (Terrarium tile z15 pixel, 8-tile LRU), barometer = SensorManager.getAltitude with sea-level pressure calibrated against ground (else GPS, replaced by ground when it loads: 2.63.1) once per 3 h; agree ≤25 m green else amber tip) above
+  the user tried a fixed needle + turning dial and asked for this way round): north up, then toggles 3D via Prefs.buildings3d; 2.64.0 orbit (mockup from the user's video): when tilted, long-press (combinedClickable; the Tip tooltip is dropped then since it also uses long-press) → MapScreen `orbiting` loop of 1 s `camera.glideTo(dotAt, bearing += 18°)` (`ORBIT_TURN_MS` 20 s), stops on map tap (onMapClick), panTick, compass tap, the "Orbiting · tap to stop" chip, or flattening; follow-me glides pause while orbiting; `Altimeter` (live fix, `LocationTickerService.altitudeOf`; 2.63.0 tap → `AltitudeCheckSheet` (ui/AltitudeCheck.kt, mockup approved): GPS ± verticalAccuracy, ground = `AltitudeSources.groundHeight` (Terrarium tile z15 pixel, 8-tile LRU), barometer = SensorManager.getAltitude with sea-level pressure calibrated against ground (else GPS, replaced by ground when it loads: 2.63.1) once per 3 h; agree ≤25 m green else amber tip) above
   `Speedometer` (live fix speed; shrinks to a 10 dp dot below 1 km/h|mph, in a fixed 48 dp slot) on the left of MapScreen; ZoomButtons, LayersButton, ScaleBar), `MapLayersSheet` (Default/Terrain
   pictures + 3D buildings, My location, 3D routes (Prefs `routes_3d`, gates the route-3d loader in AppMap), 3D location (2.60.0, Prefs `location_3d`: `TileOverlayView.altitude` (set only when tilted) raises the dot/nav marker by (alt − `altitudeBaseline`)×1.5 m / metersPerPixel × sin(tilt), stalk + shadow oval + `altitudeLabel` pill); Routes/Dots/None segmented (`DisplayMode.NONE`: MapScreen passes no layers and no route3d)); 2.60.0 pulse: `TileOverlayView.pulse` ValueAnimator 2 s, ring 7→33 dp fading, only while the blue dot shows (not with navMarker), stopped when detached/hidden, `GpsAccuracy` (Fog of World-style card, satellites), `ProfileScreen`,
   `ProfileMenu` (`ProfileButton` with badge outside its clip — pass `background` instead of wrapping it in a

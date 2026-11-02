@@ -211,6 +211,47 @@ if [ -n "$alt_xy" ]; then
 else
     note "MISSING the altimeter"
 fi
+# Orbit: tilt into 3D with the compass, long-press it to circle your location, then stop and lay the map flat.
+compass_xy() {
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+    python3 -I - "$OUT/.ui.xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(0)
+for node in root.iter("node"):
+    if (node.get("content-desc") or "").startswith("Compass:"):
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+}
+cxy=$(compass_xy)
+if [ -n "$cxy" ]; then
+    # shellcheck disable=SC2086
+    adb shell input tap $cxy
+    sleep 3
+    cxy=$(compass_xy)
+    # shellcheck disable=SC2086
+    set -- $cxy
+    adb shell input swipe "$1" "$2" "$1" "$2" 900
+    note "long-pressed the compass in 3D (orbit)"
+    shot 02h-orbit 7
+    tap text "Orbiting · tap to stop"
+    sleep 2
+    cxy=$(compass_xy)
+    # shellcheck disable=SC2086
+    adb shell input tap $cxy
+    sleep 2
+    cxy=$(compass_xy)
+    # shellcheck disable=SC2086
+    adb shell input tap $cxy
+    note "stopped the orbit and laid the map flat again"
+else
+    note "MISSING the compass"
+fi
 tap desc "Map layers"
 tap_scrolling text "None"
 back

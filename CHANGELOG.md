@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.64.0] - 2026-11-02
+
+### Added
+- **Orbit**: in 3D, long-press the compass and the map slowly circles your location, a full turn every 20
+  seconds, until you tap the map, the "Orbiting · tap to stop" label or the compass, drag the map, or lay it flat.
+
 ## [2.63.2] - 2026-11-02
 
 ### Fixed

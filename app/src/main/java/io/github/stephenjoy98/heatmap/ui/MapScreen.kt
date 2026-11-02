@@ -82,6 +82,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -161,6 +163,8 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val density = LocalDensity.current
     // Live GPS pauses while a page covers the map.
     val covered = LocalCovered.current
+    // Orbit (long-press the compass in 3D): the map circles your location until you touch it or tap the compass.
+    var orbiting by remember { mutableStateOf(false) }
     // The altimeter's "Check your height" sheet.
     var altitudeCheck by remember { mutableStateOf(false) }
     val liveFix = rememberLiveFix(hasLocation && !covered, detailed = accuracyOpen)
@@ -214,6 +218,25 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
 
     if (altitudeCheck) AltitudeCheckSheet(liveFix, onClose = { altitudeCheck = false })
 
+    // The orbit: a full turn around your location every ORBIT_TURN_MS, in steady one-second glides (each picks up
+    // where the last ended, so it never stutters), centred on the latest position.
+    val orbitCentre by rememberUpdatedState(dotAt)
+    val tiltedNow by Prefs.mapTilted.collectAsStateWithLifecycle()
+    LaunchedEffect(orbiting) {
+        if (!orbiting) return@LaunchedEffect
+        var bearing = camera.bearing
+        while (true) {
+            val at = orbitCentre ?: break
+            bearing = (bearing + 360f * ORBIT_STEP_MS / ORBIT_TURN_MS) % 360f
+            camera.glideTo(at.latitude, at.longitude, ORBIT_STEP_MS.toInt(), bearing)
+            delay(ORBIT_STEP_MS)
+        }
+        orbiting = false
+    }
+    // Dragging the map, or laying it flat, stops the orbit.
+    LaunchedEffect(camera.panTick) { orbiting = false }
+    LaunchedEffect(tiltedNow) { if (!tiltedNow) orbiting = false }
+
     LaunchedEffect(stats) {
         val latest = stats?.latest
         if (!centered && latest != null) {
@@ -245,11 +268,25 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             bottomInset = navPad,
             heading = heading,
             navMarker = following,
+            onMapClick = if (orbiting) { _, _ -> orbiting = false } else null,
         )
+        if (orbiting) {
+            // "Orbiting · tap to stop", under the top row.
+            Surface(
+                onClick = { orbiting = false },
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                shadowElevation = 3.dp,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 96.dp),
+            ) {
+                Text("Orbiting · tap to stop", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+        }
         // While following, keep the dot in the middle: the map glides as long as the dot does between positions.
-        LaunchedEffect(dotAt, following) {
+        LaunchedEffect(dotAt, following, orbiting) {
             val at = dotAt ?: return@LaunchedEffect
-            if (!following) return@LaunchedEffect
+            // While orbiting, the orbit moves the camera (it keeps your location in the middle too).
+            if (!following || orbiting) return@LaunchedEffect
             val now = android.os.SystemClock.uptimeMillis()
             // The map turns with you so the arrow points straight ahead (up), flat or in 3D.
             val turn = lastHeading
@@ -349,7 +386,19 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     }
                     if (!full) ScaleBar(camera, Modifier.padding(top = 14.dp))
                 }
-                CompassButton(camera, Modifier.align(Alignment.TopEnd))
+                CompassButton(
+                    camera,
+                    Modifier.align(Alignment.TopEnd),
+                    orbiting = orbiting,
+                    onOrbit = {
+                        if (orbiting) orbiting = false
+                        else if (dotAt == null) scope.launch { snackbar.showSnackbar("No position yet") }
+                        else {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            orbiting = true
+                        }
+                    },
+                )
             }
         }
 
@@ -715,3 +764,7 @@ private fun missingStartPermissions(context: Context): Array<String> {
     }
     return needed.toTypedArray()
 }
+
+/** The orbit around your location (long-press the compass in 3D): one full turn takes this long. */
+private const val ORBIT_TURN_MS = 20_000L
+private const val ORBIT_STEP_MS = 1_000L
