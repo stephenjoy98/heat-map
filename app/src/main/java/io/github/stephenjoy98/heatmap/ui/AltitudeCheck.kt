@@ -174,7 +174,8 @@ fun AltitudeCheckSheet(fix: Location?, onClose: () -> Unit) {
                     else String.format(java.util.Locale.US, "%.1f hPa", p) + (at?.let { ", set against the ${if (ground != null) "ground" else "GPS"} height at $it" } ?: ""),
                 )
             }
-            val values = listOfNotNull(gps, ground, baro)
+            val groundM = ground
+            val values = listOfNotNull(gps, groundM, baro)
             if (values.size >= 2) {
                 val spread = values.max() - values.min()
                 val ok = spread <= AGREE_M
@@ -191,7 +192,7 @@ fun AltitudeCheckSheet(fix: Location?, onClose: () -> Unit) {
                             )
                             Text(
                                 if (ok) "Your GPS height looks right."
-                                else if (gps != null && ground != null && abs(gps - ground) > AGREE_M)
+                                else if (gps != null && groundM != null && abs(gps - groundM) > AGREE_M)
                                     "GPS heights are often off indoors, under cover or with few satellites in view; the ground height is usually closer. Upstairs or on a bridge, you're above the ground anyway."
                                 else "The barometer drifts with the weather; it's set again every few hours.",
                                 style = MaterialTheme.typography.bodySmall,
