@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.63.1] - 2026-11-02
+
+### Fixed
+- Check your height: the barometer could be set against the GPS height before the ground height had loaded, and
+  then kept that for hours. It now switches to the ground height as soon as it arrives.
+
 ## [2.63.0] - 2026-11-02
 
 ### Added

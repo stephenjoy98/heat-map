@@ -109,8 +109,15 @@ object AltitudeSources {
         private set
     private const val BARO_REFRESH_MS = 3 * 60 * 60_000L
 
-    fun calibrate(pressure: Float, heightM: Double, now: Long = System.currentTimeMillis()) {
-        if (seaLevelPressure != null && now - setAt < BARO_REFRESH_MS) return
+    /** Whether the reference came from the ground height (better) rather than the GPS one. */
+    var fromGround = false
+        private set
+
+    fun calibrate(pressure: Float, heightM: Double, againstGround: Boolean, now: Long = System.currentTimeMillis()) {
+        // Keep a recent reference, unless it was the GPS height and the ground height has come in since.
+        val fresh = seaLevelPressure != null && now - setAt < BARO_REFRESH_MS
+        if (fresh && (fromGround || !againstGround)) return
+        fromGround = againstGround
         // The standard atmosphere, as SensorManager.getAltitude, turned round: p0 = p / (1 − h / 44330)^5.255.
         seaLevelPressure = (pressure / (1 - heightM / 44330.0).pow(5.255)).toFloat()
         setAt = now
@@ -143,8 +150,9 @@ fun AltitudeCheckSheet(fix: Location?, onClose: () -> Unit) {
         onDispose { sm?.unregisterListener(listener) }
     }
     val p = pressure
-    val reference = ground ?: gps
-    if (p != null && reference != null) AltitudeSources.calibrate(p, reference)
+    val groundNow = ground
+    if (p != null && groundNow != null) AltitudeSources.calibrate(p, groundNow, againstGround = true)
+    else if (p != null && gps != null) AltitudeSources.calibrate(p, gps, againstGround = false)
     val p0 = AltitudeSources.seaLevelPressure
     val baro = if (p != null && p0 != null) SensorManager.getAltitude(p0, p).toDouble() else null
 
@@ -171,7 +179,7 @@ fun AltitudeCheckSheet(fix: Location?, onClose: () -> Unit) {
                     "Barometer (air pressure)",
                     baro,
                     if (p == null) "Reading the sensor…"
-                    else String.format(java.util.Locale.US, "%.1f hPa", p) + (at?.let { ", set against the ${if (ground != null) "ground" else "GPS"} height at $it" } ?: ""),
+                    else String.format(java.util.Locale.US, "%.1f hPa", p) + (at?.let { ", set against the ${if (AltitudeSources.fromGround) "ground" else "GPS"} height at $it" } ?: ""),
                 )
             }
             val groundM = ground
