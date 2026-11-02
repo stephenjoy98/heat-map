@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.63.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.63.2**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -220,7 +220,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   cacheDir/updates (re-fetches release details first; 404/size change → retry 4× 30 s apart, because CI's --clobber
   re-upload briefly removes the asset), installs via PackageInstaller session with USER_ACTION_NOT_REQUIRED on 31+; `inForeground` set by
   MainActivity so auto installs wait until onStop), `InstallReceiver` (pending user action → start confirm intent or
-  notify), `UpdateWorker` (6 h periodic + on app open; Prefs `auto_update` (off by default since 2.37.0, forced off once via
+  notify; 2.63.2: `State.Installing(release, file, since)` and `MainActivity.onResume` → `Updater.resumeMissedInstall()` (≥10 s old → `Ready`, re-offers the sheet) because a missed/ignored confirmation never calls back; UpdatesSection shows "Install again" while Installing), `UpdateWorker` (6 h periodic + on app open; Prefs `auto_update` (off by default since 2.37.0, forced off once via
   `auto_update_off_v1`: the user doesn't want auto downloads; the sheet offers Later / Download and install now), `update_wifi_only`), UI `UpdatesSection`
   (Settings › Updates; STABLE_FEATURES ignores patch bumps and rebuilds unless `check(manual = true)`), channel by
   `UpdateFrequency` BETA (newest of /releases incl. pre-releases) / STABLE / STABLE_FEATURES;

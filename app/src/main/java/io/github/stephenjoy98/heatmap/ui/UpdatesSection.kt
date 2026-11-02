@@ -124,9 +124,14 @@ internal fun UpdatesSection(resumeTick: Int, onChangelog: () -> Unit = {}) {
                         Button(onClick = { scope.launch { Updater.install(context, s.release, s.file) } }) { Text("Install now") }
                         Spacer(Modifier.width(8.dp))
                     }
+                    // Still "installing" (Android's confirmation can be missed): installing again brings it back.
+                    is Updater.State.Installing -> {
+                        OutlinedButton(onClick = { scope.launch { Updater.install(context, s.release, s.file) } }) { Text("Install again") }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     else -> Unit
                 }
-                val busy = state is Updater.State.Checking || state is Updater.State.Downloading || state is Updater.State.Installing
+                val busy = state is Updater.State.Checking || state is Updater.State.Downloading
                 OutlinedButton(enabled = !busy, onClick = { scope.launch { Updater.check(context, manual = true) } }) { Text("Check now") }
             }
             if (release != null && release.pageUrl.isNotEmpty()) {

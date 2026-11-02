@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.63.2] - 2026-11-02
+
+### Fixed
+- An update could get stuck on "Installing…" if Android's install confirmation was missed, with no way to install
+  it later. Coming back to the app now offers it again (ready to install, without downloading it again), and
+  Settings › Updates has an **Install again** button while it's installing.
+
 ## [2.63.1] - 2026-11-02
 
 ### Fixed

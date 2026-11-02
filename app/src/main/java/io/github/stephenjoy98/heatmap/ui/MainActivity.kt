@@ -102,6 +102,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         Updater.inForeground = true
+        // An update still "installing" when you come back means Android's confirmation was missed: offer it again.
+        if (Updater.resumeMissedInstall()) UpdatePrompt.offeredThisSession = false
     }
 
     override fun onPause() {

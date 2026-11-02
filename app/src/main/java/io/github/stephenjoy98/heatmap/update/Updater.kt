@@ -64,7 +64,8 @@ object Updater {
         class Downloading(val release: Release, val fraction: Float) : State
         /** Downloaded, waiting to be installed (for instance until you leave the app). */
         class Ready(val release: Release, val file: File) : State
-        class Installing(val release: Release) : State
+        /** Handed to Android's installer at [since]; [file] stays so it can be installed again if that's missed. */
+        class Installing(val release: Release, val file: File, val since: Long = System.currentTimeMillis()) : State
         class Failed(val message: String, val release: Release? = null) : State
     }
 
@@ -296,7 +297,7 @@ object Updater {
                     (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
                 session.commit(PendingIntent.getBroadcast(context, id, intent, flags).intentSender)
             }
-            _state.value = State.Installing(r)
+            _state.value = State.Installing(r, file)
         } catch (e: Exception) {
             _state.value = State.Failed("Couldn't install ${r.label}: ${e.message ?: e.javaClass.simpleName}", r)
         }
@@ -314,6 +315,20 @@ object Updater {
         val ready = _state.value as? State.Ready ?: return
         if (ready.file.exists()) install(context, ready.release, ready.file)
     }
+
+    /**
+     * Back in the app with the update still "installing": Android's confirmation was missed or dismissed (it
+     * doesn't always say so), so offer it again: ready to install, from the file already downloaded. Returns
+     * whether it did.
+     */
+    fun resumeMissedInstall(minAgeMs: Long = MISSED_INSTALL_MS): Boolean {
+        val s = _state.value as? State.Installing ?: return false
+        if (System.currentTimeMillis() - s.since < minAgeMs || !s.file.exists()) return false
+        _state.value = State.Ready(s.release, s.file)
+        return true
+    }
+
+    private const val MISSED_INSTALL_MS = 10_000L
 
     internal fun failed(message: String) {
         val r = (_state.value as? State.Installing)?.release
