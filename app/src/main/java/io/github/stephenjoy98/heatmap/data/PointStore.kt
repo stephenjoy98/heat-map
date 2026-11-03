@@ -718,6 +718,31 @@ class PointStore private constructor(context: Context) :
      * A fixed height that 3D routes are measured up from: a low point (5th percentile, so the odd bad GPS
      * reading doesn't count) of every height recorded. Worked out again at most every 10 minutes.
      */
+    /** The ~[cellDeg] squares (row, column from the south-west corner of the world) with heights recorded before [before]. */
+    fun altitudeCells(before: Long, cellDeg: Double): List<Pair<Int, Int>> =
+        readableDatabase.rawQuery(
+            "SELECT DISTINCT CAST((lat + 90) / $cellDeg AS INTEGER), CAST((lon + 180) / $cellDeg AS INTEGER) FROM points " +
+                "WHERE time < $before AND altitude IS NOT NULL",
+            null,
+        ).use { c -> buildList { while (c.moveToNext()) add(c.getInt(0) to c.getInt(1)) } }
+
+    /** Adds [by] metres to the heights recorded before [before] in one square (and to soft-deleted dots there). */
+    fun shiftAltitudes(before: Long, cellDeg: Double, row: Int, col: Int, by: Double) {
+        val db = writableDatabase
+        val where = "time < $before AND altitude IS NOT NULL AND CAST((lat + 90) / $cellDeg AS INTEGER) = $row " +
+            "AND CAST((lon + 180) / $cellDeg AS INTEGER) = $col"
+        db.beginTransaction()
+        try {
+            db.execSQL("UPDATE points SET altitude = altitude + $by WHERE $where")
+            db.execSQL("UPDATE deleted_points SET altitude = altitude + $by WHERE $where")
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        baselineCache = null
+        changed()
+    }
+
     fun altitudeBaseline(): Double {
         val now = System.currentTimeMillis()
         baselineCache?.let { (at, value) -> if (now - at < 10 * 60_000L) return value }

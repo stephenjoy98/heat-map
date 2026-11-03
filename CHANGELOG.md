@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.65.0] - 2026-11-03
+
+### Fixed
+- **Heights are now above sea level.** GPS gives heights above a mathematical shape of the Earth (the ellipsoid),
+  which around Vancouver is about 17 m below sea level, so heights read about 17 m low (even below zero near the
+  sea). On Android 14 and later the app now converts them with the map of sea level built into Android, for the
+  altimeter, new dots and 3D. Heights you'd already recorded are corrected once, and backed up again.
+
 ## [2.64.1] - 2026-11-02
 
 ### Fixed

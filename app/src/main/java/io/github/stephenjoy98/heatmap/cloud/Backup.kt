@@ -252,6 +252,8 @@ object Backup {
             val uses = c.indices.filter { it < s.size && it < n.size }.map { SatelliteUse(c[it].toInt(), s[it].toInt(), n[it].toLong()) }
             store.restoreSatelliteDay(day, uses, (doc.get("f") as? Number)?.toLong() ?: 0L)
         }
+        // A backup from before heights were moved to sea level brings back GPS heights: correct them now.
+        runCatching { io.github.stephenjoy98.heatmap.data.Geoid.correctHistory(store) }
         // Dots without a backed-up trip (from older backups) are sorted into trips as usual.
         TripDetector.process(context)
         return added

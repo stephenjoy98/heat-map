@@ -32,6 +32,7 @@ import com.google.android.gms.location.Priority
 import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.LocationPoint
 import io.github.stephenjoy98.heatmap.data.PointStore
+import io.github.stephenjoy98.heatmap.data.Geoid
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Satellites
 import com.google.android.gms.location.DetectedActivity
@@ -234,7 +235,8 @@ class LocationTickerService : Service() {
                 activity = ActivityTracker.current,
                 // The mode picked for the trip being taken right now, if any; the trip detector follows it.
                 mode = Prefs.currentMode.value ?: TravelMode.UNKNOWN.id,
-                altitude = altitudeOf(location),
+                // On the recording thread, so the geoid map can be read here if this area's offset isn't known yet.
+                altitude = location.also { Geoid.offset(it.latitude, it.longitude) }.let { altitudeOf(it) },
             )
         )
         lastSavedAt = location.time
@@ -362,10 +364,16 @@ class LocationTickerService : Service() {
 
         private const val STILL_WINDOW_MS = 60_000L
 
-        /** Height above sea level where Android provides it (14+), otherwise GPS height; null if neither. */
+        /**
+         * Height above sea level: Android's own figure where the fix has one, else the GPS (ellipsoid) height moved to
+         * sea level with Geoid (Android 14+; worked out in the background the first time in an area), or with the
+         * offset set by matching the ground on older phones. Null with no height at all.
+         */
         fun altitudeOf(location: Location): Double? = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && location.hasMslAltitude() -> location.mslAltitudeMeters
-            location.hasAltitude() -> location.altitude
+            location.hasAltitude() -> location.altitude + (
+                if (Geoid.supported) Geoid.cachedOffset(location.latitude, location.longitude) ?: 0.0 else Geoid.manualOffset
+            )
             else -> null
         }
 

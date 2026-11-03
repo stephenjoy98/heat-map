@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.64.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.65.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -102,7 +102,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   USER, restores it on return; built-ins force auto + their accuracy); manual `setIntervalSec`/`setAutoInterval`/
   `setHighAccuracy` switch back to USER; `AutoInterval.choose(..., profile)`. UI `PowerProfilesSection` on the Battery page.
 - `tracking/`: `LocationTickerService` (foreground service, fused location, records altitude via
-  `altitudeOf` — MSL on API 34+), `AutoInterval` (vehicle 1 s, cycle 2 s, walk 3 s, unknown 5 s, still 15 s,
+  `altitudeOf` — MSL: fix's own mslAltitude, else ellipsoid + `data/Geoid` offset (2.65.0: AltitudeConverter on API 34+, per 0.1° cell, `offset` blocking on the recording thread / `cachedOffset` async for the UI; older Android: `Prefs.altitudeOffset` from matching the ground); `Geoid.correctHistory` once (Prefs `altitude_msl_v1`, dots before `altitude_msl_cutoff` set on first run; also after restoring a backup without that key) shifts stored altitudes per cell and resets backup_complete_v2 so every day re-uploads), `AutoInterval` (vehicle 1 s, cycle 2 s, walk 3 s, unknown 5 s, still 15 s,
   long still 60 s; stillness judged over the last minute of fixes), `ActivityTracker`, `TripDetector`,
   `BootReceiver`. Manual interval slider is 15 s … 1 day. Fixes worse than `accuracyLimitM` (100 m high
   accuracy / 500 m) are skipped, and (2.33.2) GPS jumps (>150 m at >55 m/s within 60 s of the last saved fix, max 5 in a

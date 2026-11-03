@@ -247,6 +247,8 @@ object Prefs {
             sp.edit().putBoolean("idle_mode_v1", true).putBoolean("idle_unsnapped_v1", false).apply()
             saveModes()
         }
+        // The first run with Geoid: dots from now on are converted as they're recorded.
+        if (!sp.contains("altitude_msl_cutoff")) sp.edit().putLong("altitude_msl_cutoff", System.currentTimeMillis()).apply()
         if (!sp.getBoolean("idle_grey_v1", false)) {
             TravelMode.greyIdle()
             sp.edit().putBoolean("idle_grey_v1", true).apply()
@@ -590,7 +592,7 @@ object Prefs {
         "share_routes", "auto_backup", "backup_every_hours", "settings_pages", "saved_places", "custom_modes",
         "deleted_modes", "next_mode_id", "mode_labels", "mode_colors", "modes_seeded_v1", "idle_mode_v1", "auto_update", "update_wifi_only", "update_frequency",
         "power_profile", "user_profile", "map_brightness_dark", "map_brightness_light", "map_colour_dark", "map_colour_light",
-        "show_location_dot", "breakdown_pie", "map_colour_roads", "heat_palette", "routes_3d", "location_3d",
+        "show_location_dot", "breakdown_pie", "map_colour_roads", "heat_palette", "routes_3d", "location_3d", "altitude_msl_v1",
     )
 
     /** The user's settings as JSON, each value tagged with its type: {"units": {"s": "METRIC"}, ...}. */
@@ -629,6 +631,9 @@ object Prefs {
                 t.has("set") -> t.getJSONArray("set").let { a -> e.putStringSet(key, (0 until a.length()).map { a.getString(it) }.toSet()) }
             }
         }
+        // A backup from before heights were moved to sea level: correct what it brings back, dots recorded on this
+        // phone from now on are converted as they come in.
+        if (!o.has("altitude_msl_v1")) e.putBoolean("altitude_msl_v1", false).putLong("altitude_msl_cutoff", System.currentTimeMillis())
         e.commit()
         init(context)
     }
@@ -641,6 +646,28 @@ object Prefs {
 
     fun setBackupComplete() {
         sp.edit().putBoolean("backup_complete_v2", true).apply()
+    }
+
+    /** Back up every day again (after heights were corrected, say). */
+    fun resetBackupComplete() {
+        sp.edit().putBoolean("backup_complete_v2", false).apply()
+    }
+
+    /** Whether heights recorded before Geoid existed have been moved to sea level (see Geoid.correctHistory). */
+    val altitudeCorrected: Boolean get() = sp.getBoolean("altitude_msl_v1", false)
+
+    fun setAltitudeCorrected() {
+        sp.edit().putBoolean("altitude_msl_v1", true).apply()
+    }
+
+    /** Dots recorded from this time on were converted as they came in; older ones need correcting. */
+    val altitudeCorrectionCutoff: Long get() = sp.getLong("altitude_msl_cutoff", Long.MAX_VALUE)
+
+    /** Phones without Android's converter: metres to add to GPS heights, from matching the ground height. */
+    val altitudeOffset: Double get() = sp.getFloat("altitude_offset", 0f).toDouble()
+
+    fun setAltitudeOffset(meters: Double) {
+        sp.edit().putFloat("altitude_offset", meters.toFloat()).apply()
     }
 
     fun addDirtyBackupDays(days: Collection<String>) {

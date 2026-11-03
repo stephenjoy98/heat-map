@@ -7,6 +7,8 @@ import io.github.stephenjoy98.heatmap.cloud.Account
 import io.github.stephenjoy98.heatmap.cloud.FirebaseGate
 import io.github.stephenjoy98.heatmap.cloud.SyncWorker
 import io.github.stephenjoy98.heatmap.data.Prefs
+import io.github.stephenjoy98.heatmap.data.Geoid
+import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import io.github.stephenjoy98.heatmap.tracking.TripDetector
 import io.github.stephenjoy98.heatmap.update.UpdateWorker
@@ -18,6 +20,9 @@ class TickerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        // GPS heights to sea level (Android 14+), and once, the heights recorded before that.
+        Geoid.init(this)
+        Thread({ runCatching { Geoid.correctHistory(PointStore.get(this)) } }, "geoid").start()
 
         MapLibre.getInstance(this)
 
