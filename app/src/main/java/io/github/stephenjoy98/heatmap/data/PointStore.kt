@@ -923,10 +923,14 @@ class PointStore private constructor(context: Context) :
      * fixes (worse than 20 m) or would need an impossible speed. Drawn, they make long straight lines to nowhere.
      */
     fun findSpikes(from: Long, to: Long): List<Long> {
-        class P(val id: Long, val time: Long, val lat: Double, val lon: Double, val acc: Float)
+        class P(val id: Long, val time: Long, val lat: Double, val lon: Double, val acc: Float, val byHand: Boolean)
         val pts = readableDatabase.rawQuery(
-            "SELECT id, time, lat, lon, accuracy FROM points WHERE time >= $from AND time <= $to ORDER BY time", null
-        ).use { c -> buildList { while (c.moveToNext()) add(P(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4))) } }
+            "SELECT id, time, lat, lon, accuracy, activity FROM points WHERE time >= $from AND time <= $to ORDER BY time", null
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) add(P(c.getLong(0), c.getLong(1), c.getDouble(2), c.getDouble(3), c.getFloat(4), c.getInt(5) == ACTIVITY_BY_HAND))
+            }
+        }
         val spikes = mutableListOf<Long>()
         fun d(a: P, b: P) = TrackRules.distanceMeters(a.lat, a.lon, b.lat, b.lon)
         var i = 1
@@ -943,6 +947,8 @@ class PointStore private constructor(context: Context) :
                 val first = run.first()
                 val seconds = (first.time - prev.time).coerceAtLeast(1) / 1000.0
                 val impossible = d(prev, first) / seconds > SPIKE_IMPOSSIBLE_MPS
+                // Dots placed or moved by hand are where you said, however far out: never blips.
+                if (run.any { it.byHand }) continue
                 if (run.any { it.acc > SPIKE_COARSE_M } || impossible) {
                     found = k
                     break
@@ -1048,7 +1054,11 @@ class PointStore private constructor(context: Context) :
             } ?: return DeleteResult(emptySet(), emptyList())
             days += dayOf(row.first)
             val acc = accuracy ?: minOf(row.third, HAND_PLACED_ACCURACY_M)
-            db.execSQL("UPDATE points SET lat = ?, lon = ?, accuracy = ? WHERE id = ?", arrayOf<Any>(lat, lon, acc, id))
+            // Marked as placed by hand, so the GPS blip clean-up leaves it where you put it.
+            db.execSQL(
+                "UPDATE points SET lat = ?, lon = ?, accuracy = ?, activity = $ACTIVITY_BY_HAND WHERE id = ?",
+                arrayOf<Any>(lat, lon, acc, id),
+            )
             if (row.second > 0) refreshTrip(db, row.second, remoteIds)
             invalidateExplored(db)
             db.setTransactionSuccessful()
@@ -1061,7 +1071,7 @@ class PointStore private constructor(context: Context) :
 
     /**
      * Adds a dot by hand halfway in time between dot [afterId] and the next one, at [lat], [lon], in the same
-     * trip, to trace a route the recording missed. Returns the new dot's id, or null if there's no next dot
+     * trip, to trace a route the recording missed (after the last dot: a second later). Returns the new dot's id, or null if there's no time left between the two
      * (or no time left between the two).
      */
     fun addPointAfter(afterId: Long, lat: Double, lon: Double): Pair<Long, DeleteResult>? {
@@ -1076,9 +1086,14 @@ class PointStore private constructor(context: Context) :
             } ?: return null
             val next = db.rawQuery("SELECT MIN(time) FROM points WHERE time > ${before[0]}", null).use { c ->
                 if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
-            } ?: return null
-            if (next - before[0] < 2) return null
-            time = (before[0] + next) / 2
+            }
+            time = if (next != null) {
+                if (next - before[0] < 2) return null
+                (before[0] + next) / 2
+            } else {
+                // After the very last dot: a second later (taps keep adding further along).
+                before[0] + 1_000
+            }
             val values = ContentValues().apply {
                 put("time", time)
                 put("lat", lat)
@@ -1086,7 +1101,7 @@ class PointStore private constructor(context: Context) :
                 put("accuracy", HAND_PLACED_ACCURACY_M)
                 put("interval_ms", before[4])
                 put("mode", before[2])
-                put("activity", before[3])
+                put("activity", ACTIVITY_BY_HAND)
                 put("trip_id", before[1])
             }
             id = db.insertWithOnConflict("points", null, values, SQLiteDatabase.CONFLICT_IGNORE)
@@ -2285,6 +2300,8 @@ class PointStore private constructor(context: Context) :
 
         // Accuracy given to a dot moved or added by hand, so it never counts as a coarse fix.
         private const val HAND_PLACED_ACCURACY_M = 5f
+        /** The activity saved with dots added or moved by hand (Android's activity types are all 0 or more). */
+        const val ACTIVITY_BY_HAND = -2
 
         private const val POINT_COLS = "time, lat, lon, accuracy, interval_ms, activity, mode, altitude"
 

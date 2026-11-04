@@ -440,7 +440,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         Unit
     }
     // Moving a dot, or adding one by hand, can be undone too: the dot goes back and the trips around it with it.
-    fun dotEdit(label: String, dot: EditablePoint, change: () -> DeleteResult, back: () -> DeleteResult) {
+    // [label] is read once the change is made, and null means nothing changed: then [failed] is said instead, with no Undo.
+    fun dotEdit(label: () -> String?, dot: EditablePoint, change: () -> DeleteResult, back: () -> DeleteResult, failed: String = "") {
         if (edit.busy) return
         edit.busy = true
         scope.launch {
@@ -448,7 +449,12 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             afterDotEdit(context, result)
             editReload++
             editSnackbar.currentSnackbarData?.dismiss()
-            if (editSnackbar.showSnackbar(label, actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+            val said = label()
+            if (said == null) {
+                editSnackbar.showSnackbar(failed)
+                return@launch
+            }
+            if (editSnackbar.showSnackbar(said, actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
                 afterDotEdit(context, withContext(Dispatchers.IO) { back(); store.restore(snap) })
                 edit.reselect = dot.id
                 editReload++
@@ -458,12 +464,12 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     fun moveDot(dot: EditablePoint, lat: Double, lon: Double) {
         edit.placing = null
         edit.reselect = dot.id
-        dotEdit("Dot moved", dot, { store.movePoint(dot.id, lat, lon) }, { store.movePoint(dot.id, dot.lat, dot.lon, dot.accuracy) })
+        dotEdit({ "Dot moved" }, dot, { store.movePoint(dot.id, lat, lon) }, { store.movePoint(dot.id, dot.lat, dot.lon, dot.accuracy) })
     }
     fun addDot(after: EditablePoint, lat: Double, lon: Double) {
         var added = -1L
         dotEdit(
-            "Dot added", after,
+            { if (added > 0) "Dot added" else null }, after,
             {
                 val made = store.addPointAfter(after.id, lat, lon)
                 added = made?.first ?: -1L
@@ -472,6 +478,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 made?.second ?: DeleteResult(emptySet(), emptyList())
             },
             { if (added > 0) store.removeAddedPoint(added) else DeleteResult(emptySet(), emptyList()) },
+            failed = "Couldn't add a dot here: there's no time left between this dot and the next. Pick another dot first.",
         )
     }
     val changeModes = { trips: List<Trip>, mode: TravelMode ->

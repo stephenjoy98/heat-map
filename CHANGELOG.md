@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.65.1] - 2026-11-04
+
+### Fixed
+- Edit dots: a dot added by hand far from its neighbours could be taken for a GPS blip and hidden straight away,
+  while the app still said "Dot added". Dots you add or move are now never treated as blips, adding after the
+  day's last dot works, and if a dot can't be added the app says so instead of "Dot added". Dots hidden like this
+  before can be brought back from Edit dots › Deleted.
+
 ## [2.65.0] - 2026-11-03
 
 ### Fixed
