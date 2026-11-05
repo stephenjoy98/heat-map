@@ -45,6 +45,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -97,7 +99,7 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Column(Modifier.padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Map type", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Close") }

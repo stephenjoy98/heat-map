@@ -17,6 +17,10 @@ The app shows the entries since your last version as "What's new" after an updat
 ### Changed
 - The blue location dot pulses at its earlier speed again, smooth on every frame, as it did before 2.65.2.
 
+### Fixed
+- The map's layers sheet scrolls, so Map colours at the bottom can be reached on shorter screens (the 3D route
+  heights row had pushed it off the screen).
+
 ## [2.66.0] - 2026-11-05
 
 ### Added
