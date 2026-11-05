@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.65.4] - 2026-11-05
+
+### Fixed
+- "Show on Timeline" in a question now highlights the trip it's asking about on the map, zooms to it and scrolls
+  its row into view, instead of only opening the day.
+
 ## [2.65.3] - 2026-11-05
 
 ### Changed

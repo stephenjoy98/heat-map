@@ -184,6 +184,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     }
     // A trip to zoom to once its day has loaded (from "Show on Timeline").
     var focusTrip by remember { mutableStateOf<Long?>(null) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     // Grouped trips that are opened up into their parts, by start time.
     val expanded = remember { mutableStateMapOf<Long, Boolean>() }
 
@@ -574,16 +575,23 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
     // Frame the period's travels once when a new period loads. Reloads of the same period (every new dot
     // while recording) leave the camera alone, so a section you tapped stays in view.
     var framedPeriod by remember { mutableStateOf<TimelinePeriod?>(null) }
-    LaunchedEffect(data) {
+    LaunchedEffect(data, focusTrip) {
         val d = data ?: return@LaunchedEffect
         val box = d.bounds ?: return@LaunchedEffect
         if (d.period != framedPeriod) {
             framedPeriod = d.period
             frame(camera, box)
         }
+        // "Show on Timeline" from a question: frame that trip, highlight it as if tapped, and scroll its row into view.
         focusTrip?.let { id ->
             d.entries.flattened().firstOrNull { it is DayEntry.Move && it.trip.id == id }?.let { e ->
-                (e as DayEntry.Move).box?.let { frame(camera, it) }
+                val move = e as DayEntry.Move
+                showTrips(listOf(move.trip), move.box)
+                val row = d.entries.indexOfFirst {
+                    (it is DayEntry.Move && it.trip.id == id) || (it is DayEntry.Group && it.moves.any { m -> m.trip.id == id })
+                }
+                // Row 0 is the day's summary.
+                if (row >= 0) scope.launch { runCatching { listState.animateScrollToItem(row + 1) } }
                 focusTrip = null
             }
         }
@@ -937,6 +945,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             } else {
                 val d = data
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),

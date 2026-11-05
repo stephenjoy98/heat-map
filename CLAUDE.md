@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.65.3**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.65.4**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -182,7 +182,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   last dot of the first part → `PointStore.splitTrip(tripId, atTime)`, undoable); Routes/Dots segmented toggle on the map
   (Dots = Edit dots mode); trip, road and
   level questions live in the Timeline's **Questions** tab since 2.28.0 (`QuestionsPane` in TripQuestions.kt; 2.46.3: trip question = pick chip (starts on the best guess) then Save; 2.59.0: road question the same (FilterChips, starts on best match, `TripPreviewLinesMap(emphasis)` bolds the pick and fades others in place without refitting); tab badge beside the "Questions" text (Row, not BadgedBox); Timeline undo snackbar at TopCenter + statusBarsPadding so it never covers Skip/Save; one queue,
-  answer → next, Skip → back of queue; `TimelineTabs.questions` selects the tab, set by the Account page);
+  answer → next, Skip → back of queue; "Show on Timeline" sets `focusTrip` → `LaunchedEffect(data, focusTrip)` calls `showTrips` (frame + `TripHighlight`) and scrolls `listState` to the row (2.65.4); `TimelineTabs.questions` selects the tab, set by the Account page);
   Timeline nav item has the question badge), `MapEditor`,
   `MapControls` (CompassButton (2.39.1: dial with N/E/S/W + NE/SE/SW/NW ticks fixed, needle turns by -bearing;
   the user tried a fixed needle + turning dial and asked for this way round): north up, then toggles 3D via Prefs.buildings3d; 2.64.0 orbit (mockup from the user's video): when tilted, long-press (combinedClickable; the Tip tooltip is dropped then since it also uses long-press) → MapScreen `orbiting` loop of 1 s `camera.glideTo(dotAt, bearing += 18°)` (`ORBIT_TURN_MS` 20 s), stops on map tap (onMapClick), panTick, compass tap, the "Orbiting · tap to stop" chip, or flattening; follow-me glides pause while orbiting; `Altimeter` (live fix, `LocationTickerService.altitudeOf`; 2.63.0 tap → `AltitudeCheckSheet` (ui/AltitudeCheck.kt, mockup approved): GPS ± verticalAccuracy, ground = `AltitudeSources.groundHeight` (Terrarium tile z15 pixel, 8-tile LRU), barometer = SensorManager.getAltitude with sea-level pressure calibrated against ground (else GPS, replaced by ground when it loads: 2.63.1) once per 3 h; agree ≤25 m green else amber tip) above
