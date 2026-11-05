@@ -210,6 +210,8 @@ fun AltitudeCheckSheet(fix: Location?, onClose: () -> Unit) {
                     }
                 }
             }
+            // Phones whose Android can't convert GPS heights to sea level (before 14): match them to the ground by hand.
+            if (!io.github.stephenjoy98.heatmap.data.Geoid.supported) MatchGround(fix, groundM)
             Text(
                 "The ground height comes from the same terrain tiles the map's hillshading uses; nothing else is sent anywhere.",
                 style = MaterialTheme.typography.bodySmall,
@@ -220,6 +222,65 @@ fun AltitudeCheckSheet(fix: Location?, onClose: () -> Unit) {
 }
 
 private const val AGREE_M = 25.0
+
+/**
+ * "Match the ground height", for phones without Android's sea-level conversion: GPS heights are above the
+ * ellipsoid, metres off sea level, so standing outside on open ground, a tap sets the difference to the ground
+ * height; the altimeter and new dots use it from then on.
+ */
+@Composable
+private fun MatchGround(fix: Location?, ground: Double?) {
+    var offset by remember { mutableStateOf(io.github.stephenjoy98.heatmap.data.Prefs.altitudeOffset) }
+    var at by remember { mutableStateOf(io.github.stephenjoy98.heatmap.data.Prefs.altitudeOffsetAt) }
+    val raw = fix?.takeIf { it.hasAltitude() }?.altitude
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Match the ground height", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "GPS measures height above a smooth shape of the Earth, not above sea level; where you are they differ by " +
+                    "several metres (about 17 m around Vancouver). Android 14 and later correct this by themselves; this " +
+                    "phone can't, so stand outside on open ground and tap below to line GPS up with the ground height. " +
+                    "It's used for the altimeter and new dots from now on.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (at > 0) {
+                val sign = if (offset >= 0) "+" else "−"
+                Text(
+                    "Matched to the ground ($sign${Units.length(abs(offset))}) on " +
+                        DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(at)),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val next = if (raw != null && ground != null) ground - raw else null
+                androidx.compose.material3.Button(
+                    enabled = next != null,
+                    onClick = {
+                        next?.let {
+                            io.github.stephenjoy98.heatmap.data.Prefs.setAltitudeOffset(it)
+                            offset = it
+                            at = io.github.stephenjoy98.heatmap.data.Prefs.altitudeOffsetAt
+                        }
+                    },
+                ) {
+                    Text(
+                        next?.let { "Match ground (${if (it >= 0) "+" else "−"}${Units.length(abs(it))})" }
+                            ?: "Waiting for GPS and ground height…",
+                    )
+                }
+                if (at > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    androidx.compose.material3.TextButton(onClick = {
+                        io.github.stephenjoy98.heatmap.data.Prefs.setAltitudeOffset(0.0)
+                        offset = 0.0
+                        at = 0L
+                    }) { Text("Reset") }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun HeightRow(title: String, meters: Double?, detail: String) {

@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Dispatchers
 import io.github.stephenjoy98.heatmap.data.Route3d
+import io.github.stephenjoy98.heatmap.map.Route3dStatus
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.ElevationPoint
@@ -658,12 +659,15 @@ private fun VectorAppMap(
         var builtStyle = -1
         var builtRefresh: Any? = Unit
         var builtAt = 0L
-        snapshotFlow { listOf(camera.cameraTick, holder.styleVersion, refreshNow, frozen) }
+        var builtRequest = Route3dStatus.requested
+        snapshotFlow { listOf(camera.cameraTick, holder.styleVersion, refreshNow, frozen, Route3dStatus.requested) }
             .debounce(600)
             .collectLatest {
                 // Following you on the move: the route already built stays as it is (no rebuilding while the map
                 // glides along); it catches up once you've stopped or follow me ends.
-                if (frozen && builtBox != null) return@collectLatest
+                // Recalculate (layers sheet) rebuilds whatever else is going on.
+                val forced = Route3dStatus.requested != builtRequest
+                if (frozen && builtBox != null && !forced) return@collectLatest
                 val m = holder.map ?: return@collectLatest
                 val b = m.projection.visibleRegion.latLngBounds
                 val zoom = m.cameraPosition.zoom
@@ -672,22 +676,31 @@ private fun VectorAppMap(
                     b.longitudeEast <= last.east && b.longitudeWest >= last.west
                 val sameView = inside && kotlin.math.abs(zoom - builtZoom) < 1.0 && builtStyle == holder.styleVersion
                 val fresh = builtRefresh == refreshNow || System.currentTimeMillis() - builtAt < REBUILD_FOR_DOTS_MS
-                if (sameView && fresh) return@collectLatest
+                if (sameView && fresh && !forced) return@collectLatest
                 // A margin around the view, so routes don't visibly end at the screen edge while panning.
                 val padLat = (b.latitudeNorth - b.latitudeSouth) / 2
                 val padLon = (b.longitudeEast - b.longitudeWest) / 2
                 val box = GeoBox(b.latitudeNorth + padLat, b.latitudeSouth - padLat, b.longitudeEast + padLon, b.longitudeWest - padLon)
                 val load = loadRoute3d ?: return@collectLatest
-                val data = withContext(Dispatchers.IO) {
+                Route3dStatus.busy = true
+                var dotCount = 0
+                val data = try {
+                    withContext(Dispatchers.IO) {
                     // One fixed baseline, so heights don't change as the map moves. Zoomed out, fewer pieces are
                     // plenty (they're small on screen), which keeps the phone cool.
+                    val tracks = load(box)
+                    dotCount = tracks.sumOf { it.size }
                     val segments = Route3d.build(
-                        load(box),
+                        tracks,
                         PointStore.get(holder.mapView.context).altitudeBaseline(),
                         maxSegments = if (zoom >= 15) 4_000 else 2_000,
                         maxPieces = if (zoom >= 15) 8_000 else 4_000,
                     )
                     VectorMaps.route3dFeatures(segments)
+                    }
+                } finally {
+                    // Cancelled by a newer move, or done: either way, not "Recalculating…" any more.
+                    Route3dStatus.busy = false
                 }
                 m.style?.let { VectorMaps.showRoute3d(it, data) }
                 builtBox = box
@@ -695,6 +708,9 @@ private fun VectorAppMap(
                 builtStyle = holder.styleVersion
                 builtRefresh = refreshNow
                 builtAt = System.currentTimeMillis()
+                builtRequest = Route3dStatus.requested
+                Route3dStatus.builtAt = builtAt
+                Route3dStatus.dots = dotCount
             }
     }
 

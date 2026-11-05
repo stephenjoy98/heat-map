@@ -35,6 +35,8 @@ up to your Google account, and lets you compare explored areas with friends.
 - **Travel-mode filter**: the filter button (top left) slides out chips for All, Walking, Cycling,
   Driving, Car share, Transit and Other; a dot on the button shows when the map is filtered.
 - Routes or raw-points view, and very large histories automatically fall back to a density grid.
+- **Follow me when I leave** a saved place; **Recalculate 3D heights** from the layers sheet; on Android older than
+  14, **Match the ground height** to correct GPS heights.
 - **Orbit**: long-press the compass in 3D to circle your location.
 - **Check your height**: tap the altimeter to compare GPS with the ground height and the barometer.
 - **Time at your places** on the Profile, and an icon of your choice for each saved place.

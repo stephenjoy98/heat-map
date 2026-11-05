@@ -257,7 +257,9 @@ class LocationTickerService : Service() {
         if (place?.id != currentPlace?.id) {
             // Only a real arrival from outside, not the first fix after starting at home (follow me would end at once).
             val arrived = place != null && currentPlace == null && fixOutsidePlaces
+            val left = currentPlace?.takeIf { place == null }
             currentPlace = place
+            left?.let { followOnLeaving(it) }
             Prefs.setAtPlace(place)
             // Arriving at a saved place: follow me ends and recording goes automatic (it slows down while you stay).
             if (arrived && (Prefs.followBoost.value || !Prefs.autoInterval.value)) {
@@ -319,8 +321,15 @@ class LocationTickerService : Service() {
     }
 
     /** Android says you've left a saved place: record at the usual pace straight away. */
+    /** Leaving a place set to "Follow me when I leave": follow me goes on (recording every second). */
+    private fun followOnLeaving(place: SavedPlace) {
+        val now = Prefs.savedPlaces.value.firstOrNull { it.id == place.id } ?: return
+        if (now.followOnLeave && !Prefs.followBoost.value) FollowMode.set(this, true)
+    }
+
     private fun leavePlace() {
         if (currentPlace == null && placeSec == null) return
+        currentPlace?.let { followOnLeaving(it) }
         currentPlace = null
         Prefs.setAtPlace(null)
         reconsider(ActivityTracker.current, null)

@@ -743,6 +743,11 @@ class PointStore private constructor(context: Context) :
         changed()
     }
 
+    /** Forgets the cached 3D baseline, so it's worked out again from every height (Recalculate 3D heights). */
+    fun clearAltitudeBaseline() {
+        baselineCache = null
+    }
+
     fun altitudeBaseline(): Double {
         val now = System.currentTimeMillis()
         baselineCache?.let { (at, value) -> if (now - at < 10 * 60_000L) return value }

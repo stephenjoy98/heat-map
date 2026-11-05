@@ -8,6 +8,8 @@ import io.github.stephenjoy98.heatmap.data.Polyline
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Route3d
 import io.github.stephenjoy98.heatmap.data.TravelMode
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * Routes for the 3D view, following the same lines as the flat map: a trip snapped to roads uses its road
@@ -19,6 +21,24 @@ import io.github.stephenjoy98.heatmap.data.TravelMode
  * become questions on the Timeline; once answered "different levels", each pass keeps its own height there.
  * Call off the main thread.
  */
+/**
+ * The 3D route's state for the layers sheet: when it was last worked out and from how many dots, whether it's
+ * being worked out now, and [recalculate] to do it again from scratch. Compose state, so the sheet updates.
+ */
+object Route3dStatus {
+    var builtAt by androidx.compose.runtime.mutableLongStateOf(0L)
+    var dots by androidx.compose.runtime.mutableIntStateOf(0)
+    var busy by androidx.compose.runtime.mutableStateOf(false)
+    /** Goes up on each Recalculate; the map rebuilds the 3D route when it changes. */
+    var requested by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
+
+    fun recalculate(store: PointStore) {
+        store.clearAltitudeBaseline()
+        requested++
+    }
+}
+
 object Route3dTracks {
     private const val MAX_NEW_QUESTIONS = 5
 

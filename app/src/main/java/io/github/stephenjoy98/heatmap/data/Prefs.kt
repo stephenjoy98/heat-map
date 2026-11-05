@@ -667,8 +667,11 @@ object Prefs {
     val altitudeOffset: Double get() = sp.getFloat("altitude_offset", 0f).toDouble()
 
     fun setAltitudeOffset(meters: Double) {
-        sp.edit().putFloat("altitude_offset", meters.toFloat()).apply()
+        sp.edit().putFloat("altitude_offset", meters.toFloat()).putLong("altitude_offset_at", if (meters == 0.0) 0L else System.currentTimeMillis()).apply()
     }
+
+    /** When the GPS height was matched to the ground (0 if never or reset). */
+    val altitudeOffsetAt: Long get() = sp.getLong("altitude_offset_at", 0L)
 
     fun addDirtyBackupDays(days: Collection<String>) {
         val next = _dirtyBackupDays.value + days

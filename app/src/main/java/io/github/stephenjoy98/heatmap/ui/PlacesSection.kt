@@ -37,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -240,6 +241,7 @@ private fun PlaceEditor(
     var interval by remember { mutableIntStateOf(place.intervalSec) }
     // Null follows the kind (Home's house, Work's briefcase…) until an icon is picked.
     var icon by remember { mutableStateOf(place.icon) }
+    var followOnLeave by remember { mutableStateOf(place.followOnLeave) }
     LaunchedEffect(Unit) { camera.moveTo(place.lat, place.lon, if (place.lat == 0.0 && place.lon == 0.0) 2f else 16f) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -251,7 +253,7 @@ private fun PlaceEditor(
                     TextButton(
                         onClick = {
                             val c = camera.center ?: (place.lat to place.lon)
-                            onSave(place.copy(name = name.trim().ifEmpty { kind.label }, kind = kind, lat = c.first, lon = c.second, radiusM = radius.roundToInt(), intervalSec = interval, icon = icon))
+                            onSave(place.copy(name = name.trim().ifEmpty { kind.label }, kind = kind, lat = c.first, lon = c.second, radiusM = radius.roundToInt(), intervalSec = interval, icon = icon, followOnLeave = followOnLeave))
                         },
                     ) { Text("Save") }
                 }
@@ -348,6 +350,23 @@ private fun PlaceEditor(
                         PLACE_INTERVALS.forEach { sec ->
                             FilterChip(selected = sec == interval, onClick = { interval = sec }, label = { Text(formatInterval(sec)) })
                         }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth().clickable { followOnLeave = !followOnLeave }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Follow me when I leave", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Record every second with GPS as soon as you head out, like turning on follow me. It stops at " +
+                                    "the next saved place, or when you turn it off. Uses more battery on the way.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = followOnLeave, onCheckedChange = { followOnLeave = it })
                     }
                     Text(
                         "As soon as you start walking or driving, recording checks about every 20 seconds, and goes back " +

@@ -19,6 +19,8 @@ data class SavedPlace(
     val intervalSec: Int,
     /** The icon picked for it (a key from PlaceIcons), or null for its kind's own icon. */
     val icon: String? = null,
+    /** Follow me (record every second) as soon as you leave this place. */
+    val followOnLeave: Boolean = false,
 ) {
     fun distanceTo(lat: Double, lon: Double): Double = TrackRules.distanceMeters(this.lat, this.lon, lat, lon)
 
@@ -32,6 +34,7 @@ data class SavedPlace(
                     JSONObject().put("id", p.id).put("name", p.name).put("kind", p.kind.name).put("lat", p.lat)
                         .put("lon", p.lon).put("radius", p.radiusM).put("interval", p.intervalSec)
                         .apply { p.icon?.let { put("icon", it) } }
+                        .apply { if (p.followOnLeave) put("follow", true) }
                 )
             }
         }.toString()
@@ -49,6 +52,7 @@ data class SavedPlace(
                     radiusM = o.optInt("radius", DEFAULT_RADIUS_M),
                     intervalSec = o.optInt("interval", DEFAULT_INTERVAL_SEC),
                     icon = o.optString("icon").takeIf { it.isNotEmpty() },
+                    followOnLeave = o.optBoolean("follow", false),
                 )
             }
         }.getOrDefault(emptyList())

@@ -12,6 +12,17 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.66.0] - 2026-11-05
+
+### Added
+- **Follow me when I leave**, a switch for each saved place (Settings › Places): leaving that place turns on follow
+  me by itself, recording every second with GPS, until you reach a saved place again or turn it off.
+- **Recalculate 3D heights** in the map's layers sheet: shows when the 3D route heights were last worked out and
+  from how many dots, and works them out again from scratch with the latest corrections.
+- **Match the ground height**, on phones older than Android 14 (which can't convert GPS heights to sea level):
+  in Check your height, standing outside on open ground, one tap lines GPS heights up with the ground; it explains
+  why it's needed, and can be reset.
+
 ## [2.65.4] - 2026-11-05
 
 ### Fixed

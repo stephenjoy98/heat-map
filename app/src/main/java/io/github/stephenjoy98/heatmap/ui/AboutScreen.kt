@@ -80,6 +80,8 @@ private val FEATURES = listOf(
     R.drawable.ic_explore to "An altimeter, a speedometer and a compass that turns the map north, then tilts it into 3D",
     R.drawable.ic_navigation to "Follow me: long-press the location button to keep your dot centred while you travel, recording every second, long-press again to stop",
     R.drawable.ic_map to "A home screen widget showing your recording status, with a button that turns follow me on and off without opening the app",
+    R.drawable.ic_navigation to "Follow me automatically when you leave a saved place",
+    R.drawable.ic_terrain to "Recalculate 3D route heights; match GPS heights to the ground on older Android",
     R.drawable.ic_explore to "Orbit around your location in 3D (long-press the compass)",
     R.drawable.ic_terrain to "Check your height against the ground and the barometer (tap the altimeter)",
     R.drawable.ic_home to "Time spent at each of your saved places, and an icon of your choice for each",

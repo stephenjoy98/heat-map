@@ -4,6 +4,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import io.github.stephenjoy98.heatmap.data.DisplayMode
+import io.github.stephenjoy98.heatmap.map.Route3dStatus
 import io.github.stephenjoy98.heatmap.data.HeatPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -129,6 +130,28 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 6.dp),
                 )
+            }
+            // 3D route heights: when they were last worked out, and a way to do it again from scratch.
+            val raisedRoutes by Prefs.routes3d.collectAsStateWithLifecycle()
+            if (raisedRoutes) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Spacer(Modifier.height(16.dp))
+                Text("3D route heights", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (Route3dStatus.builtAt > 0) {
+                        val at = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(Route3dStatus.builtAt))
+                        "Last worked out $at · from ${"%,d".format(Route3dStatus.dots)} dots"
+                    } else {
+                        "Worked out when the map is tilted into 3D"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedButton(
+                    enabled = !Route3dStatus.busy,
+                    onClick = { Route3dStatus.recalculate(io.github.stephenjoy98.heatmap.data.PointStore.get(context)) },
+                ) { Text(if (Route3dStatus.busy) "Recalculating…" else "Recalculate now") }
             }
             Spacer(Modifier.height(20.dp))
             // The heatmap's colours: how often you've been somewhere, from one visit to the most.
