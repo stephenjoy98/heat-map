@@ -46,10 +46,12 @@ object Route3dTracks {
 
     fun load(store: PointStore, box: GeoBox, modes: Set<TravelMode>): List<List<ElevationPoint>> {
         val smooth = Prefs.smoothRoutes.value
+        // Same choice as the flat map: road shapes only while Snap to roads is on.
+        val snapped = Prefs.snapToRoads.value
         val lines = ArrayList<Line>()
         val drawnTrips = HashSet<Long>()
         for (run in store.elevationRunsIn(box, modes)) {
-            val poly = if (run.tripId > 0) store.tripPathRow(run.tripId)?.poly else null
+            val poly = if (snapped && run.tripId > 0) store.tripPathRow(run.tripId)?.poly else null
             if (poly != null) {
                 if (!drawnTrips.add(run.tripId)) continue
                 val pts = Polyline.decode(poly)
@@ -73,9 +75,28 @@ object Route3dTracks {
         val grid = HeightGrid.build(store.heightSamples(area).asSequence(), store.levelDecisions())
         store.addLevelQuestions(grid.candidates.take(MAX_NEW_QUESTIONS))
 
-        return lines.map { line ->
-            val dots = line.dots.map { ElevationPoint(it.lat, it.lon, grid.height(it.lat, it.lon, line.pass, it.altitude)) }
+        return lines.mapNotNull { line ->
+            val heights = DoubleArray(line.dots.size) { line.dots[it].let { d -> grid.height(d.lat, d.lon, line.pass, d.altitude) } }
+            if (!fillGaps(heights)) return@mapNotNull null
+            // Time spent somewhere rather than a trip (pass < 0): one height for the whole stay, so GPS height
+            // jitter indoors doesn't stand up as fins and spikes.
+            if (line.pass < 0) heights.fill(median(heights))
+            val dots = line.dots.mapIndexed { i, d -> ElevationPoint(d.lat, d.lon, heights[i]) }
             if (line.lat != null && line.lon != null) Route3d.drape(line.lat, line.lon, dots) else dots
         }
+    }
+
+    /** Fills NaN heights from the nearest dot before (or after) that has one; false when none has a height. */
+    private fun fillGaps(h: DoubleArray): Boolean {
+        val first = h.indexOfFirst { !it.isNaN() }
+        if (first < 0) return false
+        for (i in 0 until first) h[i] = h[first]
+        for (i in first + 1 until h.size) if (h[i].isNaN()) h[i] = h[i - 1]
+        return true
+    }
+
+    private fun median(h: DoubleArray): Double {
+        val s = h.sorted()
+        return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
     }
 }

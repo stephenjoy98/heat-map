@@ -463,7 +463,11 @@ class PointStore private constructor(context: Context) :
     fun countIn(box: GeoBox, modes: Set<TravelMode>): Int =
         long("SELECT COUNT(*) FROM points WHERE ${where(box)}${modeClause(modes)}").toInt()
 
-    /** Dots with heights in [box], split into runs at gaps and at changes of trip, with each run's trip id. */
+    /**
+     * Dots in [box], split into runs at gaps and at changes of trip, with each run's trip id. Dots without a height
+     * are kept (altitude NaN) so a run joins the same dots as the flat map: leaving them out used to draw straight
+     * chords across the gaps they left.
+     */
     fun elevationRunsIn(box: GeoBox, modes: Set<TravelMode>, limit: Int = 60_000): List<ElevationRun> {
         val runs = ArrayList<ElevationRun>()
         var current = ArrayList<ElevationPoint>()
@@ -474,7 +478,7 @@ class PointStore private constructor(context: Context) :
         var prevLon = 0.0
         readableDatabase.rawQuery(
             "SELECT time, lat, lon, interval_ms, altitude, trip_id FROM points WHERE ${where(box)}${modeClause(modes)} " +
-                "AND altitude IS NOT NULL ORDER BY time LIMIT $limit",
+                "ORDER BY time LIMIT $limit",
             null,
         ).use { c ->
             while (c.moveToNext()) {
@@ -488,7 +492,7 @@ class PointStore private constructor(context: Context) :
                 }
                 if (current.isEmpty()) startTime = time
                 currentTrip = trip
-                current += ElevationPoint(lat, lon, c.getDouble(4))
+                current += ElevationPoint(lat, lon, if (c.isNull(4)) Double.NaN else c.getDouble(4))
                 prevTime = time
                 prevLat = lat
                 prevLon = lon

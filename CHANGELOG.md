@@ -12,6 +12,15 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.66.2] - 2026-11-05
+
+### Fixed
+- 3D routes follow the same lines as the flat map: dots recorded without a height no longer leave gaps that
+  the 3D route crossed with straight lines.
+- Time spent somewhere (not on a trip) is drawn at one steady height in 3D, instead of a tangle of spikes and fins
+  from indoor GPS heights.
+- 3D routes use road shapes only while Snap to roads is on, like the flat map.
+
 ## [2.66.1] - 2026-11-05
 
 ### Changed
