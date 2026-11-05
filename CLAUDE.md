@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.65.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.65.2**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -138,7 +138,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   the ground (Terrarium DEM) at true scale plus overlap removal; the user found it "barely looks 3D" and it was
   reverted in 2.29.1 — don't redo that without asking;
   `drape` lays dot heights along a display line; loader `map/Route3dTracks` uses snapped polys / smoothed
-  lines like the 2D map; curtain stops 0.4 m under the ribbon to avoid z-fighting). Since 2.24.0 heights come
+  lines like the 2D map; 2.65.2 performance (phone heating): AppMap reuses the built box (rebuild only when the view leaves it, zoom changes ≥1, style reloads, or new dots after `REBUILD_FOR_DOTS_MS` 30 s — refreshKey is no longer an effect key), `VectorMaps.route3dFeatures` built on IO, caps 4k/8k pieces at z≥15 and 2k/4k below; pulse throttled to ~30 fps; curtain stops 0.4 m under the ribbon to avoid z-fighting). Since 2.24.0 heights come
   from `data/HeightGrid` (~55×36 m patches; per-pass medians, pass = trip or day for stays; patch height =
   median of passes). Patches whose passes split by >15 m become `height_levels` rows (schema v9; decision
   ASK/SAME/DIFFERENT) asked in the Timeline's Questions tab; DIFFERENT keeps per-pass heights, `TrackRules`, `Cells`, `GpxExporter` (writes `<ele>`).

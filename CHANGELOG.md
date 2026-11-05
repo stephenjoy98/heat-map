@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.65.2] - 2026-11-05
+
+### Fixed
+- 3D routes made phones work hard and heat up. They were rebuilt from scratch after every small pan, and every
+  time a new dot was saved (every second while following you). Now they're reused until the map moves well away
+  or zooms, new dots redraw them at most every 30 seconds, they're prepared off the main thread, and fewer pieces
+  are used (fewer still when zoomed out). The pulsing location dot also redraws half as often.
+
 ## [2.65.1] - 2026-11-04
 
 ### Fixed

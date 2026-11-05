@@ -641,26 +641,53 @@ private fun VectorAppMap(
     // reloads, or new dots arrive) and draw them at their recorded heights.
     // Off in Map layers › 3D routes: the map still tilts, with your routes drawn flat.
     val raised by Prefs.routes3d.collectAsStateWithLifecycle()
-    LaunchedEffect(holder, camera, tilted, route3d != null, refreshKey, raised) {
+    // New dots (every second while following you) don't restart this; they rebuild at most every REBUILD_FOR_DOTS_MS.
+    val refreshNow by rememberUpdatedState(refreshKey)
+    LaunchedEffect(holder, camera, tilted, route3d != null, raised) {
         if (!tilted || route3d == null || !raised) {
             holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
             return@LaunchedEffect
         }
-        snapshotFlow { camera.cameraTick to holder.styleVersion }
-            .debounce(400)
+        // What was last built, so small pans and turns (and following you) reuse it instead of rebuilding.
+        var builtBox: GeoBox? = null
+        var builtZoom = 0.0
+        var builtStyle = -1
+        var builtRefresh: Any? = Unit
+        var builtAt = 0L
+        snapshotFlow { Triple(camera.cameraTick, holder.styleVersion, refreshNow) }
+            .debounce(600)
             .collectLatest {
                 val m = holder.map ?: return@collectLatest
                 val b = m.projection.visibleRegion.latLngBounds
+                val zoom = m.cameraPosition.zoom
+                val last = builtBox
+                val inside = last != null && b.latitudeNorth <= last.north && b.latitudeSouth >= last.south &&
+                    b.longitudeEast <= last.east && b.longitudeWest >= last.west
+                val sameView = inside && kotlin.math.abs(zoom - builtZoom) < 1.0 && builtStyle == holder.styleVersion
+                val fresh = builtRefresh == refreshNow || System.currentTimeMillis() - builtAt < REBUILD_FOR_DOTS_MS
+                if (sameView && fresh) return@collectLatest
                 // A margin around the view, so routes don't visibly end at the screen edge while panning.
                 val padLat = (b.latitudeNorth - b.latitudeSouth) / 2
                 val padLon = (b.longitudeEast - b.longitudeWest) / 2
                 val box = GeoBox(b.latitudeNorth + padLat, b.latitudeSouth - padLat, b.longitudeEast + padLon, b.longitudeWest - padLon)
                 val load = loadRoute3d ?: return@collectLatest
-                val segments = withContext(Dispatchers.IO) {
-                    // One fixed baseline, so heights don't change as the map moves.
-                    Route3d.build(load(box), PointStore.get(holder.mapView.context).altitudeBaseline())
+                val data = withContext(Dispatchers.IO) {
+                    // One fixed baseline, so heights don't change as the map moves. Zoomed out, fewer pieces are
+                    // plenty (they're small on screen), which keeps the phone cool.
+                    val segments = Route3d.build(
+                        load(box),
+                        PointStore.get(holder.mapView.context).altitudeBaseline(),
+                        maxSegments = if (zoom >= 15) 4_000 else 2_000,
+                        maxPieces = if (zoom >= 15) 8_000 else 4_000,
+                    )
+                    VectorMaps.route3dFeatures(segments)
                 }
-                m.style?.let { VectorMaps.showRoute3d(it, segments) }
+                m.style?.let { VectorMaps.showRoute3d(it, data) }
+                builtBox = box
+                builtZoom = zoom
+                builtStyle = holder.styleVersion
+                builtRefresh = refreshNow
+                builtAt = System.currentTimeMillis()
             }
     }
 
@@ -853,3 +880,6 @@ private fun PreviewButton(label: String, onClick: () -> Unit, content: @Composab
         }
     }
 }
+
+/** New dots redraw the 3D route at most this often (when the view itself hasn't moved on). */
+private const val REBUILD_FOR_DOTS_MS = 30_000L

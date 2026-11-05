@@ -40,7 +40,7 @@ object Route3d {
     // (gaps in the ribbon and curtain).
     private const val MIN_HOP_M = 8.0
 
-    fun build(tracks: List<List<ElevationPoint>>, baseline: Double, maxSegments: Int = 8_000): List<Segment> {
+    fun build(tracks: List<List<ElevationPoint>>, baseline: Double, maxSegments: Int = 8_000, maxPieces: Int = MAX_TOTAL_PIECES): List<Segment> {
         val routes = tracks.filter { it.size >= 2 }
         if (routes.isEmpty()) return emptyList()
         val hops = routes.sumOf { it.size - 1 }
@@ -67,8 +67,8 @@ object Route3d {
         // into short pieces, each at its own height along the slope, so the steps are too small to see. The
         // step size grows if that would make too many pieces for the map to draw smoothly.
         val wanted = all.sumOf { ceil(abs(it.h1 - it.h0) / STEP_M).toInt().coerceIn(1, MAX_PIECES) }
-        val stepM = if (wanted > MAX_TOTAL_PIECES) STEP_M * wanted / MAX_TOTAL_PIECES else STEP_M
-        val out = ArrayList<Segment>(minOf(wanted, MAX_TOTAL_PIECES) + all.size)
+        val stepM = if (wanted > maxPieces) STEP_M * wanted / maxPieces else STEP_M
+        val out = ArrayList<Segment>(minOf(wanted, maxPieces) + all.size)
         for (hop in all) {
             val n = ceil(abs(hop.h1 - hop.h0) / stepM).toInt().coerceIn(1, MAX_PIECES)
             fun pieces(c: DoubleArray) = List(n) { k ->

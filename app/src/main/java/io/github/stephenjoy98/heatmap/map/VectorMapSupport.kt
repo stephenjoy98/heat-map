@@ -215,8 +215,10 @@ object VectorMaps {
      * Shows routes in 3D: a translucent curtain from the ground up to each hop's height, topped by a solid
      * ribbon, so the route visibly climbs and descends among the 3D buildings. Replaces any previous route.
      */
-    fun showRoute3d(style: Style, segments: List<Route3d.Segment>) {
-        if (!style.isFullyLoaded) return
+    fun showRoute3d(style: Style, segments: List<Route3d.Segment>) = showRoute3d(style, route3dFeatures(segments))
+
+    /** The map shapes for [segments]: build them off the main thread (there can be thousands), then [showRoute3d]. */
+    fun route3dFeatures(segments: List<Route3d.Segment>): FeatureCollection {
         val features = segments.map { seg ->
             val c = seg.corners
             val ring = listOf(
@@ -231,7 +233,11 @@ object VectorMaps {
                 addNumberProperty("c", (seg.heightM - CURTAIN_GAP_M).coerceAtLeast(0.0))
             }
         }
-        val data = FeatureCollection.fromFeatures(features)
+        return FeatureCollection.fromFeatures(features)
+    }
+
+    fun showRoute3d(style: Style, data: FeatureCollection) {
+        if (!style.isFullyLoaded) return
         val source = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)
         if (source != null) {
             source.setGeoJson(data)
@@ -538,6 +544,7 @@ class TileOverlayView(context: Context) : View(context) {
     // The pulse: a soft ring grows out of the blue dot and fades, over and over.
     private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var pulseT = 0f
+    private var lastPulseFrame = 0L
     private val pulse = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = PULSE_MS
         repeatCount = ValueAnimator.INFINITE
@@ -545,7 +552,12 @@ class TileOverlayView(context: Context) : View(context) {
         addUpdateListener { a ->
             pulseT = a.animatedValue as Float
             // Only while the blue dot is showing (follow me's marker has its own glow instead).
-            if (shown != null && !navMarker) postInvalidateOnAnimation()
+            // About 30 frames a second is plenty for a soft ring, and halves the redrawing.
+            val now = SystemClock.uptimeMillis()
+            if (shown != null && !navMarker && now - lastPulseFrame >= PULSE_FRAME_MS) {
+                lastPulseFrame = now
+                postInvalidateOnAnimation()
+            }
         }
     }
 
@@ -766,6 +778,7 @@ class TileOverlayView(context: Context) : View(context) {
         const val GLOW_STEP_DP = 0.8f
         const val GLOW_ALPHA = 16
         const val PULSE_MS = 2_000L
+        const val PULSE_FRAME_MS = 33L
         // Same as 3D routes, so the raised marker sits at its route's height.
         const val HEIGHT_EXAGGERATION = 1.5
     }
