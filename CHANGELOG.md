@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.66.3] - 2026-11-05
+
+### Fixed
+- 3D routes keep to the roads when a lot of history is in view: they used to keep only every few dots, cutting
+  corners in straight lines; now only the smallest wiggles are straightened and every corner stays.
+
 ## [2.66.2] - 2026-11-05
 
 ### Fixed

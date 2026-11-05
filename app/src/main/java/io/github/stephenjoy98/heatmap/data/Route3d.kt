@@ -39,17 +39,29 @@ object Route3d {
     // shorter than the ribbon is wide, GPS wobble crosses a piece's edges into a bow-tie, which the map leaves out
     // (gaps in the ribbon and curtain).
     private const val MIN_HOP_M = 8.0
+    // Beyond this, simplifying would change the shape more than dropping dots does.
+    private const val MAX_TOLERANCE_M = 64.0
 
     fun build(tracks: List<List<ElevationPoint>>, baseline: Double, maxSegments: Int = 8_000, maxPieces: Int = MAX_TOTAL_PIECES): List<Segment> {
         val routes = tracks.filter { it.size >= 2 }
         if (routes.isEmpty()) return emptyList()
-        val hops = routes.sumOf { it.size - 1 }
-        // Thin out very long histories so the map stays responsive.
+        // Thin out very long histories so the map stays responsive, keeping each route's corners: straighten only
+        // bends smaller than a tolerance that doubles until the routes fit. (Keeping every n-th dot, as before
+        // 2.66.3, cut corners into straight lines that left the roads.)
+        val base = routes.map { spaced(it) }
+        var thinned = base
+        var tolerance = 1.0
+        while (thinned.sumOf { it.size - 1 } > maxSegments && tolerance < MAX_TOLERANCE_M) {
+            tolerance *= 2
+            thinned = base.map { simplify(it, tolerance) }
+        }
+        val hops = thinned.sumOf { it.size - 1 }
+        // Still too many (a huge history zoomed far out): fall back to every n-th dot.
         val step = max(1, (hops + maxSegments - 1) / maxSegments)
         class Hop(val corners: DoubleArray, val plain: DoubleArray, val h0: Double, val h1: Double)
         val all = ArrayList<Hop>(minOf(hops, maxSegments) + 1)
-        for (route in routes) {
-            val pts = spaced(if (step == 1) route else route.filterIndexed { i, _ -> i % step == 0 || i == route.lastIndex })
+        for (route in thinned) {
+            val pts = if (step == 1) route else route.filterIndexed { i, _ -> i % step == 0 || i == route.lastIndex }
             if (pts.size < 2) continue
             val heights = smooth(pts).map { ((it - baseline) * EXAGGERATION).coerceAtLeast(0.0) + LIFT_M }
             val (left, right) = offsets(pts) ?: continue
@@ -92,6 +104,51 @@ object Route3d {
     }
 
     /** The route with dots closer than [MIN_HOP_M] to the last one kept dropped; the last dot is always kept. */
+    /**
+     * Douglas–Peucker: drops dots that lie within [tolM] metres of the straight line between the dots kept either
+     * side, so corners and bends stay where they are.
+     */
+    internal fun simplify(pts: List<ElevationPoint>, tolM: Double): List<ElevationPoint> {
+        if (pts.size < 3) return pts
+        val lat0 = pts[0].lat
+        val mx = METERS_PER_DEGREE * cos(Math.toRadians(lat0))
+        val x = DoubleArray(pts.size) { (pts[it].lon - pts[0].lon) * mx }
+        val y = DoubleArray(pts.size) { (pts[it].lat - lat0) * METERS_PER_DEGREE }
+        val keep = BooleanArray(pts.size)
+        keep[0] = true
+        keep[pts.lastIndex] = true
+        val stack = ArrayDeque<Int>()
+        stack.addLast(0)
+        stack.addLast(pts.lastIndex)
+        while (stack.isNotEmpty()) {
+            val b = stack.removeLast()
+            val a = stack.removeLast()
+            if (b - a < 2) continue
+            val dx = x[b] - x[a]
+            val dy = y[b] - y[a]
+            val len2 = dx * dx + dy * dy
+            var worst = -1.0
+            var at = -1
+            for (i in a + 1 until b) {
+                val d2 = if (len2 < 1e-9) {
+                    (x[i] - x[a]) * (x[i] - x[a]) + (y[i] - y[a]) * (y[i] - y[a])
+                } else {
+                    val t = (((x[i] - x[a]) * dx + (y[i] - y[a]) * dy) / len2).coerceIn(0.0, 1.0)
+                    val px = x[a] + t * dx - x[i]
+                    val py = y[a] + t * dy - y[i]
+                    px * px + py * py
+                }
+                if (d2 > worst) { worst = d2; at = i }
+            }
+            if (worst > tolM * tolM) {
+                keep[at] = true
+                stack.addLast(a); stack.addLast(at)
+                stack.addLast(at); stack.addLast(b)
+            }
+        }
+        return pts.filterIndexed { i, _ -> keep[i] }
+    }
+
     private fun spaced(pts: List<ElevationPoint>): List<ElevationPoint> {
         if (pts.size < 3) return pts
         val out = ArrayList<ElevationPoint>(pts.size)
