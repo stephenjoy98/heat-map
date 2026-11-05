@@ -12,6 +12,11 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.66.1] - 2026-11-05
+
+### Changed
+- The blue location dot pulses at its earlier speed again, smooth on every frame, as it did before 2.65.2.
+
 ## [2.66.0] - 2026-11-05
 
 ### Added

@@ -544,7 +544,6 @@ class TileOverlayView(context: Context) : View(context) {
     // The pulse: a soft ring grows out of the blue dot and fades, over and over.
     private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var pulseT = 0f
-    private var lastPulseFrame = 0L
     private val pulse = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = PULSE_MS
         repeatCount = ValueAnimator.INFINITE
@@ -552,12 +551,8 @@ class TileOverlayView(context: Context) : View(context) {
         addUpdateListener { a ->
             pulseT = a.animatedValue as Float
             // Only while the blue dot is showing (follow me's marker has its own glow instead).
-            // About 30 frames a second is plenty for a soft ring, and halves the redrawing.
-            val now = SystemClock.uptimeMillis()
-            if (shown != null && !navMarker && now - lastPulseFrame >= PULSE_FRAME_MS) {
-                lastPulseFrame = now
-                postInvalidateOnAnimation()
-            }
+            // Every frame, as in 2.60.0: throttling it to 30 frames a second (2.65.2) made it look slow.
+            if (shown != null && !navMarker) postInvalidateOnAnimation()
         }
     }
 
@@ -778,7 +773,6 @@ class TileOverlayView(context: Context) : View(context) {
         const val GLOW_STEP_DP = 0.8f
         const val GLOW_ALPHA = 16
         const val PULSE_MS = 2_000L
-        const val PULSE_FRAME_MS = 33L
         // Same as 3D routes, so the raised marker sits at its route's height.
         const val HEIGHT_EXAGGERATION = 1.5
     }
