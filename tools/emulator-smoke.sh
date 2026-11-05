@@ -162,6 +162,10 @@ tap desc "Map layers"
 shot 02a-layers 2
 # Map colours is folded away: open it first.
 tap text "Map colours"
+sleep 1
+# The 3D route heights row pushes the slider below the fold: scroll it into view.
+adb shell input swipe 540 1700 540 1000 400
+sleep 1
 read -r mx my <<< "$(centre_of Muted)"
 read -r vx vy <<< "$(centre_of Vivid)"
 if [ -n "${mx:-}" ] && [ -n "${vx:-}" ]; then
