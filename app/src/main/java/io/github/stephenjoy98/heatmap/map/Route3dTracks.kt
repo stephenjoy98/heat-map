@@ -7,6 +7,7 @@ import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Polyline
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Route3d
+import io.github.stephenjoy98.heatmap.data.RouteBundle
 import io.github.stephenjoy98.heatmap.data.TravelMode
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -75,7 +76,7 @@ object Route3dTracks {
         val grid = HeightGrid.build(store.heightSamples(area).asSequence(), store.levelDecisions())
         store.addLevelQuestions(grid.candidates.take(MAX_NEW_QUESTIONS))
 
-        return lines.mapNotNull { line ->
+        val drawn = lines.mapNotNull { line ->
             val heights = DoubleArray(line.dots.size) { line.dots[it].let { d -> grid.height(d.lat, d.lon, line.pass, d.altitude) } }
             if (!fillGaps(heights)) return@mapNotNull null
             // Time spent somewhere rather than a trip (pass < 0): one height for the whole stay, so GPS height
@@ -84,6 +85,28 @@ object Route3dTracks {
             val dots = line.dots.mapIndexed { i, d -> ElevationPoint(d.lat, d.lon, heights[i]) }
             if (line.lat != null && line.lon != null) Route3d.drape(line.lat, line.lon, dots) else dots
         }
+        // Every pass along a street becomes one route at their average line and height. Whole road shapes can
+        // run far outside the view, so only the part around the box is bundled.
+        return RouteBundle.bundle(drawn.flatMap { clip(it, box) })
+    }
+
+    /** The stretches of [line] inside [box] widened by a quarter each way, with one dot either side of each. */
+    private fun clip(line: List<ElevationPoint>, box: GeoBox): List<List<ElevationPoint>> {
+        val padLat = (box.north - box.south) / 4
+        val padLon = (box.east - box.west) / 4
+        fun inside(p: ElevationPoint) = p.lat in (box.south - padLat)..(box.north + padLat) && p.lon in (box.west - padLon)..(box.east + padLon)
+        val out = ArrayList<List<ElevationPoint>>()
+        var start = -1
+        for (i in line.indices) {
+            if (inside(line[i])) {
+                if (start < 0) start = maxOf(0, i - 1)
+            } else if (start >= 0) {
+                out += line.subList(start, i + 1)
+                start = -1
+            }
+        }
+        if (start >= 0) out += line.subList(start, line.size)
+        return out.filter { it.size >= 2 }
     }
 
     /** Fills NaN heights from the nearest dot before (or after) that has one; false when none has a height. */

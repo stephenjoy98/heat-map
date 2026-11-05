@@ -96,7 +96,7 @@ private val FEATURES = listOf(
     R.drawable.ic_system_update to "Red dots lead to what a notification was about, and \"New\" marks sections that changed since your last look",
     R.drawable.ic_add_road to "Join sections and snap them to the road you took, or pick a road on the map",
     R.drawable.ic_help_outline to "A Questions tab on the Timeline: unclear trips, roads and heights (bridges, floors), one after another",
-    R.drawable.ic_terrain to "Smooth 3D routes at one agreed height per place, following the same line as the map",
+    R.drawable.ic_terrain to "Smooth 3D routes: every pass along a street bundled into one route at its average line and height",
     R.drawable.ic_public to "Your profile: places explored, distance explored and time captured",
     R.drawable.ic_location_city to "Distance in each city, and the new areas you've explored and where",
     R.drawable.ic_settings to "Settings as a page per section, or all in one list",

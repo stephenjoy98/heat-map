@@ -47,7 +47,8 @@ up to your Google account, and lets you compare explored areas with friends.
   routes are drawn as an orange ribbon at their recorded height (above a fixed low point of everything
   recorded, exaggerated 1.5×, smoothed over neighbouring dots) over a translucent curtain.
   Tilting with two fingers switches the 3D view on, and tilting back flat switches it off; buildings stay as set. **3D routes** in the layers sheet
-  turns the raised routes off (they're then drawn flat). **Map
+  turns the raised routes off (they're then drawn flat). Raised routes bundle every pass along a street into one
+  route at the average line and height of all your dots. **Map
   colours** (folded under its own row in the same sheet: muted to vivid, with blue water, green parks and an
   optional "Colour roads too") recolour the base map, kept separately for the dark and light themes (the
   heatmap, routes and labels aren't changed).

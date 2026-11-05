@@ -12,6 +12,13 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.67.0] - 2026-11-05
+
+### Changed
+- **3D routes are bundled**: every time you've travelled a street now makes one 3D route at the average of all
+  your passes, sideways and in height, instead of a ribbon per trip side by side. Every dot is used; nothing is
+  skipped. Streets meet at junctions, and places at clearly different heights (a bridge over a road) stay apart.
+
 ## [2.66.3] - 2026-11-05
 
 ### Fixed
