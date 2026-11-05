@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.65.3] - 2026-11-05
+
+### Changed
+- While follow me is on and you're moving, the 3D route already drawn stays as it is instead of being rebuilt as
+  the map glides along. Once you've stopped for a minute (or turn follow me off) it catches up with the new dots.
+
 ## [2.65.2] - 2026-11-05
 
 ### Fixed

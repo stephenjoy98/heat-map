@@ -201,13 +201,15 @@ fun AppMap(
     route3d: ((GeoBox) -> List<List<ElevationPoint>>)? = null,
     // Your current height above sea level, for the 3D location (the marker raised by it on a tilted map).
     altitude: Double? = null,
+    // While following you on the move: keep showing the 3D route already built, and rebuild once you've stopped.
+    freeze3d: Boolean = false,
 ) {
     val dark = isDarkTheme()
     val mapLayer by Prefs.mapLayer.collectAsStateWithLifecycle()
     val buildings by Prefs.buildings3d.collectAsStateWithLifecycle()
     val tilted by Prefs.mapTilted.collectAsStateWithLifecycle()
     val style = MapLook(dark, mapLayer == MapLayerType.TERRAIN, buildings)
-    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading, navMarker, tilted, altitude)
+    VectorAppMap(camera, layers, style, refreshKey, latest, onMapClick, onMapLongClick, cacheKey, route3d, modifier, bottomInset, heading, navMarker, tilted, altitude, freeze3d)
 }
 
 /** How the base map looks: theme, terrain shading and 3D buildings (shown flat or tilted). */
@@ -507,6 +509,7 @@ private fun VectorAppMap(
     // Tilted into 3D (compass or two fingers); 3D routes are raised only then.
     tilted: Boolean,
     altitude: Double?,
+    freeze3d: Boolean,
 ) {
     val holder = rememberVectorMap(cacheKey)
     val context = LocalContext.current
@@ -643,6 +646,7 @@ private fun VectorAppMap(
     val raised by Prefs.routes3d.collectAsStateWithLifecycle()
     // New dots (every second while following you) don't restart this; they rebuild at most every REBUILD_FOR_DOTS_MS.
     val refreshNow by rememberUpdatedState(refreshKey)
+    val frozen by rememberUpdatedState(freeze3d)
     LaunchedEffect(holder, camera, tilted, route3d != null, raised) {
         if (!tilted || route3d == null || !raised) {
             holder.withMap { m -> m.style?.let(VectorMaps::clearRoute3d) }
@@ -654,9 +658,12 @@ private fun VectorAppMap(
         var builtStyle = -1
         var builtRefresh: Any? = Unit
         var builtAt = 0L
-        snapshotFlow { Triple(camera.cameraTick, holder.styleVersion, refreshNow) }
+        snapshotFlow { listOf(camera.cameraTick, holder.styleVersion, refreshNow, frozen) }
             .debounce(600)
             .collectLatest {
+                // Following you on the move: the route already built stays as it is (no rebuilding while the map
+                // glides along); it catches up once you've stopped or follow me ends.
+                if (frozen && builtBox != null) return@collectLatest
                 val m = holder.map ?: return@collectLatest
                 val b = m.projection.visibleRegion.latLngBounds
                 val zoom = m.cameraPosition.zoom

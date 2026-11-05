@@ -163,6 +163,10 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val density = LocalDensity.current
     // Live GPS pauses while a page covers the map.
     val covered = LocalCovered.current
+    // Settled: no speed above walking pace for STILL_FOR_3D_MS. While following you and not settled, the 3D route
+    // isn't rebuilt (see AppMap's freeze3d); it catches up with the new dots once you stop.
+    var lastMovingAt by remember { mutableLongStateOf(0L) }
+    var settled by remember { mutableStateOf(true) }
     // Orbit (long-press the compass in 3D): the map circles your location until you touch it or tap the compass.
     var orbiting by remember { mutableStateOf(false) }
     // The altimeter's "Check your height" sheet.
@@ -204,6 +208,13 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     LaunchedEffect(following) { FollowMode.set(context, following) }
     // The arrow on the dot: which way you're going, while you're moving.
     val heading = liveFix?.takeIf { it.hasBearing() && it.hasSpeed() && it.speed > 1f }?.bearing
+    LaunchedEffect(speed) { if ((speed ?: 0f) > 1f) lastMovingAt = android.os.SystemClock.uptimeMillis() }
+    LaunchedEffect(lastMovingAt) {
+        if (lastMovingAt == 0L) return@LaunchedEffect
+        settled = false
+        delay(STILL_FOR_3D_MS)
+        settled = true
+    }
     // The way you were last heading, kept while you stop, for turning the map in 3D follow me.
     var lastHeading by remember { mutableFloatStateOf(Float.NaN) }
     LaunchedEffect(heading) { heading?.let { lastHeading = it } }
@@ -265,6 +276,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
             cacheKey = "map",
             route3d = if (mode == DisplayMode.NONE) null else route3d,
             altitude = altitude,
+            freeze3d = following && !settled,
             bottomInset = navPad,
             heading = heading,
             navMarker = following,
@@ -768,3 +780,6 @@ private fun missingStartPermissions(context: Context): Array<String> {
 /** The orbit around your location (long-press the compass in 3D): one full turn takes this long. */
 private const val ORBIT_TURN_MS = 20_000L
 private const val ORBIT_STEP_MS = 1_000L
+
+/** How long without moving before the 3D route catches up with the dots recorded while following you. */
+private const val STILL_FOR_3D_MS = 60_000L
