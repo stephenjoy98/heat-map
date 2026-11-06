@@ -401,6 +401,26 @@ fun EditPanel(
                                 }
                             }
                         }
+                        if (placing == null) {
+                            // Set either end of the range to this dot, then go back to the range to act on it.
+                            val at = state.selected!!
+                            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        state.range = at..maxOf(at, state.range.last)
+                                        state.selected = null
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) { Text("Start here") }
+                                FilledTonalButton(
+                                    onClick = {
+                                        state.range = minOf(state.range.first, at)..at
+                                        state.selected = null
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) { Text("End here") }
+                            }
+                        }
                         if (placing == null) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { state.selected = null }) { Text("Back to range") }
                             Spacer(Modifier.width(8.dp))

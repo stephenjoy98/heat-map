@@ -61,7 +61,7 @@ up to your Google account, and lets you compare explored areas with friends.
   means; fixes less precise than 100 m (500 m in battery-saver mode) are never recorded.
 - **Edit dots** (pencil on the Timeline tab): fix mapping errors. Pick a day, narrow it down with a **start–end
   slider** (the dots in range are highlighted and joined in time order), or tap a single dot and step
-  through its neighbours, then delete, **move** it (tap Move, then its new spot) or **add dots** after it, one
+  through its neighbours (**Start here** / **End here** make it either end of the range), then delete, **move** it (tap Move, then its new spot) or **add dots** after it, one
   per tap, to trace a route GPS got wrong, like a ferry crossing. **Move** a whole range at once: drag the round
   handle and the stretch follows (optionally pulling the 3 dots either side along so the route stays joined), then
   **Snap to a road** puts the moved dots on the nearest road (or railway / ferry route) for their trip's travel

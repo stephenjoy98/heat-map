@@ -12,6 +12,12 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.68.1] - 2026-11-06
+
+### Added
+- **Start here** and **End here** in Edit dots: pick a dot (tap it, or step to it with the arrows) and make it the
+  first or last dot of the range, so a stretch can be chosen exactly without dragging the slider over thousands of dots.
+
 ## [2.68.0] - 2026-11-06
 
 ### Added
