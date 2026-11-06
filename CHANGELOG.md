@@ -12,6 +12,16 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.68.0] - 2026-11-06
+
+### Added
+- **Move many dots at once** in Edit dots: pick a range with the slider, tap **Move**, and drag the round handle;
+  the whole stretch follows, with grey rings where it was. **Keep the ends attached** pulls the 3 dots either side
+  along so the route stays joined.
+- **Snap to a road** while moving: the moved dots go onto the nearest road for their trip's travel mode (railway or
+  ferry route for trains and boats), and the trip is matched to that road again after saving. One Undo puts
+  everything back.
+
 ## [2.67.0] - 2026-11-05
 
 ### Changed

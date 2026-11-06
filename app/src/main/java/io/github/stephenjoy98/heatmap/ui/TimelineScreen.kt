@@ -427,6 +427,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
         }
     }
     BackHandler(enabled = picked != null && !LocalCovered.current) { picked = null }
+    BackHandler(enabled = editing && edit.moving && !LocalCovered.current) { edit.stopMove() }
     // Every change to trips can be undone for a while: how trips looked around it is kept, then put back on Undo.
     val undoable = { label: String, from: Long, to: Long, change: () -> DeleteResult ->
         scope.launch {
@@ -458,6 +459,63 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
             if (editSnackbar.showSnackbar(said, actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
                 afterDotEdit(context, withContext(Dispatchers.IO) { back(); store.restore(snap) })
                 edit.reselect = dot.id
+                editReload++
+            }
+        }
+    }
+    // Moving a stretch of dots: snap the dragged dots onto the nearest road (or track) for their trip's mode.
+    fun snapMove() {
+        val pts = edit.points
+        if (pts.isEmpty() || edit.snapping) return
+        val r = edit.range
+        val moved = r.map { edit.movedPosition(it) }
+        if (moved.size < 2) {
+            edit.snapError = "Pick at least two dots to snap them to a road."
+            return
+        }
+        edit.snapping = true
+        edit.snapError = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val mode = store.tripsBetween(pts[r.first].time, pts[r.last].time + 1)
+                        .firstOrNull { it.endTime >= pts[r.first].time && it.startTime <= pts[r.last].time }?.mode ?: TravelMode.DRIVE
+                    val lat = DoubleArray(moved.size) { moved[it].first }
+                    val lon = DoubleArray(moved.size) { moved[it].second }
+                    val network = TrackSnapper.networkFor(mode)
+                    val line = if (network != null) TrackSnapper.snap(lat, lon, network)
+                    else Valhalla.match(lat, lon, Valhalla.costing(mode) ?: "auto")
+                    line?.let { l -> moved.map { (a, b) -> nearestOnLine(l, a, b) } }
+                }
+            }
+            edit.snapping = false
+            val onRoad = result.getOrNull()
+            if (onRoad != null && edit.moving) {
+                edit.snapped = onRoad
+            } else if (edit.moving) {
+                edit.snapError = result.exceptionOrNull()?.let { "Snapping failed: ${it.message ?: it.javaClass.simpleName}" }
+                    ?: "No road found near these dots. Drag them closer to it and try again."
+            }
+        }
+    }
+    fun saveMove() {
+        val pts = edit.points
+        if (pts.isEmpty() || edit.busy) return
+        val idx = edit.movedIndices()
+        val moves = idx.map { i -> edit.movedPosition(i).let { (lat, lon) -> PointStore.DotMove(pts[i].id, lat, lon) } }
+        val back = idx.map { i -> PointStore.DotMove(pts[i].id, pts[i].lat, pts[i].lon, pts[i].accuracy) }
+        val first = pts[idx.first]
+        val last = pts[idx.last]
+        val label = if (edit.snapped != null) "${moves.size} dots moved onto the road" else "${moves.size} dots moved"
+        edit.busy = true
+        edit.stopMove()
+        scope.launch {
+            val (snap, result) = withContext(Dispatchers.IO) { store.snapshot(first.time, last.time) to store.movePoints(moves) }
+            afterDotEdit(context, result)
+            editReload++
+            editSnackbar.currentSnackbarData?.dismiss()
+            if (editSnackbar.showSnackbar(label, actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                afterDotEdit(context, withContext(Dispatchers.IO) { store.movePoints(back); store.restore(snap) })
                 editReload++
             }
         }
@@ -750,6 +808,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                         editing -> { lat, lon ->
                             val dot = edit.selected?.let { edit.points.getOrNull(it) }
                             when {
+                                edit.moving -> Unit // Only the handle moves the stretch; taps don't pick dots meanwhile.
                                 dot != null && edit.placing == DotPlacing.MOVE -> moveDot(dot, lat, lon)
                                 dot != null && edit.placing == DotPlacing.ADD -> addDot(dot, lat, lon)
                                 else -> nearestDot(camera, edit, lat, lon, tapRadiusPx)?.let { edit.selected = it }
@@ -816,6 +875,7 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                 }
                 if (editing) {
                     DotsOverlay(camera, edit, Modifier.fillMaxSize())
+                    MoveHandle(camera, edit)
                     // Map type and 3D buildings, right where you're editing.
                     LayersButton(onClick = { layersOpen = true }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
                     SwipeSnackbarHost(editSnackbar, Modifier.align(Alignment.TopCenter))
@@ -862,6 +922,8 @@ fun TimelineScreen(contentPadding: PaddingValues, resumeTick: Int, onProfile: ()
                                 editSnackbar.showSnackbar(if (back.size == 1) "Dot restored" else "${back.size} dots restored")
                             }
                         },
+                        onSnapMove = ::snapMove,
+                        onSaveMove = ::saveMove,
                         onClose = stopEditing,
                     )
                 }
@@ -2060,4 +2122,23 @@ private fun PeriodRow(stat: PeriodStat, scale: TimelineScale, max: Double, onCli
             }
         }
     }
+}
+
+/** The point on [line] (lat, lon pairs) nearest to [lat], [lon]. */
+private fun nearestOnLine(line: DoubleArray, lat: Double, lon: Double): Pair<Double, Double> {
+    val mx = kotlin.math.cos(Math.toRadians(lat))
+    var best = line[0] to line[1]
+    var bestD = Double.MAX_VALUE
+    for (k in 0 until line.size / 2 - 1) {
+        val ay = line[k * 2]; val ax = line[k * 2 + 1] * mx
+        val by = line[k * 2 + 2]; val bx = line[k * 2 + 3] * mx
+        val py = lat; val px = lon * mx
+        val dx = bx - ax; val dy = by - ay
+        val len2 = dx * dx + dy * dy
+        val t = if (len2 == 0.0) 0.0 else (((px - ax) * dx + (py - ay) * dy) / len2).coerceIn(0.0, 1.0)
+        val qx = ax + t * dx; val qy = ay + t * dy
+        val d = (qx - px) * (qx - px) + (qy - py) * (qy - py)
+        if (d < bestD) { bestD = d; best = qy to qx / mx }
+    }
+    return best
 }

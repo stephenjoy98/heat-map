@@ -1078,6 +1078,43 @@ class PointStore private constructor(context: Context) :
         return DeleteResult(days, remoteIds)
     }
 
+    /** Where one dot goes in [movePoints]; [accuracy] null = counts as placed by hand (undo passes the old one). */
+    class DotMove(val id: Long, val lat: Double, val lon: Double, val accuracy: Float? = null)
+
+    /**
+     * Moves several dots at once (a stretch dragged on the map, or snapped to a road), in one go: their trips are
+     * worked out again once each and matched to roads afresh.
+     */
+    fun movePoints(moves: List<DotMove>): DeleteResult {
+        if (moves.isEmpty()) return DeleteResult(emptySet(), emptyList())
+        val db = writableDatabase
+        val days = HashSet<String>()
+        val remoteIds = mutableListOf<String>()
+        val trips = LinkedHashSet<Long>()
+        db.beginTransaction()
+        try {
+            for (m in moves) {
+                val row = db.rawQuery("SELECT time, trip_id, accuracy FROM points WHERE id = ${m.id}", null).use { c ->
+                    if (c.moveToFirst()) Triple(c.getLong(0), c.getLong(1), c.getFloat(2)) else null
+                } ?: continue
+                days += dayOf(row.first)
+                val acc = m.accuracy ?: minOf(row.third, HAND_PLACED_ACCURACY_M)
+                db.execSQL(
+                    "UPDATE points SET lat = ?, lon = ?, accuracy = ?, activity = $ACTIVITY_BY_HAND WHERE id = ?",
+                    arrayOf<Any>(m.lat, m.lon, acc, m.id),
+                )
+                if (row.second > 0) trips += row.second
+            }
+            for (trip in trips) refreshTrip(db, trip, remoteIds)
+            invalidateExplored(db)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed()
+        return DeleteResult(days, remoteIds)
+    }
+
     /**
      * Adds a dot by hand halfway in time between dot [afterId] and the next one, at [lat], [lon], in the same
      * trip, to trace a route the recording missed (after the last dot: a second later). Returns the new dot's id, or null if there's no time left between the two

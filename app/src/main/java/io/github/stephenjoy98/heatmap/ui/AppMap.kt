@@ -138,6 +138,11 @@ class MapCamera(val initialLat: Double, val initialLon: Double, val initialZoom:
     /** Where a coordinate is on the map, in pixels from its top-left corner; null until the map is ready. */
     fun toScreen(lat: Double, lon: Double): Offset? = projector?.invoke(lat, lon)
 
+    internal var unprojector: ((Offset) -> Pair<Double, Double>?)? = null
+
+    /** The coordinate under a point on the map, in pixels from its top-left corner; null until the map is ready. */
+    fun toLatLng(point: Offset): Pair<Double, Double>? = unprojector?.invoke(point)
+
     fun zoomIn() {
         actions.tryEmit(Action.ZOOM_IN)
     }
@@ -596,9 +601,13 @@ private fun VectorAppMap(
             camera.projector = { lat, lon ->
                 m.projection.toScreenLocation(MLatLng(lat, lon)).let { Offset(it.x, it.y) }
             }
+            camera.unprojector = { o ->
+                m.projection.fromScreenLocation(android.graphics.PointF(o.x, o.y)).let { it.latitude to it.longitude }
+            }
         }
         onDispose {
             camera.projector = null
+            camera.unprojector = null
             if (holder.camera === camera) holder.camera = null
         }
     }

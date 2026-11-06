@@ -41,6 +41,19 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -86,6 +99,55 @@ class DotEditState(day: LocalDate) {
     /** A move or add is being saved; taps wait for the dots to reload so they act on the right dot. */
     var busy = false
 
+    /** Moving the range: dragged by [moveLat]/[moveLon], or put on a road by [snapped] (one position per range dot). */
+    var moving by mutableStateOf(false)
+    var moveLat by mutableDoubleStateOf(0.0)
+    var moveLon by mutableDoubleStateOf(0.0)
+    /** Pull the few dots either side of the range along, fading out, so the route stays joined at its ends. */
+    var attachEnds by mutableStateOf(false)
+    var snapped by mutableStateOf<List<Pair<Double, Double>>?>(null)
+    var snapping by mutableStateOf(false)
+    var snapError by mutableStateOf<String?>(null)
+
+    fun startMove() {
+        selected = null
+        placing = null
+        moveLat = 0.0
+        moveLon = 0.0
+        snapped = null
+        snapError = null
+        moving = true
+    }
+
+    fun stopMove() {
+        moving = false
+        snapped = null
+        snapping = false
+        snapError = null
+    }
+
+    /** Where dot [i] sits with the move as it stands. */
+    fun movedPosition(i: Int): Pair<Double, Double> {
+        val p = points[i]
+        if (!moving || points.isEmpty()) return p.lat to p.lon
+        if (i in range) return snapped?.getOrNull(i - range.first) ?: (p.lat + moveLat to p.lon + moveLon)
+        if (!attachEnds) return p.lat to p.lon
+        val end = if (i < range.first) range.first else range.last
+        val away = kotlin.math.abs(i - end)
+        if (away > ATTACHED_DOTS) return p.lat to p.lon
+        val e = points[end]
+        val (lat, lon) = movedPosition(end)
+        val w = (ATTACHED_DOTS + 1 - away).toDouble() / (ATTACHED_DOTS + 1)
+        return p.lat + (lat - e.lat) * w to p.lon + (lon - e.lon) * w
+    }
+
+    /** The dots a move changes: the range, plus the ones pulled along at its ends. */
+    fun movedIndices(): IntRange {
+        if (points.isEmpty()) return IntRange.EMPTY
+        val pad = if (attachEnds) ATTACHED_DOTS else 0
+        return (range.first - pad).coerceAtLeast(0)..(range.last + pad).coerceAtMost(points.lastIndex)
+    }
+
     /** The dots a delete (or restore) would act on: the tapped dot if there is one, otherwise the range. */
     val target: List<EditablePoint>
         get() = selected?.let { listOfNotNull(points.getOrNull(it)) }
@@ -98,6 +160,11 @@ class DotEditState(day: LocalDate) {
         reselect = null
         busy = false
         if (selected == null) placing = null
+        stopMove()
+    }
+
+    companion object {
+        const val ATTACHED_DOTS = 3
     }
 }
 
@@ -121,8 +188,17 @@ fun DotsOverlay(camera: MapCamera, state: DotEditState, modifier: Modifier = Mod
         val r = 4.dp.toPx()
         val path = Path()
         var started = false
-        pts.forEachIndexed { i, p ->
-            val o = camera.toScreen(p.lat, p.lon) ?: return@Canvas
+        if (state.moving) {
+            // Where the moved dots were, as grey rings.
+            for (i in state.movedIndices()) {
+                val p = pts[i]
+                val o = camera.toScreen(p.lat, p.lon) ?: return@Canvas
+                drawCircle(outside, radius = r * 1.2f, center = o, style = Stroke(width = 1.5.dp.toPx()))
+            }
+        }
+        pts.forEachIndexed { i, _ ->
+            val (lat, lon) = state.movedPosition(i)
+            val o = camera.toScreen(lat, lon) ?: return@Canvas
             val active = i in state.range
             if (active) {
                 if (started) path.lineTo(o.x, o.y) else path.moveTo(o.x, o.y)
@@ -135,6 +211,54 @@ fun DotsOverlay(camera: MapCamera, state: DotEditState, modifier: Modifier = Mod
             val o = camera.toScreen(p.lat, p.lon) ?: return@let
             drawCircle(ring, radius = r * 3f, center = o)
             drawCircle(pick, radius = r * 2.2f, center = o)
+        }
+    }
+}
+
+/**
+ * The round handle in the middle of the range while moving it: drag it and the whole stretch follows. Only the
+ * handle takes the drag, so the map around it still pans and zooms.
+ */
+@Composable
+fun MoveHandle(camera: MapCamera, state: DotEditState, modifier: Modifier = Modifier) {
+    if (!state.moving || state.points.isEmpty()) return
+    camera.cameraTick // Follow the map as it moves.
+    val r = state.range
+    var lat = 0.0
+    var lon = 0.0
+    for (i in r) {
+        val (a, b) = state.movedPosition(i)
+        lat += a
+        lon += b
+    }
+    val n = (r.last - r.first + 1).coerceAtLeast(1)
+    val centre = camera.toScreen(lat / n, lon / n) ?: return
+    val sizePx = with(androidx.compose.ui.platform.LocalDensity.current) { 52.dp.toPx() }
+    Box(
+        modifier
+            .offset { IntOffset((centre.x - sizePx / 2).roundToInt(), (centre.y - sizePx / 2).roundToInt()) }
+            .size(52.dp)
+            .semantics { contentDescription = "Drag to move these dots" }
+            .pointerInput(state) {
+                detectDragGestures { change, drag ->
+                    change.consume()
+                    val here = camera.toScreen(state.points[state.range.first].lat + state.moveLat, state.points[state.range.first].lon + state.moveLon)
+                        ?: return@detectDragGestures
+                    val from = camera.toLatLng(here) ?: return@detectDragGestures
+                    val to = camera.toLatLng(Offset(here.x + drag.x, here.y + drag.y)) ?: return@detectDragGestures
+                    // Dragging again starts from where the dots were dragged to, not from the road.
+                    state.snapped = null
+                    state.snapError = null
+                    state.moveLat += to.first - from.first
+                    state.moveLon += to.second - from.second
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(shape = CircleShape, color = Color(0xFFF0F0F5), shadowElevation = 6.dp, modifier = Modifier.size(52.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                MaterialIcon(R.drawable.ic_open_with, size = 26, tint = Color(0xFF141418))
+            }
         }
     }
 }
@@ -177,6 +301,8 @@ fun EditPanel(
     onShow: (List<EditablePoint>) -> Unit,
     onDelete: (List<EditablePoint>) -> Unit,
     onRestore: (List<EditablePoint>) -> Unit,
+    onSnapMove: () -> Unit,
+    onSaveMove: () -> Unit,
     onClose: () -> Unit,
 ) {
     var picking by remember { mutableStateOf(false) }
@@ -284,6 +410,58 @@ fun EditPanel(
                                 DeleteButton("Delete dot") { confirming = listOf(sel) }
                             }
                         }
+                    } else if (state.moving) {
+                        val count = state.range.last - state.range.first + 1
+                        Text(
+                            if (state.snapped != null) "Moving $count dots · on the road" else "Moving $count dots",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        Hint(
+                            when {
+                                state.snapError != null -> state.snapError!!
+                                state.snapped != null -> "The dots sit on the nearest road for their trip's travel mode, and the trip is " +
+                                    "matched to it again after saving. Grey rings show where they were."
+                                else -> "Drag the round handle to move them together. Pan and zoom the map as usual."
+                            }
+                        )
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Keep the ends attached", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    "The ${DotEditState.ATTACHED_DOTS} dots either side are pulled along",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = state.attachEnds, onCheckedChange = { state.attachEnds = it })
+                        }
+                        FilledTonalButton(
+                            onClick = { if (state.snapped != null) state.snapped = null else onSnapMove() },
+                            enabled = !state.snapping,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        ) {
+                            if (state.snapping) {
+                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Finding the road…")
+                            } else {
+                                MaterialIcon(R.drawable.ic_route, size = 18)
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (state.snapped != null) "Undo snap" else "Snap to a road")
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { state.stopMove() }) { Text("Cancel") }
+                            Spacer(Modifier.width(8.dp))
+                            Button(
+                                onClick = onSaveMove,
+                                enabled = !state.snapping && (state.snapped != null || state.moveLat != 0.0 || state.moveLon != 0.0),
+                            ) { Text("Save") }
+                        }
                     } else {
                         val first = pts[state.range.first]
                         val last = pts[state.range.last]
@@ -302,16 +480,24 @@ fun EditPanel(
                             )
                             RangeSteppers(state, Modifier.padding(horizontal = 4.dp))
                         }
+                        Text(
+                            "Tap a dot to pick it",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
                         Row(
-                            Modifier.fillMaxWidth().padding(start = 12.dp),
+                            Modifier.fillMaxWidth().padding(start = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                "Tap a dot to pick it",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f),
-                            )
+                            if (!state.showingDeleted) {
+                                FilledTonalButton(onClick = { state.startMove() }) {
+                                    MaterialIcon(R.drawable.ic_open_with, size = 18)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (count == 1) "Move" else "Move $count")
+                                }
+                            }
+                            Spacer(Modifier.weight(1f))
                             TextButton(onClick = { onShow(state.target) }) { Text("Show") }
                             if (state.showingDeleted) {
                                 RestoreButton(if (count == 1) "Restore dot" else "Restore $count") { onRestore(state.target) }

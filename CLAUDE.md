@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.67.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.68.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -169,7 +169,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   `MapCamera.snapTo` (350 ms, zoom 17 + bearing); bearing glides keep the target tilt so they don't stop the 3D tilt); the glide also sets bearing = last heading, heading-up (since 2.46.1 flat too, at the user's request; `navHeadingUp` = following; stopping calls `northUp()`))), `TimelineScreen` (also hosts **Edit dots**
   with range slider, soft delete/restore, move/add dots (2.45.0: `DotEditState.placing` MOVE/ADD, next map tap →
   `PointStore.movePoint` / `addPointAfter` (halfway in time to the next dot, or +1 s after the last, same trip, accuracy 5 m, activity `ACTIVITY_BY_HAND` −2 so `findSpikes` never soft-deletes them — 2.65.1: they used to vanish as "blips") then `refreshTrip`; `dotEdit` label is read after the change (null → failure message, no Undo);
-  undo = move back / `removeAddedPoint` + `restore(snapshot)`; for ferry routes, which are TRACK so never road-snapped), undo snackbar over the map, layers button; long-press a trip row
+  undo = move back / `removeAddedPoint` + `restore(snapshot)`; 2.68.0 move a range (mockup approved, "Build all" incl. options): `DotEditState.moving`/`moveLat`/`moveLon`/`attachEnds` (`ATTACHED_DOTS` 3 either side, weights fading)/`snapped` (positions per range dot), `movedPosition(i)`, `movedIndices()`; `MoveHandle` (MapEditor.kt, 52 dp disc at the moved centroid, only it takes drags: `detectDragGestures` + `MapCamera.toLatLng` (new `unprojector`), desc "Drag to move these dots"); DotsOverlay draws moved positions + grey rings; Timeline `snapMove` (trip mode of the range → TrackSnapper.snap or Valhalla.match, each dot → `nearestOnLine`) and `saveMove` (`PointStore.movePoints(List<DotMove>)` one transaction, refreshTrip per trip clears trip_paths so RoadSnapper re-matches; Undo = movePoints(back) + restore(snapshot)); map taps ignored while moving; Move button sits in the Show/Delete row; for ferry routes, which are TRACK so never road-snapped), undo snackbar over the map, layers button; long-press a trip row
   for a mode menu (`setTripMode`) and **Change times** (`RetimePanel` → `PointStore.retimeTrip`, which moves
   dots between the trip, adjacent trips (<5 min apart) and stays (trip_id -1), then `refreshTrip`s them);
   the map is framed only when the period changes, not on every reload; `DayEntry.Group` joins back-to-back

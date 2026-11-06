@@ -97,6 +97,26 @@ for node in root.iter("node"):
 PY
 }
 
+# Centre of the first element whose text starts with $1 (mode "prefix") or whose content-desc is $1 (mode "desc").
+centre_match() {
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    adb pull /sdcard/ui.xml "$OUT/.ui.xml" > /dev/null 2>&1
+    python3 -I - "$OUT/.ui.xml" "$1" "$2" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(0)
+mode, want = sys.argv[2], sys.argv[3]
+for node in root.iter("node"):
+    ok = (node.get("text") or "").startswith(want) if mode == "prefix" else node.get("content-desc") == want
+    if ok:
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds", "")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+}
+
 # Like tap, but scrolls down (up to 5 times) until the element is on screen.
 tap_scrolling() {
     local mode=$1 label=$2 attr
@@ -274,6 +294,28 @@ shot 03-timeline 5
 # Dots on the Timeline map, then back to Routes.
 tap text "Dots"
 shot 03a-timeline-dots 4
+# Move a stretch of dots: Move, drag the handle, snap to a road, then cancel (nothing saved).
+read -r mx my <<< "$(centre_match prefix 'Move')"
+if [ -n "${mx:-}" ]; then
+    adb shell input tap "$mx" "$my"
+    sleep 2
+    shot 03b-move-dots 1
+    read -r hx hy <<< "$(centre_match desc 'Drag to move these dots')"
+    if [ -n "${hx:-}" ]; then
+        adb shell input swipe "$hx" "$hy" $((hx + 160)) $((hy + 120)) 900
+        note "dragged the move handle"
+        sleep 1
+        shot 03c-moved-dots 1
+    else
+        note "MISSING the move handle"
+    fi
+    tap text "Snap to a road"
+    sleep 6
+    shot 03d-moved-snapped 1
+    tap text "Cancel"
+else
+    note "MISSING the Move button"
+fi
 tap text "Routes"
 tap text "Questions"
 shot 04-questions 3
