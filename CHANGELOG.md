@@ -12,6 +12,22 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.69.0] - 2026-11-11
+
+### Changed
+- **More colours in the heatmap**: a road now takes about 140 trips (instead of 30) to reach full brightness, so the
+  roads you use a lot still step through dark red, red, orange and yellow instead of all looking white.
+- **Time counts in the heatmap**: places where you spend time (home, work) glow by the hours you've spent there, so
+  your workplace outshines the road you drive to it.
+- **Cleaner 3D routes**: only trips matched to a road (or railway / ferry route) are raised; trips not matched yet,
+  ones that strayed from the road, and time spent somewhere stay flat. Passes are only joined within a lane, so each
+  carriageway of a divided road keeps its own ribbon. The flat heatmap fades under the 3D routes so it no longer
+  covers them.
+
+### Added
+- **Recalculate 3D routes** in Settings › Map & routes: matches every trip that isn't matched to a road yet, then works
+  every 3D route out again from all the dots since your first one, with progress as it goes.
+
 ## [2.68.2] - 2026-11-11
 
 ### Fixed

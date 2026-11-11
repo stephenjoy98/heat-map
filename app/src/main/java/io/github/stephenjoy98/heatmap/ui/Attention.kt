@@ -52,6 +52,7 @@ object Attention {
         settings("general") to "2.31.0",
         settings("modes") to "2.61.0",
         settings("places") to "2.66.0",
+        settings("map") to "2.69.0",
     )
 
     // Goes up when something is marked seen, so markers drawn from it update.

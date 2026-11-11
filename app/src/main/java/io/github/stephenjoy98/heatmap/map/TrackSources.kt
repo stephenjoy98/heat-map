@@ -51,6 +51,8 @@ class OwnTracks(private val store: PointStore, private val modes: Set<TravelMode
     }
 
     override fun grid(box: GeoBox, cellLat: Double, cellLon: Double): GridData = store.gridIn(box, cellLat, cellLon, modes)
+
+    override fun forEachStay(box: GeoBox, block: (Double, Double, Double) -> Unit) = store.forEachStayDot(box, modes, block)
 }
 
 /** A friend's shared routes (no timestamps; each route is already continuous). */

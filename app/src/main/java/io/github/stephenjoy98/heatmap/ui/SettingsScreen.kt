@@ -95,6 +95,10 @@ import io.github.stephenjoy98.heatmap.tracking.LocationTickerService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import io.github.stephenjoy98.heatmap.map.Route3dStatus
 import java.time.LocalDate
 import kotlin.math.abs
 import androidx.annotation.DrawableRes
@@ -366,6 +370,8 @@ fun SettingsScreen(
                         if (it) RoadSnapWorker.runNow(context)
                     })
                 }
+                ItemDivider()
+                Recalculate3dRow(store, snapToRoads)
             }
 
             if (shows(SettingsPage.MODES)) TravelModesSection()
@@ -506,6 +512,81 @@ internal fun Section(title: String, content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column { content() }
+    }
+}
+
+/**
+ * Settings › Map › Recalculate 3D routes: matches every trip not matched to a road yet, then works the 3D routes out
+ * again from all the dots recorded since the first one. Only matched trips are raised in 3D, so the progress shows
+ * how many are matched.
+ */
+@Composable
+private fun Recalculate3dRow(store: PointStore, snapToRoads: Boolean) {
+    val context = LocalContext.current
+    var running by remember { mutableStateOf(false) }
+    var counts by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    var since by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            since = store.firstPointTime()
+            counts = store.matchCounts()
+        }
+    }
+    // While it runs, follow the matching as it goes, until nothing is left waiting (or ten minutes pass).
+    LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
+        val started = System.currentTimeMillis()
+        while (true) {
+            delay(2_000)
+            val now = withContext(Dispatchers.IO) { store.matchCounts() }
+            counts = now
+            if (now.second == 0 || System.currentTimeMillis() - started > 10 * 60_000L) break
+        }
+        Route3dStatus.recalculate(store)
+        running = false
+    }
+    val sinceText = since?.let {
+        java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            .format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM))
+    }
+    Column(Modifier.padding(16.dp)) {
+        Text("Recalculate 3D routes", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Works out every 3D route again from all the dots you've recorded" + (sinceText?.let { " since $it" } ?: "") +
+                ": heights, lanes and road matches. Trips not matched to a road yet are matched first; only matched " +
+                "trips are raised in 3D.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        counts?.let { (total, waiting, matched) ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (running && waiting > 0) "Matching trips to roads · ${total - waiting} of $total"
+                else "$matched of $total trips matched to a road" + (if (waiting > 0) " · $waiting waiting" else ""),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (running && total > 0) {
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(progress = { (total - waiting).toFloat() / total }, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        if (!snapToRoads) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Turn on Snap routes to roads above to match trips; without it only trips already matched are raised.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        FilledTonalButton(
+            onClick = {
+                running = true
+                store.clearAltitudeBaseline()
+                RoadSnapWorker.runNow(context)
+            },
+            enabled = !running,
+        ) { Text(if (running) "Recalculating…" else "Recalculate everything") }
     }
 }
 

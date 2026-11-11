@@ -787,6 +787,22 @@ class PointStore private constructor(context: Context) :
             TrackData(i, time, lat, lon, interval)
         }
 
+    /**
+     * Dots in [box] recorded while not on a trip (time spent somewhere), each with the hours it stands for: the
+     * recording interval at the time, capped at an hour so a gap in recording doesn't count as being there.
+     */
+    fun forEachStayDot(box: GeoBox, modes: Set<TravelMode>, block: (Double, Double, Double) -> Unit) {
+        readableDatabase.rawQuery(
+            "SELECT lat, lon, interval_ms FROM points WHERE ${where(box)}${modeClause(modes)} AND trip_id <= 0",
+            null,
+        ).use { c ->
+            while (c.moveToNext()) {
+                val hours = c.getLong(2).coerceIn(0L, 3_600_000L) / 3_600_000.0
+                if (hours > 0) block(c.getDouble(0), c.getDouble(1), hours)
+            }
+        }
+    }
+
     /** Counts points per cell, where cell (0, 0) is the south-west corner of [box]. */
     fun gridIn(box: GeoBox, cellLat: Double, cellLon: Double, modes: Set<TravelMode>): GridData =
         readableDatabase.rawQuery(
@@ -1835,6 +1851,16 @@ class PointStore private constructor(context: Context) :
         )
         changed()
     }
+
+    /** For Settings › Recalculate 3D routes: all trips, those still waiting to be matched, and those matched to a road. */
+    fun matchCounts(): Triple<Int, Int, Int> = Triple(
+        long("SELECT COUNT(*) FROM trips").toInt(),
+        long("SELECT COUNT(*) FROM trips WHERE id NOT IN (SELECT trip_id FROM trip_paths)").toInt(),
+        long("SELECT COUNT(*) FROM trip_paths WHERE poly IS NOT NULL").toInt(),
+    )
+
+    /** When the first dot was recorded, or null with none. */
+    fun firstPointTime(): Long? = long("SELECT COALESCE(MIN(time), 0) FROM points").takeIf { it > 0 }
 
     fun tripsWithoutPath(limit: Int = 20): List<Trip> =
         trips("WHERE id NOT IN (SELECT trip_id FROM trip_paths) ORDER BY start_time LIMIT $limit")

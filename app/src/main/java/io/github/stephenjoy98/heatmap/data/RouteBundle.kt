@@ -7,8 +7,9 @@ import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
- * Bundles every pass along the same street into one route for the 3D view, so ten trips down a road make one
- * ribbon at their average line and height instead of ten ribbons side by side.
+ * Bundles passes along the same lane into one route for the 3D view, so ten trips down a road make one ribbon
+ * at their average line and height. Only passes within a couple of metres pool (matched trips follow the same
+ * road shape), so separate lanes and carriageways keep ribbons of their own.
  *
  * Every dot counts: each route is walked in small steps, the steps are pooled into ~10 m squares, each square's
  * position and height is pulled towards its busy neighbours (weighted by how many passes went through them) a few
@@ -18,17 +19,17 @@ import kotlin.math.sqrt
  */
 object RouteBundle {
     private const val METERS_PER_DEGREE = 111_320.0
-    private const val STEP_M = 4.0
-    private const val CELL_M = 10.0
+    private const val STEP_M = 2.0
+    private const val CELL_M = 4.0
     private const val BAND_M = 12.0
-    private const val SIGMA_M = 9.0
-    private const val RADIUS_CELLS = 3
-    private const val ROUNDS = 3
-    private const val MERGE_M = 8.0
+    private const val SIGMA_M = 2.0
+    private const val RADIUS_CELLS = 1
+    private const val ROUNDS = 2
+    private const val MERGE_M = 3.0
     // Heights further apart than this are different levels and never pooled.
     private const val LEVEL_M = 5.0
     // Side branches shorter than this off a street are leftovers of the pooling, not streets.
-    private const val STUB_M = 25.0
+    private const val STUB_M = 12.0
 
     fun bundle(lines: List<List<ElevationPoint>>): List<List<ElevationPoint>> {
         val routes = lines.filter { it.size >= 2 }

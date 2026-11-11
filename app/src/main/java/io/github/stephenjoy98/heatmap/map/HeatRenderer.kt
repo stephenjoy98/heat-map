@@ -6,12 +6,16 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.data.GeoBox
 import io.github.stephenjoy98.heatmap.data.GridData
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan
+import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -29,6 +33,9 @@ interface TrackSource {
 
     /** Points per cell, or null if this source can't aggregate. */
     fun grid(box: GeoBox, cellLat: Double, cellLon: Double): GridData?
+
+    /** Time spent in [box] while not travelling: [block] once per dot with the hours it stands for. */
+    fun forEachStay(box: GeoBox, block: (lat: Double, lon: Double, hours: Double) -> Unit) = Unit
 }
 
 /**
@@ -48,6 +55,31 @@ object HeatRenderer {
      * of times and every day all get colours of their own.
      */
     const val PASS_ALPHA = 0.085f
+
+    /**
+     * What one pass actually draws into the density buffer: much less than [PASS_ALPHA], so it takes about 140
+     * passes (rather than 30) to fill up and busy roads keep stepping through the colours. [toRamp] maps the
+     * buffer back so one pass still lands on [PASS_ALPHA] of the ramp, and the rest spreads out logarithmically.
+     */
+    private const val DRAW_PASS = 3f / 255f
+    /** Where 8-bit blending stops adding up at [DRAW_PASS]; treated as "travelled the most". */
+    private const val DRAW_FULL = 0.80f
+    /** Hours at one spot that count as "the most": time at home or work glows up to white over weeks. */
+    private const val FULL_HOURS = 400.0
+
+    /** Density buffer value (0..1) to position on the colour ramp (0..1). */
+    fun toRamp(t: Float): Float = when {
+        t <= 0f -> 0f
+        t <= DRAW_PASS -> t / DRAW_PASS * PASS_ALPHA
+        else -> (PASS_ALPHA + (1f - PASS_ALPHA) * (ln(t / DRAW_PASS) / ln(DRAW_FULL / DRAW_PASS))).coerceAtMost(1f)
+    }
+
+    /** The other way: how much to draw for a position on the ramp. */
+    fun fromRamp(r: Float): Float = when {
+        r <= 0f -> 0f
+        r <= PASS_ALPHA -> r / PASS_ALPHA * DRAW_PASS
+        else -> (DRAW_PASS * exp((r.coerceAtMost(1f) - PASS_ALPHA) / (1f - PASS_ALPHA) * ln(DRAW_FULL / DRAW_PASS))).coerceAtMost(1f)
+    }
 
     /**
      * Renders the [box] area into a [size]×[size] bitmap, or returns null if nothing is there.
@@ -89,7 +121,9 @@ object HeatRenderer {
         } else {
             drawRoutes(source, query, px, canvas, stroke, isCancelled)
         }
-        if (!drew || isCancelled()) {
+        // Time spent somewhere glows by the hours, so a place you stay all day outshines the road to it.
+        val stayed = mode != DisplayMode.POINTS && drawStays(source, query, px, canvas, stroke)
+        if (!(drew || stayed) || isCancelled()) {
             buffer.recycle()
             return null
         }
@@ -100,13 +134,13 @@ object HeatRenderer {
     private fun drawRoutes(
         source: TrackSource, query: GeoBox, px: Projector, canvas: Canvas, stroke: Float, isCancelled: () -> Boolean,
     ): Boolean {
-        val alpha = (PASS_ALPHA * 255).roundToInt()
+        val alpha = (DRAW_PASS * 255).roundToInt()
         val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
             strokeWidth = stroke * 3.5f
-            color = Color.argb(alpha / 4, 255, 255, 255)
+            color = Color.argb(maxOf(1, alpha / 4), 255, 255, 255)
         }
         val core = Paint(glow).apply {
             strokeWidth = stroke
@@ -155,21 +189,62 @@ object HeatRenderer {
             val lat = query.south + (grid.row[i] + 0.5) * cellLat
             val lon = query.west + (grid.col[i] + 0.5) * cellLon
             // Many points in one cell count for more, but logarithmically, like repeated visits.
-            val weight = min(1f, PASS_ALPHA * (1f + ln(grid.count[i].toFloat())))
-            paint.color = Color.argb((weight * 255).roundToInt(), 255, 255, 255)
+            val weight = fromRamp(min(1f, PASS_ALPHA * (1f + ln(grid.count[i].toFloat()))))
+            paint.color = Color.argb((weight * 255).roundToInt().coerceAtLeast(1), 255, 255, 255)
             canvas.drawCircle(px.x(lon), px.y(lat), radius, paint)
         }
         return grid.size > 0
     }
+
+    /**
+     * Pools the time spent at each spot into small squares and draws each as a soft round glow, stronger the
+     * more hours were spent there.
+     */
+    private fun drawStays(source: TrackSource, query: GeoBox, px: Projector, canvas: Canvas, stroke: Float): Boolean {
+        val cell = maxOf(stroke * 3f, 6f)
+        val hours = HashMap<Long, DoubleArray>()
+        source.forEachStay(query) { lat, lon, h ->
+            val x = px.x(lon)
+            val y = px.y(lat)
+            val key = (floor(x / cell).toLong() shl 32) or (floor(y / cell).toLong() and 0xFFFFFFFFL)
+            val acc = hours.getOrPut(key) { DoubleArray(3) }
+            acc[0] += h
+            acc[1] += x * h
+            acc[2] += y * h
+        }
+        var drew = false
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val radius = cell * 1.3f
+        for (acc in hours.values) {
+            val h = acc[0]
+            if (h < MIN_STAY_HOURS) continue
+            val r = PASS_ALPHA + (1f - PASS_ALPHA) * (ln(1.0 + h) / ln(1.0 + FULL_HOURS)).toFloat()
+            val a = (fromRamp(r) * 255).roundToInt().coerceIn(1, 255)
+            val cx = (acc[1] / h).toFloat()
+            val cy = (acc[2] / h).toFloat()
+            paint.shader = RadialGradient(
+                cx, cy, radius,
+                intArrayOf(Color.argb(a, 255, 255, 255), Color.argb(a / 2, 255, 255, 255), Color.argb(0, 255, 255, 255)),
+                floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(cx, cy, radius, paint)
+            drew = true
+        }
+        return drew
+    }
+
+    private const val MIN_STAY_HOURS = 0.25
 
     /** Replaces the white density buffer with ramp colours, in place. */
     private fun colorize(bitmap: Bitmap, ramp: IntArray) {
         val w = bitmap.width
         val h = bitmap.height
         val row = IntArray(w)
+        // The buffer is filled slowly (see DRAW_PASS); spread it back over the whole ramp.
+        val lut = IntArray(256) { ramp[(toRamp(it / 255f) * 255).roundToInt().coerceIn(0, 255)] }
         for (y in 0 until h) {
             bitmap.getPixels(row, 0, w, 0, y, w, 1)
-            for (x in 0 until w) row[x] = ramp[row[x] ushr 24]
+            for (x in 0 until w) row[x] = lut[row[x] ushr 24]
             bitmap.setPixels(row, 0, w, 0, y, w, 1)
         }
     }

@@ -358,6 +358,15 @@ shot 06-settings 3
 tap text "General"
 shot 07-settings-general 3
 back
+# Map & routes: the Recalculate 3D routes card (scrolled into view, not run).
+tap text "Map & routes"
+sleep 1
+read -r rx ry <<< "$(centre_of 'Recalculate everything')"
+if [ -z "${rx:-}" ]; then adb shell input swipe 540 1700 540 700 300; sleep 1; fi
+read -r rx ry <<< "$(centre_of 'Recalculate everything')"
+[ -n "${rx:-}" ] || note "MISSING Recalculate everything"
+shot 07b-settings-map 3
+back
 tap text "Battery"
 shot 08-settings-battery 3
 tap text "Battery saver"

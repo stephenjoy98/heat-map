@@ -46,27 +46,17 @@ object Route3dTracks {
     private class Line(val pass: Long, val dots: List<ElevationPoint>, val lat: DoubleArray?, val lon: DoubleArray?)
 
     fun load(store: PointStore, box: GeoBox, modes: Set<TravelMode>): List<List<ElevationPoint>> {
-        val smooth = Prefs.smoothRoutes.value
-        // Same choice as the flat map: road shapes only while Snap to roads is on.
-        val snapped = Prefs.snapToRoads.value
         val lines = ArrayList<Line>()
         val drawnTrips = HashSet<Long>()
+        // Only trips matched to a road (or railway / ferry route) are raised: a route that strays from the road,
+        // isn't matched yet, or is time spent somewhere stays flat on the heatmap, so 3D shows only clean lines.
         for (run in store.elevationRunsIn(box, modes)) {
-            val poly = if (snapped && run.tripId > 0) store.tripPathRow(run.tripId)?.poly else null
-            if (poly != null) {
-                if (!drawnTrips.add(run.tripId)) continue
-                val pts = Polyline.decode(poly)
-                val n = pts.size / 2
-                if (n < 2) continue
-                lines += Line(run.pass, store.tripElevations(run.tripId), DoubleArray(n) { pts[it * 2] }, DoubleArray(n) { pts[it * 2 + 1] })
-            } else if (smooth && run.dots.size >= 3) {
-                val lat = DoubleArray(run.dots.size) { run.dots[it].lat }
-                val lon = DoubleArray(run.dots.size) { run.dots[it].lon }
-                val (la, lo) = Smoothing.smooth(lat, lon, 0, run.dots.size)
-                lines += Line(run.pass, run.dots, la, lo)
-            } else {
-                lines += Line(run.pass, run.dots, null, null)
-            }
+            if (run.tripId <= 0 || !drawnTrips.add(run.tripId)) continue
+            val poly = store.tripPathRow(run.tripId)?.poly ?: continue
+            val pts = Polyline.decode(poly)
+            val n = pts.size / 2
+            if (n < 2) continue
+            lines += Line(run.pass, store.tripElevations(run.tripId), DoubleArray(n) { pts[it * 2] }, DoubleArray(n) { pts[it * 2 + 1] })
         }
         if (lines.isEmpty()) return emptyList()
 

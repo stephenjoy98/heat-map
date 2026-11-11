@@ -627,8 +627,11 @@ private fun VectorAppMap(
         }
     }
 
+    // While 3D routes stand up off the map, the flat heat (drawn above the map) fades so it doesn't cover them.
+    val raisedRoutes by Prefs.routes3d.collectAsStateWithLifecycle()
+    val heatDim = if (tilted && raisedRoutes && route3d != null) HEAT_UNDER_3D else 1f
     SideEffect {
-        overlay.setLayers(layers.map { TileOverlayView.LayerSpec(it.id, it.source, it.alpha, it.zIndex) })
+        overlay.setLayers(layers.map { TileOverlayView.LayerSpec(it.id, it.source, it.alpha * heatDim, it.zIndex) })
         overlay.latest = latest?.let { MLatLng(it.latitude, it.longitude) }
         overlay.heading = heading
         overlay.navMarker = navMarker
@@ -915,3 +918,6 @@ private fun PreviewButton(label: String, onClick: () -> Unit, content: @Composab
 
 /** New dots redraw the 3D route at most this often (when the view itself hasn't moved on). */
 private const val REBUILD_FOR_DOTS_MS = 30_000L
+
+/** How strongly the flat heatmap shows under raised 3D routes. */
+private const val HEAT_UNDER_3D = 0.35f
