@@ -1859,9 +1859,6 @@ class PointStore private constructor(context: Context) :
         long("SELECT COUNT(*) FROM trip_paths WHERE poly IS NOT NULL").toInt(),
     )
 
-    /** When the first dot was recorded, or null with none. */
-    fun firstPointTime(): Long? = long("SELECT COALESCE(MIN(time), 0) FROM points").takeIf { it > 0 }
-
     fun tripsWithoutPath(limit: Int = 20): List<Trip> =
         trips("WHERE id NOT IN (SELECT trip_id FROM trip_paths) ORDER BY start_time LIMIT $limit")
 
