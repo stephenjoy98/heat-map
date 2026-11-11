@@ -170,6 +170,10 @@ class LocationTickerService : Service() {
     private var currentPlace: SavedPlace? = null
     /** Whether the latest fix was outside every saved place. */
     private var fixOutsidePlaces = false
+    /** A place just left (by a fix or Android's geofence) that a clearly-outside fix hasn't confirmed yet. */
+    private var leaving: SavedPlace? = null
+    /** Follow me was turned on by leaving a place, so being back at any saved place turns it off again. */
+    private var followFromLeaving = false
 
     private fun requestUpdates() {
         // Follow me on the map: every second, with GPS, until it's turned off.
@@ -256,16 +260,27 @@ class LocationTickerService : Service() {
         val place = PlaceZones.find(Prefs.savedPlaces.value, location.latitude, location.longitude, currentPlace)
         if (place?.id != currentPlace?.id) {
             // Only a real arrival from outside, not the first fix after starting at home (follow me would end at once).
-            val arrived = place != null && currentPlace == null && fixOutsidePlaces
-            val left = currentPlace?.takeIf { place == null }
+            // Follow me started by leaving counts too, whatever the last fix said.
+            val arrived = place != null && currentPlace == null && (fixOutsidePlaces || followFromLeaving)
+            currentPlace?.takeIf { place == null }?.let { leaving = it }
             currentPlace = place
-            left?.let { followOnLeaving(it) }
             Prefs.setAtPlace(place)
             // Arriving at a saved place: follow me ends and recording goes automatic (it slows down while you stay).
             if (arrived && (Prefs.followBoost.value || !Prefs.autoInterval.value)) {
+                followFromLeaving = false
                 Prefs.setFollowBoost(false)
                 FollowMode.autoRecording()
                 requestUpdates()
+            }
+        }
+        // Leaving only counts once a fix is clearly outside the place, not on one wobbly fix or a geofence alone.
+        leaving?.let { left ->
+            when {
+                place != null -> leaving = null
+                PlaceZones.clearlyOutside(left, location.latitude, location.longitude, location.accuracy) -> {
+                    leaving = null
+                    followOnLeaving(left)
+                }
             }
         }
         fixOutsidePlaces = place == null
@@ -324,12 +339,16 @@ class LocationTickerService : Service() {
     /** Leaving a place set to "Follow me when I leave": follow me goes on (recording every second). */
     private fun followOnLeaving(place: SavedPlace) {
         val now = Prefs.savedPlaces.value.firstOrNull { it.id == place.id } ?: return
-        if (now.followOnLeave && !Prefs.followBoost.value) FollowMode.set(this, true)
+        if (now.followOnLeave && !Prefs.followBoost.value) {
+            followFromLeaving = true
+            FollowMode.set(this, true)
+        }
     }
 
     private fun leavePlace() {
         if (currentPlace == null && placeSec == null) return
-        currentPlace?.let { followOnLeaving(it) }
+        // Android's geofence can say "left" while you're still inside; the next fixes confirm it (see onFix).
+        currentPlace?.let { leaving = it }
         currentPlace = null
         Prefs.setAtPlace(null)
         reconsider(ActivityTracker.current, null)

@@ -62,9 +62,16 @@ data class SavedPlace(
 /** Which saved place a position is in. */
 object PlaceZones {
     // Once inside, a place only lets go this far past its edge, so GPS wobble at the edge doesn't flip-flop.
-    private const val LEAVE_MARGIN_M = 30.0
+    const val LEAVE_MARGIN_M = 30.0
 
     /** The place containing the position: [current] while still within its edge plus a margin, else the nearest. */
+    /**
+     * Whether a fix is clearly outside [place]: even the near edge of its accuracy circle is past the place's
+     * leave margin, so one wobbly fix indoors can't count as leaving.
+     */
+    fun clearlyOutside(place: SavedPlace, lat: Double, lon: Double, accuracyM: Float): Boolean =
+        place.distanceTo(lat, lon) - accuracyM.coerceAtLeast(0f) > place.radiusM + LEAVE_MARGIN_M
+
     fun find(places: List<SavedPlace>, lat: Double, lon: Double, current: SavedPlace?): SavedPlace? {
         val stay = current?.let { c -> places.firstOrNull { it.id == c.id } }
         if (stay != null && stay.distanceTo(lat, lon) <= stay.radiusM + LEAVE_MARGIN_M) return stay

@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.68.1**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.68.2**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -96,7 +96,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   needs background location; `PlaceFenceReceiver` in manifest), service `placeSec` override: settled →
   max(base, place interval) + balanced accuracy; moving (activity or >0.7 m/s) → auto: max(base, 20 s), fixed:
   base. UI `PlacesSection` (Settings) with full-screen `PlaceEditor` (pin at map centre via `MapCamera.center`),
-  suggestions from `PointStore.frequentSpots`. 2.62.0 (design approved from a mockup): `SavedPlace.icon` key (JSON "icon", null = kind's default) from `ui/PlaceIcons` (20 Material **filled** drawables `ic_place_<key>` since 2.62.1 — the outlined set mixes line and solid glyphs, the user disliked it; `res(place)`, `placeFor(places, lat, lon, name)` for Timeline stays); icon grid in `PlaceEditor` (map fixed at 40% of screen height, settings scroll below: 2.62.1); 2.66.0 `SavedPlace.followOnLeave` (JSON "follow", editor Switch "Follow me when I leave"): service `followOnLeaving` on leaving (fix leaves the circle or geofence `leavePlace`) → `FollowMode.set(true)`; Profile `PlaceTimeCard` = `PointStore.timeAtPlaces(places, from, to)` (gaps ≤ `MAX_PLACE_GAP_MS` 1 h between consecutive dots in the same place, plus total recorded time), period = year chips, tap cycles this week / this month.
+  suggestions from `PointStore.frequentSpots`. 2.62.0 (design approved from a mockup): `SavedPlace.icon` key (JSON "icon", null = kind's default) from `ui/PlaceIcons` (20 Material **filled** drawables `ic_place_<key>` since 2.62.1 — the outlined set mixes line and solid glyphs, the user disliked it; `res(place)`, `placeFor(places, lat, lon, name)` for Timeline stays); icon grid in `PlaceEditor` (map fixed at 40% of screen height, settings scroll below: 2.62.1); 2.66.0 `SavedPlace.followOnLeave` (JSON "follow", editor Switch "Follow me when I leave"): service `followOnLeaving` on leaving (fix leaves the circle or geofence `leavePlace`) → `FollowMode.set(true)` (2.68.2 fix, user saw it trigger at home: leaving only sets `leaving`; follow starts when a fix is `PlaceZones.clearlyOutside` (distance − accuracy > radius + 30 m); geofence EXIT alone never starts it; `followFromLeaving` makes any return to a saved place count as arrival and end it); Profile `PlaceTimeCard` = `PointStore.timeAtPlaces(places, from, to)` (gaps ≤ `MAX_PLACE_GAP_MS` 1 h between consecutive dots in the same place, plus total recorded time), period = year chips, tap cycles this week / this month.
 - Battery profiles (2.32.0): `data/PowerProfile` (USER/PERFORMANCE/DEFAULT/SAVER: per-activity seconds + highAccuracy),
   `Prefs.powerProfile`, `applyPowerProfile` (saves the user's interval/auto/accuracy as JSON "user_profile" when leaving
   USER, restores it on return; built-ins force auto + their accuracy); manual `setIntervalSec`/`setAutoInterval`/

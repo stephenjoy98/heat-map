@@ -12,6 +12,14 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.68.2] - 2026-11-11
+
+### Fixed
+- **Follow me when I leave** no longer turns on while you're still at the place: one inaccurate fix indoors, or
+  Android's "left this place" signal on its own, used to start it. Now a fix has to be clearly outside the place,
+  even allowing for its accuracy. And if follow me was started by leaving, it turns off as soon as you're back at
+  any saved place.
+
 ## [2.68.1] - 2026-11-06
 
 ### Added
