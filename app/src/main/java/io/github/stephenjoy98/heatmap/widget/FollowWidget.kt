@@ -145,7 +145,7 @@ class FollowWidget : AppWidgetProvider() {
             val glow = when (palette) {
                 HeatPalette.FIRE -> Color.rgb(128, 10, 44)
                 HeatPalette.ICE -> Color.rgb(18, 55, 165)
-                HeatPalette.WHITE -> Color.rgb(150, 150, 155)
+                HeatPalette.FOG -> Color.rgb(150, 150, 155)
             }
             val cx = px / 2f
             val r = px * 0.34f

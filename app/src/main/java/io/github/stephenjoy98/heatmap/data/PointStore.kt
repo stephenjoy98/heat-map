@@ -803,6 +803,23 @@ class PointStore private constructor(context: Context) :
         }
     }
 
+    /**
+     * How much of [box] you've been to: the share of ~60 m squares in it that have a dot, from 0 to 1 (for the
+     * Fog of war's "explored" figure).
+     */
+    fun exploredShare(box: GeoBox, modes: Set<TravelMode>): Double {
+        val midLat = (box.north + box.south) / 2
+        val cellLat = EXPLORE_CELL_M / 111_320.0
+        val cellLon = EXPLORE_CELL_M / (111_320.0 * kotlin.math.cos(Math.toRadians(midLat)).coerceAtLeast(0.01))
+        val rows = ((box.north - box.south) / cellLat).coerceAtLeast(1.0)
+        val cols = ((box.east - box.west) / cellLon).coerceAtLeast(1.0)
+        val explored = long(
+            """SELECT COUNT(*) FROM (SELECT DISTINCT CAST((lat - ${box.south}) / $cellLat AS INTEGER),
+               CAST((lon - ${box.west}) / $cellLon AS INTEGER) FROM points WHERE ${where(box)}${modeClause(modes)})"""
+        )
+        return (explored / (rows * cols)).coerceIn(0.0, 1.0)
+    }
+
     /** Counts points per cell, where cell (0, 0) is the south-west corner of [box]. */
     fun gridIn(box: GeoBox, cellLat: Double, cellLon: Double, modes: Set<TravelMode>): GridData =
         readableDatabase.rawQuery(
@@ -2369,6 +2386,7 @@ class PointStore private constructor(context: Context) :
 
         // Accuracy given to a dot moved or added by hand, so it never counts as a coarse fix.
         private const val HAND_PLACED_ACCURACY_M = 5f
+        private const val EXPLORE_CELL_M = 60.0
         /** The activity saved with dots added or moved by hand (Android's activity types are all 0 or more). */
         const val ACTIVITY_BY_HAND = -2
 

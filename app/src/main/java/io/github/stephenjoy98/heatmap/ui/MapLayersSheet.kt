@@ -163,8 +163,17 @@ fun MapLayersSheet(onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LayerTile("Fire", palette == HeatPalette.FIRE, { Prefs.setHeatPalette(HeatPalette.FIRE) }) { drawHeatArt(FIRE_STOPS) }
                 LayerTile("Ice", palette == HeatPalette.ICE, { Prefs.setHeatPalette(HeatPalette.ICE) }) { drawHeatArt(ICE_STOPS) }
-                // Snow, no heat: every route the same white, with a soft glow.
-                LayerTile("Snow", palette == HeatPalette.WHITE, { Prefs.setHeatPalette(HeatPalette.WHITE) }) { drawHeatArt(WHITE_STOPS) }
+                // Fog of war: the map hidden except where you've been.
+                LayerTile("Fog", palette == HeatPalette.FOG, { Prefs.setHeatPalette(HeatPalette.FOG) }) { drawFogArt() }
+            }
+            if (palette == HeatPalette.FOG) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Fog of war: the map stays hidden except where your dots have been, and the top bar shows how much of " +
+                        "the area in view you've explored.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             // Routes draws the lines you travelled; Dots draws where the recorded dots are, thicker where there are more.
             val display by Prefs.displayMode.collectAsStateWithLifecycle()
@@ -350,7 +359,20 @@ private fun DrawScope.drawBuildingsArt(c: ArtColors) {
 
 // The heatmap palettes' own colours (map elements aren't themed), from one visit to the most.
 private val FIRE_STOPS = listOf(Color(0xFF78082D), Color(0xFFDC2819), Color(0xFFFF9100), Color(0xFFFFF0A0), Color.White)
-private val WHITE_STOPS = List(5) { Color(0xFFF0F0F0) }
+/** Grey fog with a winding path cleared through it, showing the dark map underneath. */
+private fun DrawScope.drawFogArt() {
+    val w = size.width
+    val h = size.height
+    drawRect(Color(0xFF2A2A2E), topLeft = Offset(w * 0.1f, h * 0.3f), size = androidx.compose.ui.geometry.Size(w * 0.8f, h * 0.4f))
+    val path = Path().apply {
+        moveTo(w * 0.1f, h * 0.6f)
+        cubicTo(w * 0.35f, h * 0.45f, w * 0.55f, h * 0.65f, w * 0.9f, h * 0.38f)
+    }
+    // The fog, then the path cleared through it (the dark map shows where it's cleared).
+    drawRect(Color(0xEB767980), topLeft = Offset(w * 0.1f, h * 0.3f), size = androidx.compose.ui.geometry.Size(w * 0.8f, h * 0.4f))
+    drawPath(path, Color(0xFF2A2A2E), style = androidx.compose.ui.graphics.drawscope.Stroke(width = h * 0.12f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+    drawPath(path, Color(0xFF3A3B40), style = androidx.compose.ui.graphics.drawscope.Stroke(width = h * 0.03f))
+}
 private val ICE_STOPS = listOf(Color(0xFF0C1969), Color(0xFF195AD7), Color(0xFF46B4FF), Color(0xFFC8EEFF), Color.White)
 
 /** A heatmap palette as stripes of solid colour, from one visit (left) to the most (right). */

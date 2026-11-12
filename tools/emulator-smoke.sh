@@ -204,11 +204,13 @@ tap_scrolling text "Ice"
 shot 02d-layers-ice 2
 back
 shot 02c-map-vivid 4
-# Snow: plain white routes (no heat), then back to Fire.
+# Fog of war: the map hidden except where the dots are, with the explored share in the top bar; then back to Fire.
 tap desc "Map layers"
-tap_scrolling text "Snow"
+tap_scrolling text "Fog"
 back
-shot 02e-map-white 4
+shot 02e-map-fog 4
+read -r ex ey <<< "$(centre_of explored)"
+[ -n "${ex:-}" ] || note "MISSING the explored share"
 tap desc "Map layers"
 tap_scrolling text "Fire"
 back

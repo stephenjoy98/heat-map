@@ -14,7 +14,8 @@ enum class MapTheme { SYSTEM, DARK, LIGHT }
 enum class MapLayerType { DEFAULT, TERRAIN }
 
 /** The heatmap's colours: Fire (dark red to white) or Ice (darkest blue to white). */
-enum class HeatPalette { FIRE, ICE, WHITE }
+/** How your own routes show on the map: Fire or Ice heat, or Fog (a fog of war lifted where you've been). */
+enum class HeatPalette { FIRE, ICE, FOG }
 
 /** Where Review insights are written. */
 enum class AiEngine { ON_DEVICE, CLOUD, STATS }
@@ -275,7 +276,9 @@ object Prefs {
         _mapColourDark.value = sp.getFloat("map_colour_dark", 0f)
         _mapColourLight.value = sp.getFloat("map_colour_light", 0f)
         _mapColourRoads.value = sp.getBoolean("map_colour_roads", false)
-        _heatPalette.value = HeatPalette.entries.byName(sp.getString("heat_palette", null)) ?: HeatPalette.FIRE
+        // Snow (WHITE) was replaced by Fog in 2.70.0: whoever had Snow gets Fog.
+        _heatPalette.value = sp.getString("heat_palette", null).let { if (it == "WHITE") HeatPalette.FOG else HeatPalette.entries.byName(it) }
+            ?: HeatPalette.FIRE
         // Updates aren't downloaded on their own any more: the app offers them and you choose (asked 2026-10-21).
         // Turn automatic updates off once for everyone who had them on by default.
         if (!sp.getBoolean("auto_update_off_v1", false)) {
