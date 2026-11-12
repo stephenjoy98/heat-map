@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.70.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.70.1**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -146,7 +146,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   from AWS Terrarium DEM declared at tileSize 128 for sharpness, 3D buildings fill-extrusion, 3D route
   layers, `applyColours(style, dark, vivid)` (2.35.0: blends muted→vivid `Palette`s per theme; light is left
   untouched at 0; Prefs `mapColourDark/Light`; roads only with Prefs `map_colour_roads`, else muted; 2.46.2 darker dark-map roads at the user's request: muted minor #1F1F1F / major #2B2B2B, vivid #30363E / #5C6570), `setTint` (2.34.0 world-polygon tint for Prefs `mapBrightnessDark/Light`; the slider was removed in 2.40.0 at the
-  user's request (sheet too cluttered) and AppMap now clears the tint; Map colours is a collapsible row in `MapLayersSheet`); `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix,
+  user's request (sheet too cluttered) and AppMap now clears the tint; Map colours is a collapsible row in `MapLayersSheet`); `TileLayerRenderer`/`TileOverlayView`: heat tiles drawn over MapLibre with a 4-point matrix (2.70.1, user saw lag/reloads on zoom: missing tiles drawn from a cached coarser tile ≤4 levels up (cropped `drawPart`) or the 4 finer ones, else `TileBitmapSource.placeholderColor` (FogTiles = fog); LIFO ThreadPoolExecutor (3 threads, `LinkedBlockingDeque` offerFirst) that skips tiles no longer in `wanted`; cache = maxMemory/5 within 48–192 MB; AppMap refreshes tiles for new dots at most every `MIN_TILE_REFRESH_MS` 15 s),
   blue location dot that glides linearly between positions over the time between them (2.37.1; MapScreen feeds
   the newer of the last recorded dot and the live fix ≤50 m; `heading` arrow from the live fix's bearing when >1 m/s)),
   heat rendering (`HeatRenderer.PASS_ALPHA` 0.085 = where one pass sits on the ramp; since 2.69.0 the buffer is drawn with `DRAW_PASS` 3/255 per pass (8-bit blending stalls ≈ `DRAW_FULL` 0.80 ≈ 140 passes) and `colorize` maps through `toRamp` (linear to one pass, then log) — grid uses `fromRamp`; stays add heat by time: `TrackSource.forEachStay` (OwnTracks → `PointStore.forEachStayDot`: trip_id ≤ 0 dots, hours = interval_ms capped 1 h) → `drawStays` pools hours per ~3-stroke cell, radial glow at ramp position ln(1+h)/ln(1+`FULL_HOURS` 400), skipped under 15 min; `HeatRamps.own/friend(palette, dark)`,

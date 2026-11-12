@@ -12,6 +12,16 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.70.1] - 2026-11-12
+
+### Fixed
+- **Smoother zooming**: while the map draws the heatmap (or fog) for a new zoom level, the last one stays on screen
+  scaled to fit instead of leaving empty squares, and the squares you're looking at are drawn first instead of
+  waiting behind ones for the zoom levels you passed through. More of them are kept, so zooming back finds them
+  ready.
+- **Less lag while recording**: new dots redraw the heatmap at most every 15 seconds (it was after every dot, every
+  second with follow me), which also keeps the phone cooler.
+
 ## [2.70.0] - 2026-11-12
 
 ### Added

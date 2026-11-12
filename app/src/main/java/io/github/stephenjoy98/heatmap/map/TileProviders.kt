@@ -15,6 +15,9 @@ fun heatTilePx(density: Float): Int = (256 * density).toInt().coerceIn(256, 1024
 /** Renders one Web Mercator tile (x, y at zoom), or null if it's empty. Called on background threads. */
 fun interface TileBitmapSource {
     fun render(x: Int, y: Int, zoom: Int): Bitmap?
+
+    /** Drawn over a tile while it's still being rendered and nothing cached can stand in (Fog: the fog itself). */
+    val placeholderColor: Int? get() = null
 }
 
 /**
@@ -27,6 +30,9 @@ class FogTiles(
     private val fogColor: Int,
     private val sizePx: Int = TILE_PX,
 ) : TileBitmapSource {
+    // Unexplored ground stays covered while its tile is drawn.
+    override val placeholderColor: Int get() = fogColor
+
     override fun render(x: Int, y: Int, zoom: Int): Bitmap? = runCatching {
         val box = TileMath.box(x, y, zoom)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)

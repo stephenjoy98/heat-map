@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
@@ -648,8 +649,14 @@ private fun VectorAppMap(
         overlay.altitudeLabel = altitude?.let { Units.length(it) }
     }
 
+    // New dots redraw the heat tiles, but at most every MIN_TILE_REFRESH_MS: with follow me a dot comes every
+    // second, and redrawing every tile that often made the map lag and the phone warm.
+    var lastTileRefresh by remember { mutableLongStateOf(0L) }
     LaunchedEffect(refreshKey) {
         delay(1500)
+        val wait = MIN_TILE_REFRESH_MS - (System.currentTimeMillis() - lastTileRefresh)
+        if (wait > 0) delay(wait)
+        lastTileRefresh = System.currentTimeMillis()
         overlay.refresh()
     }
 
@@ -921,3 +928,6 @@ private const val REBUILD_FOR_DOTS_MS = 30_000L
 
 /** How strongly the flat heatmap shows under raised 3D routes. */
 private const val HEAT_UNDER_3D = 0.35f
+
+/** New dots refresh the heat tiles at most this often. */
+private const val MIN_TILE_REFRESH_MS = 15_000L

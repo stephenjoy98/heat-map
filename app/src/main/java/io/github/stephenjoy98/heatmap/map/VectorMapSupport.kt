@@ -343,11 +343,22 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
         }
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply { this.alpha = (alpha * 255).toInt() }
-    private val cache = object : LruCache<Long, Entry>(64 * 1024 * 1024) {
+    private val fill = Paint()
+    // Room for a few screens of tiles at every zoom you pass through (high-density tiles are ~3 MB each), so
+    // zooming out and back in finds them still here.
+    private val cache = object : LruCache<Long, Entry>(CACHE_BYTES) {
         override fun sizeOf(key: Long, value: Entry) = value.bitmap?.byteCount ?: 64
     }
     private val pending = HashSet<Long>()
-    private val executor: ExecutorService = Executors.newFixedThreadPool(2)
+    // Newest requests first, and tiles no longer on screen are skipped, so after a zoom the tiles you're looking
+    // at don't wait behind ones for the zoom levels you passed through.
+    private val executor: ExecutorService = java.util.concurrent.ThreadPoolExecutor(
+        THREADS, THREADS, 30, java.util.concurrent.TimeUnit.SECONDS,
+        object : java.util.concurrent.LinkedBlockingDeque<Runnable>() {
+            override fun offer(e: Runnable): Boolean = offerFirst(e)
+        },
+    )
+    @Volatile private var wanted: Set<Long> = emptySet()
     private val main = Handler(Looper.getMainLooper())
     private var generation = 0
     private val corners = FloatArray(8)
@@ -365,7 +376,8 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
 
     /**
      * Draws the tiles at [maxZoom] (or coarser, when that would take too many) covering the given bounds. [place] writes a tile's four corners in screen
-     * pixels (top-left, top-right, bottom-right, bottom-left) so tiles follow a rotated map.
+     * pixels (top-left, top-right, bottom-right, bottom-left) so tiles follow a rotated map. A tile still being
+     * drawn is stood in for by a bigger cached one scaled up (or its four smaller ones), so zooming never leaves holes.
      */
     fun draw(
         canvas: Canvas,
@@ -390,27 +402,97 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
             zoom--
         }
 
+        val onScreen = HashSet<Long>()
+        for (x in x0..x1) for (y in y0..y1) onScreen += key(zoom, x, y)
+        wanted = onScreen
+        val placeholder = source.placeholderColor
         for (x in x0..x1) for (y in y0..y1) {
-            val key = (zoom.toLong() shl 48) or (x.toLong() shl 24) or y.toLong()
+            val key = key(zoom, x, y)
             val entry = cache.get(key)
             if ((entry == null || entry.generation != generation) && key !in pending) request(key, x, y, zoom)
-            val bitmap = entry?.bitmap ?: continue
-            if (bitmap.isRecycled) continue
-            val box = TileMath.box(x, y, zoom)
-            place(box.north, box.west, box.south, box.east, corners)
-            val w = bitmap.width.toFloat()
-            val h = bitmap.height.toFloat()
-            src[2] = w; src[4] = w; src[5] = h; src[7] = h
-            matrix.setPolyToPoly(src, 0, corners, 0, 4)
-            canvas.drawBitmap(bitmap, matrix, paint)
+            if (entry != null) {
+                val bitmap = entry.bitmap ?: continue
+                if (!bitmap.isRecycled) {
+                    drawPart(canvas, bitmap, zoom, x, y, 0f, 0f, 1f, place)
+                    continue
+                }
+            }
+            if (drawStandIn(canvas, zoom, x, y, place)) continue
+            if (placeholder != null) {
+                val box = TileMath.box(x, y, zoom)
+                place(box.north, box.west, box.south, box.east, corners)
+                fill.color = placeholder
+                fill.alpha = (android.graphics.Color.alpha(placeholder) * paint.alpha / 255)
+                val path = android.graphics.Path().apply {
+                    moveTo(corners[0], corners[1]); lineTo(corners[2], corners[3]); lineTo(corners[4], corners[5]); lineTo(corners[6], corners[7]); close()
+                }
+                canvas.drawPath(path, fill)
+            }
         }
     }
+
+    /** A cached tile from a coarser zoom covering (x, y), scaled up, or else its four finer tiles. */
+    private fun drawStandIn(
+        canvas: Canvas, zoom: Int, x: Int, y: Int,
+        place: (Double, Double, Double, Double, FloatArray) -> Unit,
+    ): Boolean {
+        for (up in 1..MAX_STAND_IN_LEVELS) {
+            if (zoom - up < 0) break
+            val parent = cache.get(key(zoom - up, x shr up, y shr up))?.bitmap ?: continue
+            if (parent.isRecycled) continue
+            val part = 1f / (1 shl up)
+            drawPart(canvas, parent, zoom, x, y, (x and ((1 shl up) - 1)) * part, (y and ((1 shl up) - 1)) * part, part, place)
+            return true
+        }
+        var any = false
+        for (dx in 0..1) for (dy in 0..1) {
+            val child = cache.get(key(zoom + 1, x * 2 + dx, y * 2 + dy))?.bitmap ?: continue
+            if (child.isRecycled) continue
+            drawPart(canvas, child, zoom + 1, x * 2 + dx, y * 2 + dy, 0f, 0f, 1f, place)
+            any = true
+        }
+        return any
+    }
+
+    /** Draws the part of [bitmap] starting at ([fx], [fy]) and [size] across (fractions of it) onto tile (x, y). */
+    private fun drawPart(
+        canvas: Canvas, bitmap: Bitmap, zoom: Int, x: Int, y: Int, fx: Float, fy: Float, size: Float,
+        place: (Double, Double, Double, Double, FloatArray) -> Unit,
+    ) {
+        val box = TileMath.box(x, y, zoom)
+        place(box.north, box.west, box.south, box.east, corners)
+        val w = bitmap.width.toFloat()
+        val h = bitmap.height.toFloat()
+        val l = fx * w
+        val t = fy * h
+        val r = (fx + size) * w
+        val b = (fy + size) * h
+        src[0] = l; src[1] = t; src[2] = r; src[3] = t; src[4] = r; src[5] = b; src[6] = l; src[7] = b
+        matrix.setPolyToPoly(src, 0, corners, 0, 4)
+        canvas.save()
+        if (size < 1f) {
+            // Only the part that belongs to this tile.
+            canvas.concat(matrix)
+            canvas.clipRect(l, t, r, b)
+            canvas.drawBitmap(bitmap, 0f, 0f, paint)
+        } else {
+            canvas.drawBitmap(bitmap, matrix, paint)
+        }
+        canvas.restore()
+    }
+
+    private fun key(zoom: Int, x: Int, y: Int) = (zoom.toLong() shl 48) or (x.toLong() shl 24) or y.toLong()
 
     private fun request(key: Long, x: Int, y: Int, zoom: Int) {
         pending += key
         val gen = generation
         val src = source
         executor.execute {
+            // Scrolled or zoomed away before its turn: skip it (it's asked for again if it comes back).
+            if (key !in wanted) {
+                main.post { if (gen == generation) pending -= key }
+                return@execute
+            }
             val bitmap = runCatching { src.render(x, y, zoom) }.getOrNull()
             main.post {
                 if (gen != generation) return@post
@@ -424,6 +506,12 @@ class TileLayerRenderer(source: TileBitmapSource, alpha: Float, private val onTi
     fun release() {
         executor.shutdownNow()
         cache.evictAll()
+    }
+
+    private companion object {
+        const val THREADS = 3
+        const val MAX_STAND_IN_LEVELS = 4
+        val CACHE_BYTES = (Runtime.getRuntime().maxMemory() / 5).coerceIn(48L shl 20, 192L shl 20).toInt()
     }
 
     private fun tileX(lon: Double, n: Int) = floor((lon + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
