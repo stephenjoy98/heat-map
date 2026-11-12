@@ -100,6 +100,7 @@ import io.github.stephenjoy98.heatmap.R
 import io.github.stephenjoy98.heatmap.data.DisplayMode
 import io.github.stephenjoy98.heatmap.tracking.FollowMode
 import io.github.stephenjoy98.heatmap.data.GeoBox
+import io.github.stephenjoy98.heatmap.data.HeatPalette
 import io.github.stephenjoy98.heatmap.data.PointStore
 import io.github.stephenjoy98.heatmap.data.Prefs
 import io.github.stephenjoy98.heatmap.data.Stats
@@ -107,6 +108,7 @@ import io.github.stephenjoy98.heatmap.data.TravelMode
 import io.github.stephenjoy98.heatmap.map.Route3dTracks
 import io.github.stephenjoy98.heatmap.map.HeatRamps
 import io.github.stephenjoy98.heatmap.map.HeatTiles
+import io.github.stephenjoy98.heatmap.map.FogTiles
 import io.github.stephenjoy98.heatmap.map.heatTilePx
 import io.github.stephenjoy98.heatmap.map.OwnTracks
 import io.github.stephenjoy98.heatmap.tracking.ActivityTracker
@@ -223,8 +225,35 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
     val palette by Prefs.heatPalette.collectAsStateWithLifecycle()
     // None (layers sheet): no routes or dots of yours, flat or 3D.
     val layers = remember(filter, mode, dark, smoothRoutes, snapToRoads, palette) {
-        if (mode == DisplayMode.NONE) emptyList()
-        else listOf(MapLayer("heat-$palette", HeatTiles(OwnTracks(store, filter), HeatRamps.own(palette, dark), mode, tilePx)))
+        when {
+            mode == DisplayMode.NONE -> emptyList()
+            // Fog of war: the map hidden except where you've been; no route lines.
+            palette == HeatPalette.FOG -> listOf(MapLayer("fog-$dark", FogTiles(store, filter, if (dark) FOG_DARK else FOG_LIGHT, tilePx)))
+            else -> listOf(MapLayer("heat-$palette", HeatTiles(OwnTracks(store, filter), HeatRamps.own(palette, dark), mode, tilePx)))
+        }
+    }
+    // With Fog: how much of the area in view you've been to, worked out each time the map settles.
+    var explored by remember { mutableStateOf<String?>(null) }
+    val viewSize = with(LocalDensity.current) {
+        androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp.dp.toPx() to it.screenHeightDp.dp.toPx() }
+    }
+    LaunchedEffect(palette, filter, camera.cameraTick, stats?.total) {
+        if (palette != HeatPalette.FOG) {
+            explored = null
+            return@LaunchedEffect
+        }
+        delay(400)
+        val a = camera.toLatLng(androidx.compose.ui.geometry.Offset(0f, 0f)) ?: return@LaunchedEffect
+        val b = camera.toLatLng(androidx.compose.ui.geometry.Offset(viewSize.first, viewSize.second)) ?: return@LaunchedEffect
+        val box = GeoBox(maxOf(a.first, b.first), minOf(a.first, b.first), maxOf(a.second, b.second), minOf(a.second, b.second))
+        val share = withContext(Dispatchers.IO) { runCatching { store.exploredShare(box, filter) }.getOrNull() } ?: return@LaunchedEffect
+        val pct = share * 100
+        explored = when {
+            pct <= 0.0 -> "0%"
+            pct < 1 -> "<1%"
+            pct < 10 -> "%.1f%%".format(pct)
+            else -> "${pct.toInt()}%"
+        }
     }
 
     if (altitudeCheck) AltitudeCheckSheet(liveFix, onClose = { altitudeCheck = false })
@@ -355,7 +384,7 @@ fun MapScreen(contentPadding: PaddingValues, snackbar: SnackbarHostState, resume
                     onClick = { filtersOpen = !filtersOpen },
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
-                StatsBar(stats, Modifier.align(Alignment.Center))
+                StatsBar(stats, explored, Modifier.align(Alignment.Center))
                 ProfileButton(
                     onClick = onOpenProfile,
                     background = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
@@ -648,7 +677,7 @@ private fun ModeFilterRow(filter: Set<TravelMode>) {
 }
 
 @Composable
-private fun StatsBar(stats: Stats?, modifier: Modifier = Modifier) {
+private fun StatsBar(stats: Stats?, explored: String?, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
@@ -662,6 +691,7 @@ private fun StatsBar(stats: Stats?, modifier: Modifier = Modifier) {
         ) {
             StatItem(stats?.let { formatCount(it.total) } ?: "–", "points")
             StatItem(stats?.let { formatCount(it.today) } ?: "–", "today")
+            explored?.let { StatItem(it, "explored") }
         }
     }
 }
@@ -783,3 +813,7 @@ private const val ORBIT_STEP_MS = 1_000L
 
 /** How long without moving before the 3D route catches up with the dots recorded while following you. */
 private const val STILL_FOR_3D_MS = 60_000L
+
+/** Fog of war: light grey over the dark map (not too light, so the cleared map stands out), mid grey over the light one. */
+private const val FOG_DARK = 0xEB767980.toInt()
+private const val FOG_LIGHT = 0xE0808389.toInt()

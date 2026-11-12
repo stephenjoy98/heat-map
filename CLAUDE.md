@@ -71,7 +71,7 @@ travel stats, Insights (AI write-ups), backup and friends.
 
 ## Versioning and releases (SemVer)
 
-- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.69.0**).
+- Version lives only in `gradle.properties` → `appVersion=MAJOR.MINOR.PATCH` (currently **2.70.0**).
   versionCode = MAJOR*10000 + MINOR*100 + PATCH (minor/patch < 100). Build fails if CHANGELOG.md has no
   `## [x.y.z]` entry for it.
 - Rules agreed with the user: MAJOR = breaks existing data/backups/sharing; MINOR = new features (also
@@ -150,7 +150,7 @@ travel stats, Insights (AI write-ups), backup and friends.
   blue location dot that glides linearly between positions over the time between them (2.37.1; MapScreen feeds
   the newer of the last recorded dot and the live fix ≤50 m; `heading` arrow from the live fix's bearing when >1 m/s)),
   heat rendering (`HeatRenderer.PASS_ALPHA` 0.085 = where one pass sits on the ramp; since 2.69.0 the buffer is drawn with `DRAW_PASS` 3/255 per pass (8-bit blending stalls ≈ `DRAW_FULL` 0.80 ≈ 140 passes) and `colorize` maps through `toRamp` (linear to one pass, then log) — grid uses `fromRamp`; stays add heat by time: `TrackSource.forEachStay` (OwnTracks → `PointStore.forEachStayDot`: trip_id ≤ 0 dots, hours = interval_ms capped 1 h) → `drawStays` pools hours per ~3-stroke cell, radial glow at ramp position ln(1+h)/ln(1+`FULL_HOURS` 400), skipped under 15 min; `HeatRamps.own/friend(palette, dark)`,
-  Prefs `heat_palette` FIRE/ICE/WHITE (2.48.0: WHITE, labelled **Snow** since 2.48.1 = `HeatRamps.plain(line, glow)`: opaque line from PASS_ALPHA up, icy glow at ≤50% for the glow pass (t ≤ 0.025), no heat; friends then use Fire) chosen in the layers sheet; friends get the other palette), smoothing, tile sources.
+  Prefs `heat_palette` FIRE/ICE/FOG (2.70.0, on branch `fog`, the user's request + approved mockup: **Fog** replaced Snow/WHITE — stored "WHITE" reads as FOG; MapScreen swaps the heat layer for `FogTiles` (map/TileProviders.kt: tile filled with `FOG_DARK` 0xEB767980 / `FOG_LIGHT` 0xE0808389, cleared with DST_OUT radial gradients `REVEAL_M` 45 m (≥3 px) around `gridIn` cells, no lines); StatsBar adds "x% explored" from `PointStore.exploredShare(box, modes)` (60 m squares with a dot / squares in view, view box from `MapCamera.toLatLng` of the screen corners, after the camera settles); `HeatRamps.own(FOG)` = Fire for Compare/friend screens, friends get their usual other palette; plainWhite/plainDark ramps now unused) chosen in the layers sheet; friends get the other palette), smoothing, tile sources.
 - `ui/`: `MainActivity` (AppScaffold: tabs **Map** and **Timeline**; `PageHost` page stack for Profile,
   Friends, Backup, Settings, About, Changelog, **Insights** (file still `ReviewScreen.kt`, enum `Page.REVIEW`),
   Compare; back = pop page → Map tab → exit confirm), `Navigation.kt` (PageStack, predictive back,

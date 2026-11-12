@@ -12,6 +12,16 @@ The app shows the entries since your last version as "What's new" after an updat
 
 ## [Unreleased]
 
+## [2.70.0] - 2026-11-12
+
+### Added
+- **Fog of war** in the layers sheet, instead of Snow: the map is covered in grey fog except where your dots have been,
+  which clears with soft edges and shows the map underneath (no route lines). The top bar adds how much of the area
+  in view you've explored. If you had Snow, you now have Fog.
+
+### Removed
+- **Snow** (plain white routes), replaced by Fog.
+
 ## [2.69.0] - 2026-11-11
 
 ### Changed

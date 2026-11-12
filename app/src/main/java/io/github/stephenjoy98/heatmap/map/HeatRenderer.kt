@@ -305,7 +305,8 @@ object HeatRamps {
     fun own(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {
         HeatPalette.FIRE -> if (dark) darkHeat else lightHeat
         HeatPalette.ICE -> if (dark) darkIce else lightIce
-        HeatPalette.WHITE -> if (dark) plainWhite else plainDark
+        // Fog draws no lines (FogTiles); elsewhere (comparing with a friend) your routes show in Fire.
+        HeatPalette.FOG -> if (dark) darkHeat else lightHeat
     }
 
     /**
@@ -342,7 +343,7 @@ object HeatRamps {
     fun friend(palette: HeatPalette, dark: Boolean): IntArray = when (palette) {
         HeatPalette.FIRE -> if (dark) darkFriend else lightFriend
         HeatPalette.ICE -> if (dark) darkHeat else lightHeat
-        HeatPalette.WHITE -> if (dark) darkHeat else lightHeat
+        HeatPalette.FOG -> if (dark) darkFriend else lightFriend
     }
 
     /** Light orange to deep crimson, which reads well on the white map. */
